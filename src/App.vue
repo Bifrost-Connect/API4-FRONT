@@ -19,7 +19,6 @@ import Navbar from './components/AppNavbar.vue'
 <style scoped>
 .app-layout {
   padding: 3rem;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
