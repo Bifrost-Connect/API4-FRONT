@@ -34,10 +34,10 @@
   --color-brand: var(--vis-brand-orange);
   --color-brand-hover: var(--vis-brand-orange-hover);
 
-  --color-background: var(--vis-c-light);
-  --color-background-soft: var(--vis-c-light-soft);
-  --color-background-mute: var(--vis-c-light-mute);
-
+  --color-background: var(--vis-c-light-mute); /* Grey background for the app #f1f3f5 */
+  --color-surface: var(--vis-c-light); /* White background for cards #ffffff */
+  --color-surface-soft: var(--vis-c-light-soft); /* Slightly off-white for internal card elements #f8f9fa */
+  
   --color-border: var(--vis-c-divider-light-2);
   --color-border-hover: var(--vis-c-divider-light-1);
 
@@ -67,8 +67,8 @@
   --color-brand-hover: var(--vis-brand-orange);
 
   --color-background: var(--vis-c-dark);
-  --color-background-soft: var(--vis-c-dark-soft);
-  --color-background-mute: var(--vis-c-dark-mute);
+  --color-surface: var(--vis-c-dark-soft);
+  --color-surface-soft: var(--vis-c-dark-mute);
 
   --color-border: var(--vis-c-divider-dark-2);
   --color-border-hover: var(--vis-c-divider-dark-1);
