@@ -15,7 +15,10 @@
   letter-spacing: 1px;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: color 0.4s ease-in-out, border-color 0.4s ease-in-out, opacity 0.2s ease;
+  transition:
+    color 0.4s ease-in-out,
+    border-color 0.4s ease-in-out,
+    opacity 0.2s ease;
   border: 2px solid var(--color-brand);
   background: transparent;
   color: var(--color-brand);
@@ -25,7 +28,7 @@
 
 /* O fundo desliza da esquerda para a direita */
 .btn::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: 0;
@@ -39,7 +42,9 @@
 }
 
 .btn:focus {
-  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-brand);
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px var(--color-brand);
 }
 
 .btn:disabled {
@@ -62,14 +67,18 @@
   border-color: var(--color-brand);
   color: var(--color-brand);
 }
-.btn_primary::before { background: var(--color-brand); }
+.btn_primary::before {
+  background: var(--color-brand);
+}
 
 /* Variação Success */
 .btn_success {
   border-color: var(--vis-c-success);
   color: var(--vis-c-success);
 }
-.btn_success::before { background: var(--vis-c-success); }
+.btn_success::before {
+  background: var(--vis-c-success);
+}
 .btn_success:hover:not(:disabled) {
   border-color: var(--vis-c-success);
   box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
@@ -80,7 +89,9 @@
   border-color: var(--vis-c-danger);
   color: var(--vis-c-danger);
 }
-.btn_recuse::before { background: var(--vis-c-danger); }
+.btn_recuse::before {
+  background: var(--vis-c-danger);
+}
 .btn_recuse:hover:not(:disabled) {
   border-color: var(--vis-c-danger);
   box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
@@ -91,7 +102,9 @@
   border-color: var(--color-border);
   color: var(--color-text);
 }
-.btn_outline::before { background: var(--color-brand); }
+.btn_outline::before {
+  background: var(--color-brand);
+}
 .btn_outline:hover:not(:disabled) {
   border-color: var(--color-brand);
   color: #ffffff;

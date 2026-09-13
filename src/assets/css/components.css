@@ -9,11 +9,26 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-.badge_success { background-color: rgba(16, 185, 129, 0.15); color: var(--vis-c-success); }
-.badge_danger { background-color: rgba(239, 68, 68, 0.15); color: var(--vis-c-danger); }
-.badge_warning { background-color: rgba(245, 158, 11, 0.15); color: var(--vis-c-warning); }
-.badge_info { background-color: rgba(59, 130, 246, 0.15); color: var(--vis-c-info); }
-.badge_primary { background-color: rgba(242, 101, 34, 0.15); color: var(--color-brand); }
+.badge_success {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--vis-c-success);
+}
+.badge_danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--vis-c-danger);
+}
+.badge_warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--vis-c-warning);
+}
+.badge_info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--vis-c-info);
+}
+.badge_primary {
+  background-color: rgba(242, 101, 34, 0.15);
+  color: var(--color-brand);
+}
 
 /* Spinner */
 .spinner {
@@ -26,7 +41,9 @@
   animation: spin 1s ease-in-out infinite;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Card */

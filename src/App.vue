@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import Sidebar from './components/Sidebar.vue'
-import Navbar from './components/Navbar.vue'
-import ThemeButtom from './components/Theme_Buttom.vue'
+import Sidebar from './components/AppSidebar.vue'
+import Navbar from './components/AppNavbar.vue'
 </script>
 
 <template>
@@ -11,7 +10,6 @@ import ThemeButtom from './components/Theme_Buttom.vue'
     <div class="main-wrapper">
       <header>
         <Navbar />
-        <ThemeButtom />
       </header>
       <RouterView />
     </div>
@@ -20,8 +18,8 @@ import ThemeButtom from './components/Theme_Buttom.vue'
 
 <style scoped>
 .app-layout {
-  display: flex;
-  min-height: 100vh;
+  padding: 3rem;
+  margin: 0 auto;
 }
 
 .main-wrapper {

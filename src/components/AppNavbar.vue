@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// Componente Navbar em branco para ser configurado futuramente
+import ThemeButton from './ThemeButton.vue'
 </script>
 
 <template>
   <nav class="navbar">
-    <!-- Conteúdo da Navbar -->
+    <ThemeButton />
   </nav>
 </template>
 
