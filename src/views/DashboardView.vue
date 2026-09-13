@@ -13,14 +13,15 @@ const filterOptions = ref<{ conjuntos: any[]; etapas: any[]; situacoes: any[] }>
   etapas: [],
   situacoes: [],
 })
-const isLoading = ref(true)
+const isInitialLoading = ref(true)
+const isTableLoading = ref(false)
 
 const filters = ref({
   dateBeggin: '',
   dateEnd: '',
   conjunto: '',
   etapa: '',
-  situacao: ''
+  situacao: '',
 })
 
 const tableColumns: Column[] = [
@@ -33,23 +34,34 @@ const tableColumns: Column[] = [
 ]
 
 const loadData = async (currentFilters?: any) => {
-  isLoading.value = true
+  if (!isInitialLoading.value) {
+    isTableLoading.value = true
+  }
   try {
-    const data = await dashboardService.getDashboardData(currentFilters)
-    summaryData.value = data.summary
-    recentProcesses.value = data.recentProcesses
+    const processes = await dashboardService.getDashboardProcesses(currentFilters)
+    recentProcesses.value = processes
   } catch (error) {
-    console.error('Failed to fetch dashboard data', error)
+    console.error('Failed to fetch dashboard processes', error)
   } finally {
-    isLoading.value = false
+    isInitialLoading.value = false
+    isTableLoading.value = false
+  }
+}
+
+const loadSummary = async () => {
+  try {
+    const summary = await dashboardService.getDashboardSummary()
+    summaryData.value = summary
+  } catch (error) {
+    console.error('Failed to fetch dashboard summary', error)
   }
 }
 
 onMounted(async () => {
-  dashboardService.getFilterOptions().then(options => {
+  dashboardService.getFilterOptions().then((options) => {
     filterOptions.value = options
   })
-  await loadData()
+  await Promise.all([loadSummary(), loadData()])
 })
 
 const applyFilters = async () => {
@@ -74,7 +86,7 @@ const getBadgeClass = (status: string) => {
 
 <template>
   <main class="dashboard">
-    <div v-if="isLoading" class="loading-state">
+    <div v-if="isInitialLoading" class="loading-state">
       <div class="spinner"></div>
       <p>Carregando dados do dashboard...</p>
     </div>
@@ -95,12 +107,24 @@ const getBadgeClass = (status: string) => {
         <div class="card-content filters-container">
           <div class="filter-item">
             <label for="dateBeggin">Início:</label>
-            <input type="date" id="dateBeggin" name="date" class="input-inline" v-model="filters.dateBeggin" />
+            <input
+              type="date"
+              id="dateBeggin"
+              name="date"
+              class="input-inline"
+              v-model="filters.dateBeggin"
+            />
           </div>
 
           <div class="filter-item">
             <label for="dateEnd">Fim:</label>
-            <input type="date" id="dateEnd" name="date" class="input-inline" v-model="filters.dateEnd" />
+            <input
+              type="date"
+              id="dateEnd"
+              name="date"
+              class="input-inline"
+              v-model="filters.dateEnd"
+            />
           </div>
 
           <div class="filter-item">
@@ -140,7 +164,11 @@ const getBadgeClass = (status: string) => {
       </div>
 
       <div class="mt-4">
-        <DataTable :columns="tableColumns" :data="recentProcesses" rowKey="id">
+        <div v-if="isTableLoading" class="loading-state" style="padding: 2rem">
+          <div class="spinner"></div>
+          <p>Atualizando tabela...</p>
+        </div>
+        <DataTable v-else :columns="tableColumns" :data="recentProcesses" rowKey="id">
           <template #cell-status="{ value }">
             <span :class="getBadgeClass(value)">{{ value }}</span>
           </template>
@@ -359,7 +387,7 @@ const getBadgeClass = (status: string) => {
 
 .alert-warning {
   background-color: rgba(234, 179, 8, 0.15);
-  color: var(--color-text); /* Fallback to standard text color for readability */
+  color: var(--color-text);
   padding: 0.75rem;
   border-radius: 4px;
   display: flex;
@@ -368,7 +396,7 @@ const getBadgeClass = (status: string) => {
 }
 
 .alert-warning strong {
-  color: #b45309; /* Ensure any strong text inside stands out slightly */
+  color: #b45309;
 }
 
 :root[data-theme='dark'] .alert-warning strong {

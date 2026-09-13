@@ -21,11 +21,6 @@ export interface ProcessLog {
   pauseReason?: string;
 }
 
-export interface DashboardData {
-  summary: DashboardSummary[];
-  recentProcesses: ProcessLog[];
-}
-
 export interface DashboardFilters {
   dateBeggin?: string;
   dateEnd?: string;
@@ -37,9 +32,17 @@ export interface DashboardFilters {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const dashboardService = {
-  async getDashboardData(filters?: DashboardFilters): Promise<DashboardData> {
+  async getDashboardSummary(): Promise<DashboardSummary[]> {
     // Para chamar a API descomente a linha abaixo e remova/comente o mock:
-    // return (await api.get('/dashboard', { params: filters })).data;
+    // return (await api.get('/dashboard/summary')).data;
+    
+    await delay(400);
+    return mockDashboardData.summary;
+  },
+
+  async getDashboardProcesses(filters?: DashboardFilters): Promise<ProcessLog[]> {
+    // Para chamar a API descomente a linha abaixo e remova/comente o mock:
+    // return (await api.get('/dashboard/processes', { params: filters })).data;
     
     await delay(800);
     
@@ -62,10 +65,7 @@ export const dashboardService = {
       }
     }
 
-    return {
-      summary: mockDashboardData.summary,
-      recentProcesses: filteredProcesses
-    };
+    return filteredProcesses;
   },
   
   async getFilterOptions() {
