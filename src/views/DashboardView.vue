@@ -210,7 +210,7 @@ const getBadgeClass = (status: string) => {
       </div>
 
       <div class="bottom-action mt-5 text-center">
-        <button class="btn btn-upload">+ NOVA CARGA DE DADOS (Upload)</button>
+        <router-link to="/upload" class="btn btn-upload">+ NOVA CARGA DE DADOS (Upload)</router-link>
       </div>
     </template>
   </main>
