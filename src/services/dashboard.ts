@@ -1,5 +1,5 @@
 import api from './api';
-import { mockDashboardData, mockFilterOptions } from './dashboard.mock';
+import { mockDashboardData, mockFilterOptions } from './mocks/dashboard.mock';
 
 export interface DashboardSummary {
   title: string;
