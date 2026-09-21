@@ -4,28 +4,43 @@ import { FiCheck } from 'vue-icons-plus/fi'
 
 const props = defineProps<{
   currentStep: number
+  progressStep?: number
   steps: string[]
 }>()
 
+const emit = defineEmits<{
+  (e: 'step-click', index: number): void
+}>()
+
+const actualProgressStep = computed(() => props.progressStep ?? props.currentStep)
+
 const progressPercentage = computed(() => {
   if (props.steps.length <= 1) return '0%'
-  return `${((props.currentStep - 1) / (props.steps.length - 1)) * 100}%`
+  return `${((actualProgressStep.value - 1) / (props.steps.length - 1)) * 100}%`
 })
+
+const onStepClick = (index: number) => {
+  if (index + 1 <= actualProgressStep.value) {
+    emit('step-click', index + 1)
+  }
+}
 </script>
 
 <template>
-  <div class="stepper">
+  <div class="stepper" :style="{ '--step-count': steps.length }">
     <div
       v-for="(step, index) in steps"
       :key="index"
       class="step"
       :class="{
         'step--active': currentStep === index + 1,
-        'step--completed': currentStep > index + 1,
+        'step--completed': actualProgressStep > index + 1,
+        'step--clickable': index + 1 <= actualProgressStep
       }"
+      @click="onStepClick(index)"
     >
       <div class="step__indicator">
-        <FiCheck v-if="currentStep > index + 1" size="16" />
+        <FiCheck v-if="actualProgressStep > index + 1" size="16" />
         <span v-else>{{ index + 1 }}</span>
       </div>
       <span class="step__label">
@@ -39,18 +54,18 @@ const progressPercentage = computed(() => {
 <style scoped>
 .stepper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 2rem;
   position: relative;
-  padding: 0 1rem;
+  padding: 0;
 }
 
 .stepper__line {
   position: absolute;
   top: 1.25rem;
-  left: 3rem;
-  right: 3rem;
+  left: calc(100% / (var(--step-count) * 2));
+  right: calc(100% / (var(--step-count) * 2));
   height: 3px;
   background-color: var(--color-border);
   transform: translateY(-50%);
@@ -77,6 +92,8 @@ const progressPercentage = computed(() => {
   gap: 0.5rem;
   z-index: 1;
   cursor: default;
+  flex: 1;
+  min-width: 0; /* Prevents flex items from overflowing their container */
 }
 
 .step__indicator {
@@ -116,6 +133,9 @@ const progressPercentage = computed(() => {
   opacity: 0.5;
   text-align: center;
   transition: opacity 0.3s ease;
+  white-space: normal;
+  word-wrap: break-word;
+  max-width: 100%;
 }
 
 .step--active .step__label {
@@ -126,5 +146,13 @@ const progressPercentage = computed(() => {
 .step--completed .step__label {
   opacity: 0.8;
   color: var(--vis-c-success);
+}
+
+.step--clickable {
+  cursor: pointer;
+}
+
+.step--clickable:hover .step__indicator {
+  transform: scale(1.05);
 }
 </style>

@@ -1,5 +1,25 @@
-import type { DashboardData } from './dashboard';
+import type { DashboardSummary, ProcessLog } from '../dashboard';
 
+export interface DashboardData {
+  summary: DashboardSummary[];
+  recentProcesses: ProcessLog[];
+}
+/**
+ * ==========================================
+ * CONTRATO DE API ESPERADO (BACK-END)
+ * ==========================================
+ * Rota 1: GET /api/dashboard/summary
+ * Como o back-end deve responder:
+ * - Status 200 OK
+ * - Corpo da resposta: Array de objetos com { title, value, type, iconType }
+ * 
+ * Rota 2: GET /api/dashboard/processes
+ * Como o back-end deve receber a requisição:
+ * - Query Params Opcionais: ?dateBeggin=...&dateEnd=...&conjunto=...&etapa=...&situacao=...
+ * Como o back-end deve responder:
+ * - Status 200 OK
+ * - Corpo da resposta: Array de objetos representando os processos (ProcessLog), com { id, dateTime, dataset, stage, status, source, year, epsg, integrityHash, pauseReason }
+ */
 export const mockDashboardData: DashboardData = {
   summary: [
     { title: 'CARGAS HOJE', value: 12, type: 'orange', iconType: 'down' },
@@ -68,6 +88,15 @@ export const mockDashboardData: DashboardData = {
   ],
 };
 
+/**
+ * ==========================================
+ * CONTRATO DE API ESPERADO (BACK-END)
+ * ==========================================
+ * Rota 3: GET /api/filters
+ * Como o back-end deve responder:
+ * - Status 200 OK
+ * - Corpo da resposta: Objeto com listas de opções para os filtros: { conjuntos: [...], etapas: [...], situacoes: [...] }
+ */
 export const mockFilterOptions = {
   conjuntos: [
     { id: 'imoveis', label: 'Imóveis rurais' },
