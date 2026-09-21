@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import CardContainer from '../components/CardContainer.vue'
 import DataTable from '../components/DataTable.vue'
 import type { Column } from '../components/DataTable.vue'
@@ -15,6 +16,11 @@ const filterOptions = ref<{ conjuntos: any[]; etapas: any[]; situacoes: any[] }>
 })
 const isInitialLoading = ref(true)
 const isTableLoading = ref(false)
+const router = useRouter()
+
+const goToLog = (id: string) => {
+  router.push({ name: 'process-log', params: { id } })
+}
 
 const filters = ref({
   dateBeggin: '',
@@ -197,12 +203,19 @@ const getBadgeClass = (status: string) => {
                 <strong>Motivo da Pausa:</strong> {{ item.pauseReason }}
               </div>
 
-              <div
-                class="expanded-actions mt-3"
-                v-if="item.status === 'Falhou' || item.status === 'Em validação'"
-              >
-                <button class="btn btn_danger">Acionar Auditor</button>
-                <button class="btn btn_outline ml-2">Ver Log Completo</button>
+              <div class="expanded-actions mt-3">
+                <button 
+                  class="btn btn_outline" 
+                  @click="goToLog(item.id)"
+                >
+                  Ver Log Completo
+                </button>
+                <button 
+                  v-if="item.status === 'Falhou' || item.status === 'Em validação'"
+                  class="btn btn_danger ml-2"
+                >
+                  Acionar Auditor
+                </button>
               </div>
             </div>
           </template>

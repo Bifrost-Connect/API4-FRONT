@@ -21,6 +21,8 @@ export interface ProcessLog {
   pauseReason?: string;
 }
 
+
+
 export interface DashboardFilters {
   dateBeggin?: string;
   dateEnd?: string;
@@ -74,5 +76,5 @@ export const dashboardService = {
 
     await delay(400);
     return mockFilterOptions;
-  },
+  }
 };
