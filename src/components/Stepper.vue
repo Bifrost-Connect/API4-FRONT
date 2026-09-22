@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FiCheck } from 'vue-icons-plus/fi'
+import { FiCheck, FiAlertCircle } from 'vue-icons-plus/fi'
 
 const props = defineProps<{
   currentStep: number
   progressStep?: number
+  warningStep?: number
   steps: string[]
 }>()
 
@@ -16,7 +17,8 @@ const actualProgressStep = computed(() => props.progressStep ?? props.currentSte
 
 const progressPercentage = computed(() => {
   if (props.steps.length <= 1) return '0%'
-  return `${((actualProgressStep.value - 1) / (props.steps.length - 1)) * 100}%`
+  const percentage = ((actualProgressStep.value - 1) / (props.steps.length - 1)) * 100
+  return `${Math.min(percentage, 100)}%`
 })
 
 const onStepClick = (index: number) => {
@@ -35,12 +37,14 @@ const onStepClick = (index: number) => {
       :class="{
         'step--active': currentStep === index + 1,
         'step--completed': actualProgressStep > index + 1,
-        'step--clickable': index + 1 <= actualProgressStep
+        'step--clickable': index + 1 <= actualProgressStep,
+        'step--warning': warningStep === index + 1 && actualProgressStep <= index + 1
       }"
       @click="onStepClick(index)"
     >
       <div class="step__indicator">
         <FiCheck v-if="actualProgressStep > index + 1" size="16" />
+        <span v-else-if="warningStep === index + 1 && actualProgressStep <= index + 1" class="warning-icon">!</span>
         <span v-else>{{ index + 1 }}</span>
       </div>
       <span class="step__label">
@@ -93,7 +97,7 @@ const onStepClick = (index: number) => {
   z-index: 1;
   cursor: default;
   flex: 1;
-  min-width: 0; /* Prevents flex items from overflowing their container */
+  min-width: 0;
 }
 
 .step__indicator {
@@ -124,6 +128,23 @@ const onStepClick = (index: number) => {
   color: #ffffff;
 }
 
+.step--warning .step__indicator {
+  border-color: #eab308;
+  background-color: #fef08a;
+  color: #854d0e;
+  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.2);
+}
+
+.step--active.step--warning .step__indicator {
+  background-color: #eab308;
+  color: #ffffff;
+}
+
+.warning-icon {
+  font-weight: 900;
+  font-size: 1.2rem;
+}
+
 .step__label {
   font-size: 0.75rem;
   font-weight: 600;
@@ -146,6 +167,11 @@ const onStepClick = (index: number) => {
 .step--completed .step__label {
   opacity: 0.8;
   color: var(--vis-c-success);
+}
+
+.step--warning .step__label {
+  opacity: 1;
+  color: #eab308;
 }
 
 .step--clickable {
