@@ -20,16 +20,31 @@ const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Cálculo analí
 
 const progressStepIndex = computed(() => {
   if (!details.value) return 1
+  if (details.value.status === 'Concluída') return 6 // Todas concluídas
   const index = processSteps.indexOf(details.value.stage)
   return index >= 0 ? index + 1 : 1
 })
 
+const warningStepIndex = computed(() => {
+  if (!details.value) return undefined
+  if (details.value.status === 'Falhou' || details.value.status === 'Em validação') {
+    return processSteps.indexOf(details.value.stage) + 1
+  }
+  return undefined
+})
+
 const activeStepIndex = ref(1)
+
+const isQuarantineMode = ref(false)
+const selectedQuarantineStage = ref('')
 
 onMounted(async () => {
   try {
     details.value = await processService.getProcessDetails(processId)
-    activeStepIndex.value = progressStepIndex.value
+    activeStepIndex.value = progressStepIndex.value > 5 ? 5 : progressStepIndex.value
+    if (details.value) {
+      selectedQuarantineStage.value = details.value.stage
+    }
   } catch (e) {
     console.error(e)
   } finally {
@@ -39,6 +54,11 @@ onMounted(async () => {
 
 const handleStepClick = (index: number) => {
   activeStepIndex.value = index
+  isQuarantineMode.value = false
+}
+
+const openQuarantine = () => {
+  isQuarantineMode.value = true
 }
 
 const currentComponent = computed(() => {
@@ -60,6 +80,7 @@ const currentComponent = computed(() => {
       <Stepper
         :currentStep="activeStepIndex"
         :progressStep="progressStepIndex"
+        :warningStep="warningStepIndex"
         :steps="processSteps"
         @step-click="handleStepClick"
       />
@@ -72,8 +93,34 @@ const currentComponent = computed(() => {
       </div>
       
       <div v-else-if="details" class="details-container">
-        <div class="tab-content">
-          <component :is="currentComponent" :details="details" />
+        <!-- Visão de Quarentena -->
+        <div v-if="isQuarantineMode" class="quarantine-view tab-content">
+          <div class="card card-content">
+            <div class="quarantine-header">
+              <h2>Análise de Quarentena</h2>
+              <button class="btn btn_outline" @click="isQuarantineMode = false">Voltar</button>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 2rem; max-width: 300px;">
+              <label>Escolher Etapa</label>
+              <select class="input" v-model="selectedQuarantineStage">
+                <option value="Validação">Validação</option>
+                <option value="Tratamento">Tratamento</option>
+                <option value="Cálculo analítico">Cálculo analítico</option>
+                <option value="Publicação">Publicação</option>
+              </select>
+            </div>
+
+            <div class="quarantine-body">
+              <h3>Detalhes ({{ selectedQuarantineStage }})</h3>
+              <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visão Normal -->
+        <div v-else class="tab-content">
+          <component :is="currentComponent" :details="details" @open-quarantine="openQuarantine" />
         </div>
       </div>
       
@@ -158,5 +205,26 @@ const currentComponent = computed(() => {
   justify-content: center;
   padding: 4rem;
   gap: 1rem;
+}
+
+.quarantine-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.quarantine-header h2 {
+  color: var(--color-heading);
+  margin: 0;
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-background);
+  color: var(--color-text);
 }
 </style>

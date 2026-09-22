@@ -4,78 +4,55 @@ export interface ProcessLogDetails {
   stage: string;
   status: 'Concluída' | 'Em andamento' | 'Em validação' | 'Falhou';
   date: string;
-  layerName: string;      // "Nome da Fonte de Dados / Camada"
-  source: string;         // "Órgão Emissor"
-  year: string;           // "Ano de Referência"
-  epsg: string;           // "Sistema de Coordenadas"
-  description: string;    // "Descrição (opcional)"
+  layerName: string;
+  source: string;
+  year: string;
+  epsg: string;
+  description: string;
   logs: Record<string, string[]>;
-  mapCoordinates: [number, number][]; // Polígono delimitando o local
+  mapCoordinates: [number, number][];
   originalFileUrl: string;
   pauseReason?: string;
 }
 
-/**
- * ==========================================
- * CONTRATO DE API ESPERADO (BACK-END)
- * ==========================================
- * Rota: GET /api/processes/:id
- * 
- * Como o back-end deve receber a requisição:
- * - Método: GET
- * - Parâmetros de Rota: `id` (string) - O ID único do processo a ser detalhado.
- * - Headers: Autenticação via token Bearer (se aplicável).
- * 
- * Como o back-end deve responder:
- * - Status 200 OK
- * - Corpo da resposta (JSON) contendo as informações simuladas abaixo na constante `mockProcessDetails`
- * - A chave `logs` deve ser um objeto onde cada chave é o nome da etapa e o valor é um array de strings com o histórico de logs.
- * - A chave `mapCoordinates` deve ser um array de coordenadas [latitude, longitude] delimitando a bounding box ou o polígono da área processada para o mapa.
- */
-
 export const mockProcessDetails: Record<string, ProcessLogDetails> = {
-  'PRC-001': {
-    id: 'PRC-001',
-    dataset: 'Limites Municipais',
-    stage: 'Validação',
-    status: 'Falhou',
-    date: '07/09/2026',
-    layerName: 'Limites MG 2026',
-    source: 'IBGE',
-    year: '2026',
-    epsg: 'EPSG:4674',
-    description: 'Arquivos brutos dos limites de Minas Gerais atualizados.',
-    pauseReason: 'Falha de integridade geométrica na linha 452. Polígono auto-interceptado.',
-    originalFileUrl: '#',
-    mapCoordinates: [
-      [-19.916, -43.934],
-      [-19.916, -43.900],
-      [-19.950, -43.900],
-      [-19.950, -43.934]
-    ],
-    logs: {
-      'Ingestão': [
-        '[2026-09-07 10:00:00] Início do processamento da carga.',
-        '[2026-09-07 10:01:15] Validando formato do arquivo (Shapefile)... OK.',
-        '[2026-09-07 10:02:30] Extraindo geometrias e atributos...'
-      ],
-      'Validação': [
-        '[2026-09-07 10:03:00] Iniciando checagem de integridade espacial.',
-        '[2026-09-07 10:03:15] ERRO: Falha de integridade geométrica na linha 452. Movendo para quarentena.'
-      ]
-    }
-  },
-  'PRC-002': {
-    id: 'PRC-002',
-    dataset: 'Áreas de Risco',
+  '#993A-B12': {
+    id: '#993A-B12',
+    dataset: 'Imóveis rurais',
     stage: 'Publicação',
     status: 'Concluída',
-    date: '06/09/2026',
-    layerName: 'Mapeamento Zonas de Risco SP',
-    source: 'Defesa Civil',
-    year: '2025',
-    epsg: 'EPSG:4326',
-    description: 'Mapeamento de encostas sujeitas a deslizamento.',
+    date: '07/09/2026',
+    layerName: 'Imóveis Rurais 2023',
+    source: 'IBGE',
+    year: '2023',
+    epsg: 'EPSG:4674 (US01)',
+    description: 'Atualização da base de imóveis rurais.',
+    originalFileUrl: '#',
+    mapCoordinates: [
+      [-15.793, -47.882],
+      [-15.793, -47.800],
+      [-15.850, -47.800],
+      [-15.850, -47.882]
+    ],
+    logs: {
+      'Ingestão': ['[2026-09-07 10:00:00] Ingestão concluída.'],
+      'Validação': ['[2026-09-07 10:05:00] Validação concluída.'],
+      'Tratamento': ['[2026-09-07 10:10:00] Tratamento concluído.'],
+      'Cálculo analítico': ['[2026-09-07 10:15:00] Cálculo concluído.'],
+      'Publicação': ['[2026-09-07 10:20:00] Publicação concluída.']
+    }
+  },
+  '#994C-F88': {
+    id: '#994C-F88',
+    dataset: 'Malha municipal',
+    stage: 'Tratamento',
+    status: 'Em andamento',
+    date: '07/09/2026',
+    layerName: 'Malha Municipal 2022',
+    source: 'Prefeitura Municipal',
+    year: '2022',
+    epsg: 'EPSG:31983 (US04)',
+    description: 'Malha municipal fornecida pela prefeitura.',
     originalFileUrl: '#',
     mapCoordinates: [
       [-23.550, -46.633],
@@ -84,22 +61,91 @@ export const mockProcessDetails: Record<string, ProcessLogDetails> = {
       [-23.580, -46.633]
     ],
     logs: {
-      'Ingestão': [
-        '[2026-09-06 14:00:00] Início do processamento da carga.',
-        '[2026-09-06 14:01:00] Validando formato do arquivo (GeoJSON)... OK.'
-      ],
-      'Validação': [
-        '[2026-09-06 14:02:00] Integridade espacial verificada com sucesso.'
-      ],
-      'Tratamento': [
-        '[2026-09-06 14:05:00] Dados normalizados.'
-      ],
-      'Cálculo analítico': [
-        '[2026-09-06 14:10:00] Índices de risco calculados.'
-      ],
-      'Publicação': [
-        '[2026-09-06 14:15:00] Carga concluída com sucesso no banco de dados.'
-      ]
+      'Ingestão': ['[2026-09-07 11:00:00] Ingestão concluída.'],
+      'Validação': ['[2026-09-07 11:05:00] Validação concluída.'],
+      'Tratamento': ['[2026-09-07 11:10:00] Em andamento...'],
+      'Cálculo analítico': [],
+      'Publicação': []
+    }
+  },
+  '#995X-Z01': {
+    id: '#995X-Z01',
+    dataset: 'Reserva legal',
+    stage: 'Validação',
+    status: 'Em validação',
+    date: '07/09/2026',
+    layerName: 'Reserva Legal 2023',
+    source: 'Órgão Estadual ABC',
+    year: '2023',
+    epsg: 'EPSG:4674 (US01)',
+    description: 'Dados de reserva legal para validação.',
+    pauseReason: 'Sobreposição detectada no polígono 45. (US03)',
+    originalFileUrl: '#',
+    mapCoordinates: [
+      [-19.916, -43.934],
+      [-19.916, -43.900],
+      [-19.950, -43.900],
+      [-19.950, -43.934]
+    ],
+    logs: {
+      'Ingestão': ['[2026-09-07 12:00:00] Ingestão concluída.'],
+      'Validação': ['[2026-09-07 12:05:00] Inconsistências detectadas.'],
+      'Tratamento': [],
+      'Cálculo analítico': [],
+      'Publicação': []
+    }
+  },
+  '#996R-T55': {
+    id: '#996R-T55',
+    dataset: 'Uso e cobertura do solo',
+    stage: 'Ingestão',
+    status: 'Falhou',
+    date: '07/09/2026',
+    layerName: 'Uso Solo MapBiomas 2021',
+    source: 'MapBiomas',
+    year: '2021',
+    epsg: 'EPSG:4326',
+    description: 'Dados brutos do MapBiomas.',
+    pauseReason: 'Erro de integridade geométrica no arquivo shapefile.',
+    originalFileUrl: '#',
+    mapCoordinates: [
+      [-3.119, -60.021],
+      [-3.119, -60.000],
+      [-3.150, -60.000],
+      [-3.150, -60.021]
+    ],
+    logs: {
+      'Ingestão': ['[2026-09-07 13:00:00] Falha na leitura do arquivo.'],
+      'Validação': [],
+      'Tratamento': [],
+      'Cálculo analítico': [],
+      'Publicação': []
+    }
+  },
+  '#997Y-K22': {
+    id: '#997Y-K22',
+    dataset: 'APP_hidrografica',
+    stage: 'Publicação',
+    status: 'Em andamento',
+    date: '07/09/2026',
+    layerName: 'APP Hidrográfica 2023',
+    source: 'ANA',
+    year: '2023',
+    epsg: 'EPSG:4674 (US01)',
+    description: 'Delimitação de APP.',
+    originalFileUrl: '#',
+    mapCoordinates: [
+      [-15.793, -47.882],
+      [-15.793, -47.800],
+      [-15.850, -47.800],
+      [-15.850, -47.882]
+    ],
+    logs: {
+      'Ingestão': ['[2026-09-07 14:00:00] Ingestão concluída.'],
+      'Validação': ['[2026-09-07 14:05:00] Validação concluída.'],
+      'Tratamento': ['[2026-09-07 14:10:00] Tratamento concluído.'],
+      'Cálculo analítico': ['[2026-09-07 14:15:00] Cálculo concluído.'],
+      'Publicação': []
     }
   }
 };
