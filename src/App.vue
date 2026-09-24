@@ -18,13 +18,30 @@ import Navbar from './components/AppNavbar.vue'
 
 <style scoped>
 .app-layout {
-  padding: 3rem;
-  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  background: var(--color-background);
 }
 
 .main-wrapper {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+.main-wrapper > :deep(main) {
+  flex: 1;
+  padding: 32px;
+}
+
+@media (max-width: 760px) {
+  .app-layout {
+    display: block;
+  }
+
+  .main-wrapper > :deep(main) {
+    padding: 20px 16px;
+  }
 }
 </style>
