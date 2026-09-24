@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import CardContainer from '../components/CardContainer.vue'
 import DataTable from '../components/DataTable.vue'
 import type { Column } from '../components/DataTable.vue'
 import { dashboardService, type DashboardSummary, type ProcessLog } from '../services/dashboard'
-import { FiPlus, FiMinus } from 'vue-icons-plus/fi'
+import { FiPlus, FiMinus, FiAlertTriangle } from 'vue-icons-plus/fi'
 
 const summaryData = ref<DashboardSummary[]>([])
 const recentProcesses = ref<ProcessLog[]>([])
@@ -15,6 +16,11 @@ const filterOptions = ref<{ conjuntos: any[]; etapas: any[]; situacoes: any[] }>
 })
 const isInitialLoading = ref(true)
 const isTableLoading = ref(false)
+const router = useRouter()
+
+const goToLog = (id: string) => {
+  router.push({ name: 'process-log', params: { id } })
+}
 
 const filters = ref({
   dateBeggin: '',
@@ -74,7 +80,7 @@ const getBadgeClass = (status: string) => {
       return 'badge badge_success'
     case 'Em andamento':
       return 'badge badge_info'
-    case 'Em validação':
+    case 'Aguardando validação':
       return 'badge badge_warning'
     case 'Falhou':
       return 'badge badge_danger'
@@ -105,26 +111,27 @@ const getBadgeClass = (status: string) => {
 
       <div class="card card-filters mt-4">
         <div class="card-content filters-container">
-          <div class="filter-item">
-            <label for="dateBeggin">Início:</label>
-            <input
-              type="date"
-              id="dateBeggin"
-              name="date"
-              class="input-inline"
-              v-model="filters.dateBeggin"
-            />
-          </div>
-
-          <div class="filter-item">
-            <label for="dateEnd">Fim:</label>
-            <input
-              type="date"
-              id="dateEnd"
-              name="date"
-              class="input-inline"
-              v-model="filters.dateEnd"
-            />
+          <div class="filter-item filter-dates">
+            <div class="date-row">
+              <label for="dateBeggin">Início:</label>
+              <input
+                type="date"
+                id="dateBeggin"
+                name="dateBeggin"
+                class="input-inline"
+                v-model="filters.dateBeggin"
+              />
+            </div>
+            <div class="date-row">
+              <label for="dateEnd">Fim:</label>
+              <input
+                type="date"
+                id="dateEnd"
+                name="dateEnd"
+                class="input-inline"
+                v-model="filters.dateEnd"
+              />
+            </div>
           </div>
 
           <div class="filter-item">
@@ -158,7 +165,7 @@ const getBadgeClass = (status: string) => {
           </div>
 
           <div class="filter-actions">
-            <button class="btn btn-search" @click="applyFilters">Buscar</button>
+            <button class="btn" @click="applyFilters">Buscar</button>
           </div>
         </div>
       </div>
@@ -188,21 +195,24 @@ const getBadgeClass = (status: string) => {
                 <strong>Fonte:</strong> {{ item.source }} | <strong>Ano:</strong> {{ item.year }} |
                 <strong>EPSG:</strong> {{ item.epsg }}
               </p>
-              <p v-if="item.integrityHash">
-                <strong>Hash de Integridade:</strong> {{ item.integrityHash }}
-              </p>
-
               <div v-if="item.pauseReason" class="alert alert-warning mt-2">
-                <span class="alert-icon">⚠️</span>
+                <FiAlertTriangle size="16" style="flex-shrink:0" />
                 <strong>Motivo da Pausa:</strong> {{ item.pauseReason }}
               </div>
 
-              <div
-                class="expanded-actions mt-3"
-                v-if="item.status === 'Falhou' || item.status === 'Em validação'"
-              >
-                <button class="btn btn_danger">Acionar Auditor</button>
-                <button class="btn btn_outline ml-2">Ver Log Completo</button>
+              <div class="expanded-actions mt-3">
+                <button 
+                  class="btn btn_outline" 
+                  @click="goToLog(item.id)"
+                >
+                  Ver Log Completo
+                </button>
+                <button 
+                  v-if="item.status === 'Falhou' || item.status === 'Aguardando validação'"
+                  class="btn btn_danger ml-2"
+                >
+                  Acionar Auditor
+                </button>
               </div>
             </div>
           </template>
@@ -278,11 +288,10 @@ const getBadgeClass = (status: string) => {
 .filters-container {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  align-items: stretch;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.35rem 0.5rem;
 }
 
 .filter-item {
@@ -290,11 +299,12 @@ const getBadgeClass = (status: string) => {
   align-items: center;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: 0.35rem 0.5rem;
-  gap: 0.25rem;
-  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  gap: 0.35rem;
+  font-size: 0.75rem;
   color: var(--color-text);
-  background-color: transparent;
+  background-color: var(--color-background);
+  min-height: 100%;
 }
 
 .filter-item label {
@@ -304,13 +314,29 @@ const getBadgeClass = (status: string) => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.filter-dates {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.35rem;
 }
 
 .input-inline {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--color-text);
   padding: 0;
   margin: 0;
@@ -318,26 +344,13 @@ const getBadgeClass = (status: string) => {
 }
 
 .filter-actions {
-  flex-grow: 1;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  margin-left: auto;
 }
 
-.btn-search {
-  background-color: var(--vis-brand-orange, #f26522);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.4rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
 
-.btn-search:hover {
-  opacity: 0.9;
-}
+
 
 .btn-upload {
   background-color: var(--vis-brand-orange, #f26522);

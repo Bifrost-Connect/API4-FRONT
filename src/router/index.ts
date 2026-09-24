@@ -3,6 +3,7 @@ import DashboardView from '../views/DashboardView.vue'
 import StyleguideView from '../views/StyleguideView.vue'
 import LoginView from '../views/LoginView.vue'
 import UploadView from '../views/UploadView.vue'
+import ProcessLogView from '../views/ProcessLogView.vue'
 import MapView from '../views/MapView.vue'
 
 const router = createRouter({
@@ -12,6 +13,11 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
+    },
+    {
+      path: '/processo/:id',
+      name: 'process-log',
+      component: ProcessLogView,
     },
     {
       path: '/upload',
