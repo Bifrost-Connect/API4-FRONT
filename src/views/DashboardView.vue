@@ -352,11 +352,23 @@ const getBadgeClass = (status: string) => {
     opacity 0.2s,
     transform 0.1s;
   box-shadow: 0 4px 6px rgba(242, 101, 34, 0.3);
+  animation: uploadPulse 2.8s ease-in-out infinite;
 }
 
 .btn-upload:hover {
   opacity: 0.9;
   transform: translateY(-1px);
+  animation-play-state: paused;
+}
+
+@keyframes uploadPulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 6px rgba(242, 101, 34, 0.3);
+  }
+  50% {
+    box-shadow: 0 7px 20px rgba(242, 101, 34, 0.48);
+  }
 }
 
 .action-icon {
