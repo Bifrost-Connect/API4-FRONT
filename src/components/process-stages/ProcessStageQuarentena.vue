@@ -1,24 +1,34 @@
 <script setup lang="ts">
-import type { ProcessLogDetails } from '../services/dashboard'
+import { FiAlertTriangle, FiDownload } from 'vue-icons-plus/fi'
+import type { ProcessLogDetails } from '../../services/process'
 
 const props = defineProps<{
   details: ProcessLogDetails
 }>()
-
 </script>
 
 <template>
   <div class="quarentena-container">
     <div class="alert alert-warning mb-4">
-      <span class="alert-icon">⚠️</span>
-      <p><strong>Atenção (Quarentena):</strong> Os registros inconsistentes desta carga foram desviados para esta zona para análise e correção.</p>
+      <div class="alert-icon">
+        <FiAlertTriangle size="20" />
+      </div>
+      <p>
+        <strong>Atenção (Quarentena):</strong> Os registros inconsistentes desta carga foram
+        desviados para esta zona para análise e correção.
+      </p>
     </div>
-    
+
     <div class="card card-content mb-4">
       <h3>Motivo da Quarentena</h3>
-      <p class="error-text">{{ details.pauseReason || 'Inconsistências geométricas ou sobreposições encontradas.' }}</p>
+      <p class="error-text">
+        {{ details.pauseReason || 'Inconsistências geométricas ou sobreposições encontradas.' }}
+      </p>
       <div class="mt-3">
-        <button class="btn btn_outline">Baixar Relatório de Erros</button>
+        <button class="btn btn_outline">
+          <FiDownload size="14" />
+          Baixar Relatório de Erros
+        </button>
       </div>
     </div>
   </div>
@@ -41,7 +51,10 @@ const props = defineProps<{
 }
 
 .alert-icon {
-  font-size: 1.5rem;
+  color: #a16207;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .card {
@@ -63,6 +76,12 @@ const props = defineProps<{
 .error-text {
   color: #ef4444;
   font-weight: 500;
+}
+
+.btn_outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .mt-3 {

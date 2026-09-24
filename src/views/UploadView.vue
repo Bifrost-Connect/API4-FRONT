@@ -45,6 +45,7 @@ const isUploading = ref(false)
 const erroMensagem = ref<{ titulo: string; texto: string } | null>(null)
 const isDragover = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploadResult = ref<any>(null)
 
 const isStep1Valid = computed(() => nomeCamada.value.trim().length > 0)
 const isStep2Valid = computed(() => arquivoSelecionado.value !== null)
@@ -100,6 +101,7 @@ const handleUpload = async () => {
 
   try {
     const response = await uploadService.uploadShapefile(formData)
+    uploadResult.value = response
     console.log('Upload sucesso:', response)
     currentStep.value = 3
   } catch (err: any) {
@@ -311,6 +313,33 @@ const resetForm = () => {
           A camada <strong>{{ nomeCamada }}</strong> foi recebida e processada na Zona Bruta.
         </p>
 
+        <div v-if="uploadResult" class="upload-details">
+          <div class="detail-row">
+            <span>ID do Processo:</span>
+            <strong>#{{ uploadResult.id }}</strong>
+          </div>
+          <div class="detail-row">
+            <span>Hash de Integridade:</span>
+            <strong class="hash-text" :title="uploadResult.integrityHash">{{ uploadResult.integrityHash }}</strong>
+          </div>
+          <div class="detail-row">
+            <span>Tamanho do Arquivo:</span>
+            <strong>{{ uploadResult.tamanho }}</strong>
+          </div>
+          <div class="detail-row">
+            <span>Geometria Detectada:</span>
+            <strong>{{ uploadResult.tipoGeometria }}</strong>
+          </div>
+          <div class="detail-row">
+            <span>Sistema de Coordenadas:</span>
+            <strong>{{ formOptions.epsgs.find(e => e.id === epsg)?.label || epsg || 'N/A' }}</strong>
+          </div>
+          <div class="detail-row">
+            <span>Órgão Emissor:</span>
+            <strong>{{ orgaoEmissor || 'Não informado' }}</strong>
+          </div>
+        </div>
+
         <div class="confirmation__actions">
           <button class="btn" @click="resetForm">
             + Nova Carga
@@ -356,6 +385,8 @@ const resetForm = () => {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 2px 4px -1px rgba(0, 0, 0, 0.03);
@@ -427,6 +458,11 @@ const resetForm = () => {
 
 .form-group .label {
   margin-bottom: 0.4rem;
+}
+
+.input:not(.textarea) {
+  height: 42px;
+  box-sizing: border-box;
 }
 
 .textarea {
@@ -565,6 +601,53 @@ const resetForm = () => {
   gap: 1rem;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.upload-details {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.detail-row span {
+  color: var(--color-text);
+  opacity: 0.8;
+}
+
+.detail-row strong {
+  color: var(--color-heading);
+}
+
+.hash-text {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(0,0,0,0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
 }
 
 /* Animações */
