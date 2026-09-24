@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { processService, type ProcessLogDetails } from '../services/process'
 import Stepper from '../components/Stepper.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
 import ProcessStageValidacao from '../components/process-stages/ProcessStageValidacao.vue'
 import ProcessStageTratamento from '../components/process-stages/ProcessStageTratamento.vue'
-import ProcessStageCalculo from '../components/process-stages/ProcessStageCalculo.vue'
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 
 const route = useRoute()
@@ -16,18 +15,20 @@ const processId = route.params.id as string
 const isLoading = ref(true)
 const details = ref<ProcessLogDetails | null>(null)
 
-const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Cálculo analítico', 'Publicação']
+const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
 
 const progressStepIndex = computed(() => {
   if (!details.value) return 1
-  if (details.value.status === 'Concluída') return 6 // Todas concluídas
-  const index = processSteps.indexOf(details.value.stage)
+  if (details.value.status === 'Concluída') return 5 // Todas concluídas
+  // Map old 'Cálculo analítico' and 'Publicação' both to step 4
+  const stage = details.value.stage === 'Cálculo analítico' ? 'Publicação' : details.value.stage
+  const index = processSteps.indexOf(stage)
   return index >= 0 ? index + 1 : 1
 })
 
 const warningStepIndex = computed(() => {
   if (!details.value) return undefined
-  if (details.value.status === 'Falhou' || details.value.status === 'Em validação') {
+  if (details.value.status === 'Falhou' || details.value.status === 'Em andamento') {
     return processSteps.indexOf(details.value.stage) + 1
   }
   return undefined
@@ -41,7 +42,7 @@ const selectedQuarantineStage = ref('')
 onMounted(async () => {
   try {
     details.value = await processService.getProcessDetails(processId)
-    activeStepIndex.value = progressStepIndex.value > 5 ? 5 : progressStepIndex.value
+    activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
     if (details.value) {
       selectedQuarantineStage.value = details.value.stage
     }
@@ -66,8 +67,7 @@ const currentComponent = computed(() => {
     case 1: return ProcessStageIngestao
     case 2: return ProcessStageValidacao
     case 3: return ProcessStageTratamento
-    case 4: return ProcessStageCalculo
-    case 5: return ProcessStagePublicacao
+    case 4: return ProcessStagePublicacao
     default: return ProcessStageIngestao
   }
 })
@@ -106,7 +106,6 @@ const currentComponent = computed(() => {
               <select class="input" v-model="selectedQuarantineStage">
                 <option value="Validação">Validação</option>
                 <option value="Tratamento">Tratamento</option>
-                <option value="Cálculo analítico">Cálculo analítico</option>
                 <option value="Publicação">Publicação</option>
               </select>
             </div>

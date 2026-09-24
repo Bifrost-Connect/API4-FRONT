@@ -25,6 +25,8 @@ export const mockUploadSuccessResponse = (nome: string) => ({
   nome: nome,
   tipoGeometria: 'Polygon',
   caminhoArquivoBruto: `/storage/uploads/${nome.replace(/\s+/g, '_').toLowerCase()}.zip`,
+  integrityHash: 'sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
+  tamanho: '15.4 MB',
   dataUpload: new Date().toISOString(),
   status: 'PROCESSADO_COM_SUCESSO',
 })

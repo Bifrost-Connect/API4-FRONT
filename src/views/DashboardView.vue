@@ -5,7 +5,7 @@ import CardContainer from '../components/CardContainer.vue'
 import DataTable from '../components/DataTable.vue'
 import type { Column } from '../components/DataTable.vue'
 import { dashboardService, type DashboardSummary, type ProcessLog } from '../services/dashboard'
-import { FiPlus, FiMinus } from 'vue-icons-plus/fi'
+import { FiPlus, FiMinus, FiAlertTriangle } from 'vue-icons-plus/fi'
 
 const summaryData = ref<DashboardSummary[]>([])
 const recentProcesses = ref<ProcessLog[]>([])
@@ -80,7 +80,7 @@ const getBadgeClass = (status: string) => {
       return 'badge badge_success'
     case 'Em andamento':
       return 'badge badge_info'
-    case 'Em validação':
+    case 'Aguardando validação':
       return 'badge badge_warning'
     case 'Falhou':
       return 'badge badge_danger'
@@ -194,12 +194,8 @@ const getBadgeClass = (status: string) => {
                 <strong>Fonte:</strong> {{ item.source }} | <strong>Ano:</strong> {{ item.year }} |
                 <strong>EPSG:</strong> {{ item.epsg }}
               </p>
-              <p v-if="item.integrityHash">
-                <strong>Hash de Integridade:</strong> {{ item.integrityHash }}
-              </p>
-
               <div v-if="item.pauseReason" class="alert alert-warning mt-2">
-                <span class="alert-icon">⚠️</span>
+                <FiAlertTriangle size="16" style="flex-shrink:0" />
                 <strong>Motivo da Pausa:</strong> {{ item.pauseReason }}
               </div>
 
@@ -211,7 +207,7 @@ const getBadgeClass = (status: string) => {
                   Ver Log Completo
                 </button>
                 <button 
-                  v-if="item.status === 'Falhou' || item.status === 'Em validação'"
+                  v-if="item.status === 'Falhou' || item.status === 'Aguardando validação'"
                   class="btn btn_danger ml-2"
                 >
                   Acionar Auditor

@@ -9,16 +9,19 @@ export interface DashboardSummary {
 }
 
 export interface ProcessLog {
-  id: string;
-  dateTime: string;
-  dataset: string;
-  stage: string;
-  status: 'Concluída' | 'Em andamento' | 'Em validação' | 'Falhou';
-  source?: string;
-  year?: string;
-  epsg?: string;
-  integrityHash?: string;
-  pauseReason?: string;
+  id: string
+  dateTime: string
+  dataset: string
+  /** "Ingestão" | "Validação" | "Tratamento" | "Publicação" */
+  stage: string
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou'
+  source?: string
+  year?: string
+  epsg?: string
+  /** Motivo de pausa/quarentena — presente apenas se status for "Aguardando validação" ou "Falhou" */
+  pauseReason?: string
+  // NOTA: integrityHash não é exposto no dashboard.
+  // É retornado apenas por GET /api/processes/{id} e exibido na etapa de Ingestão.
 }
 
 
