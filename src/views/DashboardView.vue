@@ -440,9 +440,8 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .dashboard {
-  display: flex;
-  flex-direction: column;
-  padding: 2rem;
+  /* Layout normal para evitar que os filhos encolham (flex-shrink) e quebrem o visual */
+  display: block;
 }
 
 .card-grid {

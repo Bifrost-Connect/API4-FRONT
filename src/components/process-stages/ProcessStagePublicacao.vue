@@ -275,7 +275,7 @@ const goToDashboard = () => {
     </div>
 
     <!-- ═══ ERRO / QUARENTENA (DESVIO LATERAL) ══════════════════════════════════ -->
-    <div v-if="isError && details.pauseReason" class="alert-banner danger">
+    <div v-if="details.quarantineRecords?.length > 0 && details.pauseReason" class="alert-banner danger">
       <div class="alert-icon-lg">
         <FiAlertTriangle size="26" />
       </div>

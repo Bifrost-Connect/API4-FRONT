@@ -48,7 +48,7 @@ const overallStatus = computed(() => {
         </div>
         <div class="header-right">
           <span class="badge" :class="overallStatus.cls">{{ overallStatus.label }}</span>
-          <button v-if="isError" class="btn btn-warning" @click="emit('open-quarantine')">
+          <button v-if="isError || details.quarantineRecords?.length > 0" class="btn btn-warning" @click="emit('open-quarantine')">
             <FiAlertTriangle size="14" />
             Ver Quarentena
           </button>
@@ -76,7 +76,7 @@ const overallStatus = computed(() => {
           </li>
         </ul>
 
-        <div v-if="isError && details.pauseReason" class="error-alert">
+        <div v-if="(isError || details.quarantineRecords?.length > 0) && details.pauseReason" class="error-alert">
           <div class="alert-icon">
             <FiAlertTriangle size="22" />
           </div>

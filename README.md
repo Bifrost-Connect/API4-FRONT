@@ -1,73 +1,64 @@
-# frontend
+# API4 Front-end
 
-This template should help get you started developing with Vue 3 in Vite.
+Este é o repositório Front-end do sistema **API4**, uma plataforma de acompanhamento, ingestão e processamento de cargas de dados espaciais e analíticos.
 
-## Recommended IDE Setup
+O sistema permite que operadores façam uploads de dados (como conjuntos geográficos ou safras), acompanhem a saúde do processamento automático do back-end através de um pipeline estruturado (Ingestão -> Validação -> Tratamento -> Publicação) e atuem como auditores em registros retidos (Quarentena).
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+---
 
-## Recommended Browser Setup
+## 🛠️ Tecnologias Utilizadas
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- **[Vue 3](https://vuejs.org/)** (Composition API via `<script setup>`)
+- **[Vite](https://vitejs.dev/)** (Build tool e Dev server ultra-rápido)
+- **[TypeScript](https://www.typescriptlang.org/)** (Tipagem estática)
+- **[Vue Router](https://router.vuejs.org/)** (Roteamento da SPA)
+- **[Vitest](https://vitest.dev/)** (Testes unitários)
+- **[pnpm](https://pnpm.io/)** (Gerenciador de pacotes rápido e eficiente)
 
-## Type Support for `.vue` Imports in TS
+---
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
 
-## Customize configuration
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## 🚀 Instalação e Execução
 
-## Project Setup
+Este projeto utiliza estritamente o **pnpm**. Instale-o caso não possua (`npm install -g pnpm`).
 
-```sh
+### 1. Instalar Dependências
+```bash
 pnpm install
 ```
 
-### Compile and Hot-Reload for Development
-
-```sh
+### 2. Rodar o Servidor de Desenvolvimento (Hot-Reload)
+```bash
 pnpm dev
 ```
+O projeto estará rodando localmente (normalmente em `http://localhost:5173/`).
 
-### Type-Check, Compile and Minify for Production
-
-```sh
+### 3. Fazer o Build para Produção
+```bash
 pnpm build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+---
 
-```sh
+## 🧪 Testes
+
+### Testes Unitários (Vitest)
+Executam as baterias de testes da pasta `services/__tests__/` garantindo a saúde dos adaptadores e transformadores de dados.
+
+```bash
 pnpm test:unit
 ```
+*(Para rodar apenas uma vez sem o modo "watch", use `pnpm test:unit --run`)*
 
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
-pnpm build
-
-# Runs the end-to-end tests
+### Testes End-to-End (Playwright)
+```bash
 pnpm test:e2e
-# Runs the tests only on Chromium
-pnpm test:e2e --project=chromium
-# Runs the tests of a specific file
-pnpm test:e2e tests/example.spec.ts
-# Runs the tests in debug mode
-pnpm test:e2e --debug
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+---
 
-```sh
-pnpm lint
-```
+## 🛠️ Configuração Recomendada de IDE
+
+- **VS Code** com a extensão **Vue (Official) / Volar**
+- Desabilite a extensão Vetur caso a possua.

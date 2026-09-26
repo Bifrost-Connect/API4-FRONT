@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { mockCurrentUser } from '../services/mocks/user.mock'
+import { userService } from '../services/user'
 
+const currentUser = userService.getCurrentUser()
 const navigationItems = [
   { label: 'Dashboard', to: '/', icon: '▦' },
   { label: 'Upload de carga', to: '/upload', icon: '↑' },
@@ -14,8 +15,8 @@ const navigationItems = [
     <div class="brand">
       <span class="brand-mark">A4</span>
       <div>
-        <strong>{{ mockCurrentUser.name }}</strong>
-        <span>{{ mockCurrentUser.role }}</span>
+        <strong>{{ currentUser.name }}</strong>
+        <span>{{ currentUser.role }}</span>
       </div>
     </div>
 
@@ -48,7 +49,10 @@ const navigationItems = [
   inset: 0 auto 0 0;
   z-index: 20;
   width: 252px;
-  min-height: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
   padding: 28px 16px 20px;
   display: flex;
   flex-direction: column;
@@ -148,8 +152,11 @@ const navigationItems = [
   .sidebar {
     inset: 0 0 auto;
     width: 100%;
-    height: 130px;
-    min-height: 130px;
+    min-height: auto;
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 110;
     padding: 14px 12px;
     overflow: hidden;
     border-right: 0;
@@ -160,9 +167,15 @@ const navigationItems = [
     padding: 0 8px 16px;
   }
 
-  .sidebar-section-title,
-  .sidebar-footer {
+  .sidebar-section-title {
     display: none;
+  }
+  
+  .sidebar-footer {
+    display: flex;
+    padding-top: 8px;
+    border-top: none;
+    margin-top: 0;
   }
 
   .navigation {

@@ -53,6 +53,9 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
   gap: 20px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .breadcrumb,
@@ -116,7 +119,7 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
   }
 
   .navbar-link span:last-child {
-    display: none;
+    display: inline;
   }
 
   .navbar-link {

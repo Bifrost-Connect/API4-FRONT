@@ -11,14 +11,17 @@ import Navbar from './components/AppNavbar.vue'
       <header>
         <Navbar v-if="!$route.meta.hideMenu" />
       </header>
-      <RouterView />
+      <div class="content-scroll-container">
+        <RouterView />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   background: var(--color-background);
 }
@@ -30,29 +33,21 @@ import Navbar from './components/AppNavbar.vue'
   padding-top: 76px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.main-wrapper > header {
-  height: 0;
-  flex: 0 0 0;
-}
-
-.main-wrapper > :deep(main) {
+.content-scroll-container {
   flex: 1;
+  overflow-y: auto;
   padding: 32px;
 }
 
 @media (max-width: 760px) {
   .app-layout {
-    display: block;
+    flex-direction: column;
   }
 
-  .main-wrapper {
-    margin-left: 0;
-    padding-top: 194px;
-  }
-
-  .main-wrapper > :deep(main) {
+  .content-scroll-container {
     padding: 20px 16px;
   }
 }

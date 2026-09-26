@@ -1,6 +1,6 @@
 import api, { mockactive } from './api';
 import { mockProcessoCriado, mockArquivoOriginalSuccess, mockUploadErrorResponse, mockUploadOptions } from './mocks/upload.mock';
-import { mockCurrentUser } from './mocks/user.mock';
+import { userService } from './user';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -8,7 +8,7 @@ export const uploadService = {
   async cadastrarMetadados(payload: Record<string, any>): Promise<any> {
     try {
       const backendPayload = {
-        operadorId: mockCurrentUser.id,
+        operadorId: userService.getCurrentUser().id,
         orgaoId: parseInt(payload.orgaoEmissor) || 1,
         conjuntoId: parseInt(payload.conjuntoDados) || 1,
         anoSafra: payload.anoReferencia,
@@ -30,7 +30,7 @@ export const uploadService = {
     }
   },
 
-  async uploadArquivo(processoId: number, file: File, usuarioId: number = mockCurrentUser.id): Promise<any> {
+  async uploadArquivo(processoId: number, file: File, usuarioId: number = userService.getCurrentUser().id): Promise<any> {
     try {
       const formData = new FormData()
       formData.append('processoId', processoId.toString())
