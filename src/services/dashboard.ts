@@ -13,12 +13,20 @@ export interface ProcessLog {
   dateTime: string;
   dataset: string;
   stage: string;
-  status: 'Concluída' | 'Em andamento' | 'Em validação' | 'Falhou';
+  status: 'Concluída' | 'Em andamento' | 'Em validação' | 'Falhou' | 'Em quarentena';
   source?: string;
   year?: string;
   epsg?: string;
   integrityHash?: string;
   pauseReason?: string;
+  logs?: string[];
+  quarantined?: boolean;
+  auditorRequested?: boolean;
+}
+
+export interface DashboardData {
+  summary: DashboardSummary[];
+  recentProcesses: ProcessLog[];
 }
 
 export interface DashboardFilters {
@@ -66,6 +74,10 @@ export const dashboardService = {
     }
 
     return filteredProcesses;
+  },
+
+  async requestAuditor(processId: string): Promise<void> {
+    await api.post(`/dashboard/processes/${encodeURIComponent(processId)}/auditor`);
   },
   
   async getFilterOptions() {

@@ -35,12 +35,18 @@ export const mockDashboardData: DashboardData = {
       dateTime: '07/09 11:30',
       dataset: 'Reserva legal',
       stage: 'Validação',
-      status: 'Em validação',
+      status: 'Em quarentena',
       source: 'Órgão Estadual ABC',
       year: '2023',
       epsg: '4674 (US01)',
       integrityHash: '8f4e3b2a... (US02)',
-      pauseReason: 'Sobreposição detectada no polígono 45. (US03)',
+      pauseReason: 'Carga desviada para quarentena após validação geométrica.',
+      logs: [
+        '[AVISO] Sobreposição detectada entre os polígonos 45 e 46.',
+        '[ERRO] A validação topológica encontrou geometrias incompatíveis.',
+        '[AÇÃO] Carga encaminhada para quarentena para revisão.',
+      ],
+      quarantined: true,
     },
     {
       id: '#996R-T55',
@@ -53,6 +59,8 @@ export const mockDashboardData: DashboardData = {
       epsg: '4326',
       integrityHash: 'x9y8z7w6...',
       pauseReason: 'Erro de integridade geométrica no arquivo shapefile.',
+      logs: ['[ERRO] O arquivo shapefile não passou na validação de integridade.'],
+      quarantined: false,
     },
     {
       id: '#997Y-K22',
@@ -87,6 +95,7 @@ export const mockFilterOptions = {
     { id: 'concluida', label: 'Concluída' },
     { id: 'andamento', label: 'Em andamento' },
     { id: 'validacao', label: 'Em validação' },
-    { id: 'falhou', label: 'Falhou' }
+    { id: 'falhou', label: 'Falhou' },
+    { id: 'quarentena', label: 'Em quarentena' }
   ]
 };

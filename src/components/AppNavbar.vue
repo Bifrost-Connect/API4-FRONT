@@ -40,6 +40,11 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
 
 <style scoped>
 .navbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 252px;
+  z-index: 30;
   min-height: 76px;
   padding: 0 32px;
   display: flex;
@@ -104,6 +109,8 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
 
 @media (max-width: 760px) {
   .navbar {
+    top: 130px;
+    left: 0;
     min-height: 64px;
     padding: 0 16px;
   }

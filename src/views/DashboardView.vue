@@ -15,6 +15,7 @@ const filterOptions = ref<{ conjuntos: any[]; etapas: any[]; situacoes: any[] }>
 })
 const isInitialLoading = ref(true)
 const isTableLoading = ref(false)
+const auditorStatus = ref<Record<string, 'loading' | 'requested' | 'error'>>({})
 
 const filters = ref({
   dateBeggin: '',
@@ -77,9 +78,27 @@ const getBadgeClass = (status: string) => {
     case 'Em validação':
       return 'badge badge_warning'
     case 'Falhou':
+    case 'Em quarentena':
       return 'badge badge_danger'
     default:
       return 'badge badge_primary'
+  }
+}
+
+const getProcessLogs = (item: ProcessLog): string[] => {
+  if (item.logs?.length) return item.logs
+  return item.pauseReason ? [item.pauseReason] : []
+}
+
+const requestAuditor = async (item: ProcessLog) => {
+  auditorStatus.value[item.id] = 'loading'
+  try {
+    await dashboardService.requestAuditor(item.id)
+    item.auditorRequested = true
+    auditorStatus.value[item.id] = 'requested'
+  } catch (error) {
+    console.error('Failed to request auditor', error)
+    auditorStatus.value[item.id] = 'error'
   }
 }
 </script>
@@ -192,17 +211,36 @@ const getBadgeClass = (status: string) => {
                 <strong>Hash de Integridade:</strong> {{ item.integrityHash }}
               </p>
 
-              <div v-if="item.pauseReason" class="alert alert-warning mt-2">
+              <section v-if="getProcessLogs(item).length" class="system-log mt-3" aria-label="Log do sistema">
+                <h3>Log do sistema</h3>
+                <ul>
+                  <li v-for="(entry, index) in getProcessLogs(item)" :key="index">{{ entry }}</li>
+                </ul>
+              </section>
+
+              <div v-if="item.pauseReason && !item.logs?.length" class="alert alert-warning mt-2">
                 <span class="alert-icon">⚠️</span>
                 <strong>Motivo da Pausa:</strong> {{ item.pauseReason }}
               </div>
 
-              <div
-                class="expanded-actions mt-3"
-                v-if="item.status === 'Falhou' || item.status === 'Em validação'"
-              >
-                <button class="btn btn_danger">Acionar Auditor</button>
-                <button class="btn btn_outline ml-2">Ver Log Completo</button>
+              <div v-if="item.quarantined" class="expanded-actions mt-3">
+                <button
+                  class="btn btn_danger"
+                  type="button"
+                  :disabled="auditorStatus[item.id] === 'loading' || item.auditorRequested"
+                  @click="requestAuditor(item)"
+                >
+                  {{
+                    auditorStatus[item.id] === 'loading'
+                      ? 'Acionando...'
+                      : item.auditorRequested || auditorStatus[item.id] === 'requested'
+                        ? 'Auditor acionado'
+                        : 'Acionar Auditor'
+                  }}
+                </button>
+                <p v-if="auditorStatus[item.id] === 'error'" class="auditor-error" role="alert">
+                  Não foi possível acionar o auditor. Tente novamente.
+                </p>
               </div>
             </div>
           </template>
@@ -395,6 +433,40 @@ const getBadgeClass = (status: string) => {
 .expanded-details p {
   margin: 0 0 0.5rem 0;
   font-size: 0.9rem;
+}
+
+.system-log {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.system-log h3 {
+  margin-bottom: 0.5rem;
+  color: var(--color-heading);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.system-log ul {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.25rem;
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: 0.82rem;
+}
+
+.expanded-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.auditor-error {
+  color: var(--vis-c-danger, #ef4444);
 }
 
 .alert-warning {

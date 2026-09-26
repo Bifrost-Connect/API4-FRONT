@@ -26,8 +26,15 @@ import Navbar from './components/AppNavbar.vue'
 .main-wrapper {
   flex: 1;
   min-width: 0;
+  margin-left: 252px;
+  padding-top: 76px;
   display: flex;
   flex-direction: column;
+}
+
+.main-wrapper > header {
+  height: 0;
+  flex: 0 0 0;
 }
 
 .main-wrapper > :deep(main) {
@@ -38,6 +45,11 @@ import Navbar from './components/AppNavbar.vue'
 @media (max-width: 760px) {
   .app-layout {
     display: block;
+  }
+
+  .main-wrapper {
+    margin-left: 0;
+    padding-top: 194px;
   }
 
   .main-wrapper > :deep(main) {

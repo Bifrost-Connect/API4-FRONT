@@ -43,12 +43,16 @@ const navigationItems = [
 
 <style scoped>
 .sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
   width: 252px;
-  min-height: 100vh;
+  min-height: 0;
   padding: 28px 16px 20px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow-y: auto;
   background: var(--vis-c-dark);
   color: var(--vis-c-text-light-1);
   border-right: 4px solid var(--vis-brand-orange);
@@ -141,9 +145,12 @@ const navigationItems = [
 
 @media (max-width: 760px) {
   .sidebar {
+    inset: 0 0 auto;
     width: 100%;
-    min-height: auto;
+    height: 130px;
+    min-height: 130px;
     padding: 14px 12px;
+    overflow: hidden;
     border-right: 0;
     border-bottom: 4px solid var(--vis-brand-orange);
   }

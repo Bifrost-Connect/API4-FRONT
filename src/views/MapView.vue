@@ -249,11 +249,7 @@ onBeforeUnmount(() => {
   <main class="map-view">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Monitoramento geoespacial</p>
-        <h1>Mapa operacional</h1>
-        <p class="page-description">
-          Explore as bases cadastradas e visualize delimitações territoriais diretamente sobre imagens de satélite.
-        </p>
+
       </div>
       <button class="btn btn_outline locate-button" type="button" @click="locateUser">
         <span aria-hidden="true">⌖</span>
