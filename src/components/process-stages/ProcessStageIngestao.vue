@@ -33,7 +33,10 @@ const toggleEdit = () => {
 <template>
   <div class="card card-content">
     <div class="header-with-action">
-      <h3>Dados Iniciais (Formulário)</h3>
+      <div style="display: flex; align-items: center; gap: 0.75rem">
+        <h3>Dados Iniciais (Ingestão)</h3>
+        <span class="badge badge_success">Concluída</span>
+      </div>
       <button class="btn btn_outline btn-sm" @click="toggleEdit">
         {{ isEditing ? 'Salvar' : 'Editar' }}
       </button>
@@ -83,7 +86,9 @@ const toggleEdit = () => {
       <div class="form-group form-group--full">
         <label>Hash de Integridade (SHA-256)</label>
         <p class="form-value hash-value">{{ details.integrityHash || '—' }}</p>
-        <span class="hash-hint">Gerado automaticamente pelo backend a partir do arquivo original.</span>
+        <span class="hash-hint"
+          >Gerado automaticamente pelo backend a partir do arquivo original.</span
+        >
       </div>
     </div>
 

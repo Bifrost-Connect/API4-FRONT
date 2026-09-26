@@ -6,10 +6,10 @@ import Navbar from './components/AppNavbar.vue'
 
 <template>
   <div class="app-layout">
-    <Sidebar />
+    <Sidebar v-if="!$route.meta.hideMenu" />
     <div class="main-wrapper">
       <header>
-        <Navbar />
+        <Navbar v-if="!$route.meta.hideMenu" />
       </header>
       <RouterView />
     </div>

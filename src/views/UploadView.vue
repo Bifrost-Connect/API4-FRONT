@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle } from 'vue-icons-plus/fi'
 import { uploadService } from '@/services/upload'
+import { processService } from '@/services/process'
 import Stepper from '@/components/Stepper.vue'
 
 // Passos
 const currentStep = ref(1)
+const route = useRoute()
+const reprocessId = ref<string | null>(null)
 
 const nextStep = () => {
   if (currentStep.value < 3) {
@@ -38,6 +42,22 @@ onMounted(async () => {
   } catch (err) {
     console.error('Falha ao obter opcoes do formulario', err)
   }
+
+  if (route.query.reprocessId) {
+    reprocessId.value = route.query.reprocessId as string
+    try {
+      const details = await processService.getProcessDetails(reprocessId.value)
+      nomeCamada.value = details.layerName || ''
+      orgaoEmissor.value = details.source || ''
+      anoReferencia.value = details.year || ''
+      epsg.value = details.epsg || ''
+      conjuntoDados.value = details.dataset || ''
+      descricao.value = details.description || ''
+    } catch (err) {
+      console.error('Falha ao obter detalhes do processo para reprocessamento', err)
+      nomeCamada.value = 'Camada_Corrigida_' + reprocessId.value
+    }
+  }
 })
 
 const arquivoSelecionado = ref<File | null>(null)
@@ -67,6 +87,8 @@ const handleFileSelect = (event: Event) => {
   }
 }
 
+const allowedExtensions = ['.zip', '.geojson']
+
 const handleDrop = (event: DragEvent) => {
   isDragover.value = false
   if (isUploading.value) return
@@ -74,13 +96,15 @@ const handleDrop = (event: DragEvent) => {
   if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
     const file = event.dataTransfer.files[0]
     if (file) {
-      if (file.name.endsWith('.zip')) {
+      const isValid = allowedExtensions.some((ext) => file.name.toLowerCase().endsWith(ext))
+      if (isValid) {
         arquivoSelecionado.value = file
         erroMensagem.value = null
       } else {
         erroMensagem.value = {
           titulo: 'Arquivo Inválido',
-          texto: 'Por favor, selecione apenas arquivos com a extensão .zip.',
+          texto:
+            'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson).',
         }
       }
     }
@@ -93,17 +117,23 @@ const handleUpload = async () => {
   erroMensagem.value = null
   isUploading.value = true
 
-  const formData = new FormData()
-  formData.append('nome', nomeCamada.value)
-  if (arquivoSelecionado.value) {
-    formData.append('file', arquivoSelecionado.value)
+  const metadataPayload = {
+    nomeCamada: nomeCamada.value,
+    orgaoEmissor: orgaoEmissor.value,
+    anoReferencia: anoReferencia.value,
+    epsg: epsg.value,
+    conjuntoDados: conjuntoDados.value,
+    descricao: descricao.value
   }
 
   try {
-    const response = await uploadService.uploadShapefile(formData)
-    uploadResult.value = response
-    console.log('Upload sucesso:', response)
-    currentStep.value = 3
+    const processo = await uploadService.cadastrarMetadados(metadataPayload)
+    if (arquivoSelecionado.value) {
+      const response = await uploadService.uploadArquivo(processo.id, arquivoSelecionado.value)
+      uploadResult.value = response
+      console.log('Upload sucesso:', response)
+      currentStep.value = 3
+    }
   } catch (err: any) {
     erroMensagem.value = {
       titulo: err.erro || 'Falha no Upload',
@@ -118,6 +148,11 @@ const resetForm = () => {
   currentStep.value = 1
   arquivoSelecionado.value = null
   nomeCamada.value = ''
+  orgaoEmissor.value = ''
+  anoReferencia.value = ''
+  epsg.value = ''
+  conjuntoDados.value = ''
+  descricao.value = ''
 }
 </script>
 
@@ -134,13 +169,18 @@ const resetForm = () => {
 
     <!-- Passo 1: Metadados -->
     <div v-show="currentStep === 1" class="upload-card step-card animate-in">
+      
+      <div v-if="reprocessId" class="alert-info mb-4" style="background-color: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; padding: 1rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+        <FiInfo size="18" style="color: #3b82f6;" />
+        <span style="color: var(--color-text);">Reprocessando Carga #{{ reprocessId }} - O arquivo enviado substituirá os registros rejeitados na quarentena.</span>
+      </div>
+
       <div class="card-header">
         <FiInfo size="20" class="card-header-icon" />
         <h2>Dados de Origem</h2>
       </div>
       <p class="card-description">
-        Cadastre a procedência do arquivo: órgão emissor, ano de referência e sistema de
-        coordenadas.
+        Cadastre a procedência e metadados do arquivo para garantir a governança dos dados.
       </p>
 
       <div class="form-grid">
@@ -168,6 +208,16 @@ const resetForm = () => {
         </div>
 
         <div class="form-group">
+          <label class="label" for="upload-conjunto">Conjunto de Dados *</label>
+          <select id="upload-conjunto" v-model="conjuntoDados" class="input">
+            <option value="">Selecione o conjunto</option>
+            <option v-for="item in formOptions.conjuntos" :key="item.id" :value="item.id">
+              {{ item.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label class="label" for="upload-ano">Ano de Referência *</label>
           <select id="upload-ano" v-model="anoReferencia" class="input">
             <option value="">Selecione o ano</option>
@@ -185,20 +235,11 @@ const resetForm = () => {
           </select>
         </div>
 
-        <div class="form-group">
-          <label class="label" for="upload-conjunto">Conjunto de Dados *</label>
-          <select id="upload-conjunto" v-model="conjuntoDados" class="input">
-            <option value="">Selecione o conjunto</option>
-            <option v-for="item in formOptions.conjuntos" :key="item.id" :value="item.id">
-              {{ item.label }}
-            </option>
-          </select>
-        </div>
-
         <div class="form-group form-group--full">
           <label class="label" for="upload-descricao">Descrição (opcional)</label>
           <textarea
             id="upload-descricao"
+            v-model="descricao"
             class="input textarea"
             rows="3"
             placeholder="Observações sobre o arquivo ou a base de dados..."
@@ -218,7 +259,9 @@ const resetForm = () => {
         <FiUploadCloud size="20" class="card-header-icon" />
         <h2>Upload do Arquivo</h2>
       </div>
-      <p class="card-description">Arraste ou selecione o arquivo geoespacial.</p>
+      <p class="card-description">
+        Arraste ou selecione o arquivo geoespacial (formatos suportados: .zip, .geojson).
+      </p>
 
       <!-- Mensagem de Erro -->
       <Transition name="fade">
@@ -245,7 +288,7 @@ const resetForm = () => {
           id="file-upload"
           ref="fileInputRef"
           type="file"
-          accept=".zip"
+          accept=".zip,.geojson"
           @change="handleFileSelect"
           :disabled="isUploading"
           style="display: none"
@@ -256,10 +299,11 @@ const resetForm = () => {
             <FiUploadCloud size="48" class="dropzone__icon" />
           </div>
           <template v-if="!arquivoSelecionado">
-            <p class="dropzone__title">Arraste o arquivo .zip aqui</p>
+            <p class="dropzone__title">Arraste o arquivo aqui</p>
             <p class="dropzone__subtitle">ou clique para selecionar</p>
             <div class="dropzone__formats">
-              <span class="format-tag">.zip</span>
+              <span class="format-tag">.zip (Shapefile)</span>
+              <span class="format-tag">.geojson</span>
             </div>
           </template>
           <template v-else>
@@ -308,9 +352,9 @@ const resetForm = () => {
         <div class="confirmation__icon-wrapper">
           <FiCheck size="40" class="confirmation__icon" />
         </div>
-        <h2 class="confirmation__title">Mapa salvo e processado com sucesso!</h2>
+        <h2 class="confirmation__title">Arquivo recebido com sucesso!</h2>
         <p class="confirmation__subtitle">
-          A camada <strong>{{ nomeCamada }}</strong> foi recebida e processada na Zona Bruta.
+          A carga <strong>{{ nomeCamada }}</strong> foi recebida e entrou na esteira de validação.
         </p>
 
         <div v-if="uploadResult" class="upload-details">
@@ -319,31 +363,40 @@ const resetForm = () => {
             <strong>#{{ uploadResult.id }}</strong>
           </div>
           <div class="detail-row">
-            <span>Hash de Integridade:</span>
-            <strong class="hash-text" :title="uploadResult.integrityHash">{{ uploadResult.integrityHash }}</strong>
+            <span>Formato Detectado:</span>
+            <strong style="text-transform: uppercase">{{ uploadResult.formato }}</strong>
           </div>
           <div class="detail-row">
             <span>Tamanho do Arquivo:</span>
             <strong>{{ uploadResult.tamanho }}</strong>
           </div>
           <div class="detail-row">
-            <span>Geometria Detectada:</span>
-            <strong>{{ uploadResult.tipoGeometria }}</strong>
+            <span>Contagem de Registros:</span>
+            <strong>{{ uploadResult.recordCount }}</strong>
           </div>
-          <div class="detail-row">
-            <span>Sistema de Coordenadas:</span>
-            <strong>{{ formOptions.epsgs.find(e => e.id === epsg)?.label || epsg || 'N/A' }}</strong>
-          </div>
-          <div class="detail-row">
-            <span>Órgão Emissor:</span>
-            <strong>{{ orgaoEmissor || 'Não informado' }}</strong>
+
+          <div class="epsg-box">
+            <div class="epsg-box-item">
+              <span class="epsg-label">EPSG Declarado</span>
+              <strong class="epsg-val">{{
+                formOptions.epsgs.find((e) => e.id === epsg)?.label || epsg || 'N/A'
+              }}</strong>
+            </div>
+            <div class="epsg-box-item" :class="{ 'warning-bg': uploadResult.epsgDivergence }">
+              <span class="epsg-label">EPSG Detectado</span>
+              <strong class="epsg-val" :class="{ 'text-warning': uploadResult.epsgDivergence }">
+                {{
+                  formOptions.epsgs.find((e) => e.id === uploadResult.epsgDetected)?.label ||
+                  uploadResult.epsgDetected ||
+                  'N/A'
+                }}
+              </strong>
+            </div>
           </div>
         </div>
 
         <div class="confirmation__actions">
-          <button class="btn" @click="resetForm">
-            + Nova Carga
-          </button>
+          <button class="btn" @click="resetForm">+ Nova Carga</button>
           <router-link to="/" class="btn btn_outline">Voltar ao Dashboard</router-link>
         </div>
       </div>
@@ -639,12 +692,51 @@ const resetForm = () => {
   color: var(--color-heading);
 }
 
+.epsg-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.epsg-box-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.epsg-label {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  opacity: 0.7;
+}
+
+.epsg-val {
+  font-size: 0.95rem;
+  color: var(--color-heading);
+}
+
+.warning-bg {
+  background-color: rgba(234, 179, 8, 0.1);
+  border-left: 3px solid var(--vis-c-warning, #eab308);
+}
+
+.text-warning {
+  color: #a16207;
+}
+
 .hash-text {
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   font-family: monospace;
@@ -687,6 +779,10 @@ const resetForm = () => {
 
   .confirmation__actions .btn {
     width: 100%;
+  }
+
+  .epsg-box {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -1,41 +1,50 @@
 import api from './api';
-import { mockUploadSuccessResponse, mockUploadErrorResponse, mockUploadOptions } from './mocks/upload.mock';
+import { mockProcessoCriado, mockArquivoOriginalSuccess, mockUploadErrorResponse, mockUploadOptions } from './mocks/upload.mock';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const uploadService = {
-  /**
-   * Envia o pacote .zip (Shapefile) juntamente com as informações (metadata)
-   * e processa na base de dados espacial.
-   */
-  async uploadShapefile(formData: FormData): Promise<any> {
-    // Para chamar a API real, descomente a linha abaixo e remova/comente o mock:
-    // return (await api.post('/upload', formData, {
-    //   headers: {
-    //     'Content-Type': 'multipart/form-data'
-    //   }
-    // })).data;
-    
-    await delay(2000); // Simulando upload e processamento backend
-
-    const nome = formData.get('nome') as string;
-
-    // Regra do mock: se a palavra 'erro' estiver no nome da camada, simula falha HTTP 400.
-    if (nome && nome.toLowerCase().includes('erro')) {
-      return Promise.reject(mockUploadErrorResponse);
+  async cadastrarMetadados(payload: Record<string, any>): Promise<any> {
+    try {
+      const res = await api.post('/carga/metadados', payload)
+      return res.data
+    } catch (err) {
+      console.warn('API indisponível, usando mock para cadastrar metadados')
+      await delay(1000);
+      if (payload.nomeCamada && payload.nomeCamada.toLowerCase().includes('erro')) {
+        return Promise.reject(mockUploadErrorResponse);
+      }
+      return mockProcessoCriado;
     }
+  },
 
-    return mockUploadSuccessResponse(nome);
+  async uploadArquivo(processoId: number, file: File, usuarioId: number = 1): Promise<any> {
+    try {
+      const formData = new FormData()
+      formData.append('processoId', processoId.toString())
+      formData.append('file', file)
+      const res = await api.post('/carga/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      return res.data
+    } catch (err) {
+      console.warn('API indisponível, usando mock para upload de arquivo')
+      await delay(1500);
+      return mockArquivoOriginalSuccess(file);
+    }
   },
 
   /**
    * Busca as opções dinâmicas para preenchimento do formulário (anos, epsg, conjuntos)
    */
   async getUploadOptions() {
-    // Para chamar a API real, descomente a linha abaixo e remova/comente o mock:
-    // return (await api.get('/upload/options')).data;
-
-    await delay(400);
-    return mockUploadOptions;
+    try {
+      const res = await api.get('/api/v1/dominios/carga')
+      return res.data
+    } catch (err) {
+      console.warn('API indisponível, usando mock para opções de upload')
+      await delay(400)
+      return mockUploadOptions
+    }
   }
 };

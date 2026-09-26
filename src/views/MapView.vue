@@ -2,14 +2,15 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { mapService } from '../services/map'
 
 interface MapLocation {
-  id: number
+  id: string
   name: string
   type: string
   latitude: number
   longitude: number
-  status: 'Processado' | 'Em validação' | 'Aguardando'
+  status: 'Processado' | 'Em validação' | 'Aguardando' | 'Concluída'
 }
 
 interface TerritoryProperties {
@@ -25,32 +26,7 @@ const selectedLocation = ref<MapLocation | null>(null)
 const selectedCoordinates = ref({ latitude: -15.78, longitude: -47.93 })
 const mapError = ref('')
 
-const locations: MapLocation[] = [
-  {
-    id: 1,
-    name: 'Base Brasília',
-    type: 'Conjunto topográfico',
-    latitude: -15.7939,
-    longitude: -47.8828,
-    status: 'Processado',
-  },
-  {
-    id: 2,
-    name: 'Base São Paulo',
-    type: 'Uso e cobertura do solo',
-    latitude: -23.5505,
-    longitude: -46.6333,
-    status: 'Em validação',
-  },
-  {
-    id: 3,
-    name: 'Base Manaus',
-    type: 'Imagem de satélite',
-    latitude: -3.119,
-    longitude: -60.0217,
-    status: 'Aguardando',
-  },
-]
+const locations = ref<MapLocation[]>([])
 
 let map: L.Map | null = null
 let markers: L.LayerGroup | null = null
@@ -63,55 +39,6 @@ const markerIcon = L.divIcon({
   iconAnchor: [11, 11],
 })
 
-// Exemplo temporário já que eu não to usando o backend
-const mockTerritories: GeoJSON.FeatureCollection<GeoJSON.Polygon, TerritoryProperties> = {
-  type: 'FeatureCollection',
-  features: [
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Território demonstrativo Brasília',
-        category: 'Área de proteção',
-        status: 'Em validação',
-        source: 'Documento fictício de exemplo',
-      },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [
-          [
-            [-48.12, -15.68],
-            [-47.75, -15.68],
-            [-47.75, -15.93],
-            [-48.12, -15.93],
-            [-48.12, -15.68],
-          ],
-        ],
-      },
-    },
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Território demonstrativo Manaus',
-        category: 'Reserva indígena',
-        status: 'Processado',
-        source: 'Documento fictício de exemplo',
-      },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [
-          [
-            [-60.28, -2.95],
-            [-59.78, -2.95],
-            [-59.78, -3.28],
-            [-60.28, -3.28],
-            [-60.28, -2.95],
-          ],
-        ],
-      },
-    },
-  ],
-}
-
 const selectLocation = (location: MapLocation) => {
   selectedLocation.value = location
   selectedCoordinates.value = { latitude: location.latitude, longitude: location.longitude }
@@ -122,7 +49,7 @@ const findLocation = () => {
   const normalizedTerm = searchTerm.value.trim().toLowerCase()
   if (!normalizedTerm) return
 
-  const location = locations.find((item) => item.name.toLowerCase().includes(normalizedTerm))
+  const location = locations.value.find((item) => item.name.toLowerCase().includes(normalizedTerm))
   if (location) {
     selectLocation(location)
     return
@@ -190,7 +117,7 @@ const createTerritoryLayer = (data: GeoJSON.GeoJsonObject) =>
     },
   })
 
-onMounted(() => {
+onMounted(async () => {
   if (!mapElement.value) return
 
   map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
@@ -208,7 +135,8 @@ onMounted(() => {
     maxZoom: 19,
   })
 
-  territories = createTerritoryLayer(mockTerritories).addTo(map)
+  const fetchedTerritories = await mapService.getTerritories()
+  territories = createTerritoryLayer(fetchedTerritories).addTo(map)
   L.control
     .layers(
       {
@@ -222,8 +150,10 @@ onMounted(() => {
     )
     .addTo(map)
 
+  locations.value = await mapService.getPublishedLocations()
+
   markers = L.layerGroup().addTo(map)
-  locations.forEach((location) => {
+  locations.value.forEach((location) => {
     const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
       .bindTooltip(location.name)
       .on('click', () => selectLocation(location))

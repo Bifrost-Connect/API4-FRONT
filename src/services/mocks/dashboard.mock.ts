@@ -1,56 +1,9 @@
-import type { DashboardSummary, ProcessLog } from '../dashboard'
+import type { DashboardSummary, ProcessLog, Page, ProcessoMetricasResponse } from '../dashboard'
 
-export interface DashboardData {
-  summary: DashboardSummary[]
-  recentProcesses: ProcessLog[]
-}
-
-/**
- * ==========================================
- * CONTRATO DE API ESPERADO (BACK-END)
- * ==========================================
- *
- * Rota 1: GET /api/dashboard/summary
- * Resposta:
- * - Status 200 OK
- * - Corpo: Array de { title: string, value: number, type: string, iconType: string }
- *
- * Rota 2: GET /api/dashboard/processes
- * Query params opcionais: ?dateBeggin=&dateEnd=&conjunto=&etapa=&situacao=
- * Resposta:
- * - Status 200 OK
- * - Corpo: Array de ProcessLog:
- *   {
- *     id: string,          // ex: "#993A-B12"
- *     dateTime: string,    // ex: "07/09 13:00"
- *     dataset: string,     // nome do conjunto de dados
- *     stage: string,       // "Ingestão" | "Validação" | "Tratamento" | "Publicação"
- *     status: string,      // "Concluída" | "Em andamento" | "Aguardando validação" | "Falhou"
- *     source?: string,     // fonte/órgão emissor
- *     year?: string,       // ano base
- *     epsg?: string,       // código EPSG
- *     pauseReason?: string // mensagem de erro/quarentena (apenas se Falhou ou Aguardando validação)
- *   }
- *
- * NOTA: integrityHash NÃO é retornado pela API do dashboard.
- * Ele é exibido apenas na tela de detalhes (GET /api/processes/{id}) — etapa de Ingestão.
- *
- * Rota 3: GET /api/filters
- * Resposta:
- * - Status 200 OK
- * - Corpo: { conjuntos: [{id, label}], etapas: [{id, label}], situacoes: [{id, label}] }
- */
-
-export const mockDashboardData: DashboardData = {
-  summary: [
-    { title: 'CARGAS HOJE', value: 8, type: 'orange', iconType: 'down' },
-    { title: 'CONCLUÍDAS', value: 2, type: 'success', iconType: 'check' },
-    { title: 'EM VALIDAÇÃO', value: 1, type: 'warning', iconType: 'warning' },
-    { title: 'FALHAS', value: 2, type: 'danger', iconType: 'error' },
-  ],
-  recentProcesses: [
+export const mockProcessosPage: Page<ProcessLog> = {
+  content: [
     {
-      // STATUS: Concluída — processo que passou por todas as etapas com sucesso
+      // STATUS: Concluída — processo finalizado e publicado na base de produção
       id: '#993A-B12',
       dateTime: '07/09 13:00',
       dataset: 'Imóveis rurais',
@@ -58,10 +11,10 @@ export const mockDashboardData: DashboardData = {
       status: 'Concluída',
       source: 'IBGE',
       year: '2023',
-      epsg: 'EPSG:4674 (US01)',
+      epsg: 'EPSG:4674 (SIRGAS 2000)',
     },
     {
-      // STATUS: Em andamento — processo em processamento automático (Tratamento)
+      // STATUS: Em andamento — processo em execução automática de tratamento
       id: '#994C-F88',
       dateTime: '07/09 12:45',
       dataset: 'Malha municipal',
@@ -69,45 +22,46 @@ export const mockDashboardData: DashboardData = {
       status: 'Em andamento',
       source: 'Prefeitura Municipal',
       year: '2022',
-      epsg: 'EPSG:31983 (US04)',
+      epsg: 'EPSG:31983 (SIRGAS 2000 / UTM zone 23S)',
     },
     {
-      // STATUS: Aguardando validação — processo parado em quarentena por erro detectado
+      // STATUS: Falhou — erro de validação (sobreposição). Sem editor alocado -> aguardando editor
       id: '#995X-Z01',
       dateTime: '07/09 11:30',
       dataset: 'Reserva legal',
       stage: 'Validação',
-      status: 'Aguardando validação',
+      status: 'Falhou',
       source: 'Órgão Estadual ABC',
       year: '2023',
-      epsg: 'EPSG:4674 (US01)',
-      pauseReason: 'Sobreposição detectada no polígono 45.',
+      epsg: 'EPSG:4674 (SIRGAS 2000)',
+      pauseReason: 'Sobreposição detectada no polígono 45. Necessário alocar editor.',
     },
     {
-      // STATUS: Falhou — erro crítico na etapa de Ingestão (arquivo inválido)
+      // STATUS: Falhou — Ingestão concluída com sucesso após upload; erro detectado na Validação
       id: '#996R-T55',
       dateTime: '07/09 10:15',
       dataset: 'Uso e cobertura do solo',
-      stage: 'Ingestão',
+      stage: 'Validação',
       status: 'Falhou',
       source: 'MapBiomas',
       year: '2021',
       epsg: 'EPSG:4326',
-      pauseReason: 'Erro de integridade geométrica no arquivo shapefile.',
+      pauseReason:
+        'Erro de integridade geométrica no shapefile detectado na Validação. Necessário alocar editor.',
     },
     {
-      // STATUS: Em andamento — aguardando auditoria na etapa de Publicação
+      // STATUS: Em andamento — Publicação só aguarda validação para publicar a carga
       id: '#881A-B01',
       dateTime: '07/09 09:30',
-      dataset: 'APP_hidrografica',
+      dataset: 'APP Hidrográfica',
       stage: 'Publicação',
       status: 'Em andamento',
       source: 'ANA',
       year: '2023',
-      epsg: 'EPSG:4674 (US01)',
+      epsg: 'EPSG:4674 (SIRGAS 2000)',
     },
     {
-      // STATUS: Falhou — erro crítico na etapa de Tratamento
+      // STATUS: Falhou — erro crítico na etapa de Tratamento. Sem editor alocado -> aguardando editor
       id: '#882A-C02',
       dateTime: '07/09 08:45',
       dataset: 'Imóveis rurais',
@@ -115,32 +69,46 @@ export const mockDashboardData: DashboardData = {
       status: 'Falhou',
       source: 'INCRA',
       year: '2022',
-      epsg: 'EPSG:31983 (US04)',
-      pauseReason: 'Falha na correção topológica. Auto-interseções irreparáveis.',
+      epsg: 'EPSG:31983 (SIRGAS 2000 / UTM zone 23S)',
+      pauseReason:
+        'Falha na correção topológica. Auto-interseções irreparáveis. Necessário alocar editor.',
     },
     {
-      // STATUS: Concluída — processo validado aguardando próximo step
+      // STATUS: Em andamento — auditor/editor alocado para corrigir erro anterior de tratamento!
       id: '#883X-Z03',
       dateTime: '07/09 08:15',
       dataset: 'Reserva legal',
-      stage: 'Validação',
-      status: 'Concluída',
+      stage: 'Tratamento',
+      status: 'Em andamento',
       source: 'Órgão Ambiental DEF',
       year: '2021',
-      epsg: 'EPSG:4674 (US01)',
+      epsg: 'EPSG:4674 (SIRGAS 2000)',
+      assignedEditor: 'Carlos Mendes (Editor)',
+      pauseReason: 'Editor alocado para correção manual de inconsistências topológicas.',
     },
     {
-      // STATUS: Em andamento — ingestão do arquivo pesado ocorrendo
+      // STATUS: Em andamento — Ingestão concluída após upload com sucesso; Validação em processamento
       id: '#884R-T04',
       dateTime: '07/09 08:00',
       dataset: 'Malha municipal',
-      stage: 'Ingestão',
+      stage: 'Validação',
       status: 'Em andamento',
       source: 'IBGE',
       year: '2022',
       epsg: 'EPSG:4326',
     },
   ],
+  totalElements: 8,
+  totalPages: 1,
+  size: 10,
+  number: 0,
+}
+
+export const mockMetricasResponse: ProcessoMetricasResponse = {
+  total: 8,
+  concluidas: 1,
+  emAndamento: 4,
+  erros: 3,
 }
 
 export const mockFilterOptions = {
@@ -149,6 +117,7 @@ export const mockFilterOptions = {
     { id: 'malha', label: 'Malha municipal' },
     { id: 'reserva', label: 'Reserva legal' },
     { id: 'uso_solo', label: 'Uso e cobertura do solo' },
+    { id: 'app_hidrografica', label: 'APP Hidrográfica' },
   ],
   etapas: [
     { id: 'ingestao', label: 'Ingestão' },
@@ -163,3 +132,10 @@ export const mockFilterOptions = {
     { id: 'falhou', label: 'Falhou' },
   ],
 }
+
+export const mockAvailableEditors = [
+  'Carlos Mendes (Topologia)',
+  'Mariana Silva (Validação Geométrica)',
+  'Roberto Alves (Auditor Geral)',
+  'Fernanda Lima (Atributos e Schema)',
+]

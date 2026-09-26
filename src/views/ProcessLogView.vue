@@ -7,6 +7,7 @@ import ProcessStageIngestao from '../components/process-stages/ProcessStageInges
 import ProcessStageValidacao from '../components/process-stages/ProcessStageValidacao.vue'
 import ProcessStageTratamento from '../components/process-stages/ProcessStageTratamento.vue'
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
+import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +29,11 @@ const progressStepIndex = computed(() => {
 
 const warningStepIndex = computed(() => {
   if (!details.value) return undefined
-  if (details.value.status === 'Falhou' || details.value.status === 'Em andamento') {
+  // Erros acontecem APENAS quando validação ou tratamento dá errado (sem editor alocado)
+  const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
+  const isErrorStatus =
+    details.value.status === 'Falhou' || details.value.status === 'Aguardando validação'
+  if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
     return processSteps.indexOf(details.value.stage) + 1
   }
   return undefined
@@ -64,19 +69,44 @@ const openQuarantine = () => {
 
 const currentComponent = computed(() => {
   switch (activeStepIndex.value) {
-    case 1: return ProcessStageIngestao
-    case 2: return ProcessStageValidacao
-    case 3: return ProcessStageTratamento
-    case 4: return ProcessStagePublicacao
-    default: return ProcessStageIngestao
+    case 1:
+      return ProcessStageIngestao
+    case 2:
+      return ProcessStageValidacao
+    case 3:
+      return ProcessStageTratamento
+    case 4:
+      return ProcessStagePublicacao
+    default:
+      return ProcessStageIngestao
   }
 })
 
+const cancelLoad = () => {
+  if (confirm('Tem certeza que deseja cancelar/invalidar esta carga?')) {
+    if (details.value) {
+      // Cast to any to bypass strict type if 'Invalidada' isn't in union
+      details.value.status = 'Invalidada' as any
+      details.value.pauseReason = 'Carga invalidada pelo operador'
+    }
+  }
+}
 </script>
 
 <template>
   <div class="process-log-view">
     <div class="process-header">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0; color: var(--color-heading);">
+          Detalhes da Carga {{ processId }}
+          <span v-if="details" style="font-size: 0.9rem; margin-left: 0.5rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: var(--color-surface); border: 1px solid var(--color-border);">
+            {{ details.status }}
+          </span>
+        </h2>
+        <button v-if="details && details.status !== 'Invalidada'" class="btn btn_outline" style="color: #dc2626; border-color: #dc2626;" @click="cancelLoad">
+          Cancelar Carga
+        </button>
+      </div>
       <Stepper
         :currentStep="activeStepIndex"
         :progressStep="progressStepIndex"
@@ -91,28 +121,22 @@ const currentComponent = computed(() => {
         <div class="spinner"></div>
         <p>Carregando informações da carga...</p>
       </div>
-      
+
       <div v-else-if="details" class="details-container">
-        <!-- Visão de Quarentena -->
+        <!-- Visão de Quarentena (Desvio Lateral) -->
         <div v-if="isQuarantineMode" class="quarantine-view tab-content">
           <div class="card card-content">
             <div class="quarantine-header">
-              <h2>Análise de Quarentena</h2>
-              <button class="btn btn_outline" @click="isQuarantineMode = false">Voltar</button>
-            </div>
-            
-            <div class="form-group" style="margin-bottom: 2rem; max-width: 300px;">
-              <label>Escolher Etapa</label>
-              <select class="input" v-model="selectedQuarantineStage">
-                <option value="Validação">Validação</option>
-                <option value="Tratamento">Tratamento</option>
-                <option value="Publicação">Publicação</option>
-              </select>
+              <h2>Zona de Quarentena</h2>
+              <button class="btn btn_outline" @click="isQuarantineMode = false">
+                Voltar ao Fluxo
+              </button>
             </div>
 
+
+
             <div class="quarantine-body">
-              <h3>Detalhes ({{ selectedQuarantineStage }})</h3>
-              <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+              <ProcessStageQuarentena v-if="details" :details="details" />
             </div>
           </div>
         </div>
@@ -122,7 +146,7 @@ const currentComponent = computed(() => {
           <component :is="currentComponent" :details="details" @open-quarantine="openQuarantine" />
         </div>
       </div>
-      
+
       <div v-else class="loading-state">
         <p>Não foi possível carregar os detalhes.</p>
       </div>
@@ -149,8 +173,14 @@ const currentComponent = computed(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .process-log-view {
@@ -225,5 +255,25 @@ const currentComponent = computed(() => {
   border-radius: 4px;
   background-color: var(--color-background);
   color: var(--color-text);
+}
+
+.quarantine-info {
+  background: rgba(234, 179, 8, 0.06);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  border-left: 4px solid #eab308;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.quarantine-info p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.quarantine-info p:last-child {
+  margin-bottom: 0;
 }
 </style>

@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  FiCheckCircle,
-  FiXCircle,
-  FiClock,
-  FiAlertTriangle,
-} from 'vue-icons-plus/fi'
+import { FiCheckCircle, FiXCircle, FiClock, FiAlertTriangle } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
 
 const props = defineProps<{
@@ -16,17 +11,27 @@ const emit = defineEmits<{
   (e: 'open-quarantine'): void
 }>()
 
+/** Erro na validação ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
 const isError = computed(
-  () => props.details.status === 'Falhou' || props.details.status === 'Em andamento',
+  () =>
+    props.details.status === 'Falhou' ||
+    props.details.status === 'Aguardando validação' ||
+    checks.value.some((c) => c.status === 'error'),
+)
+
+const isUnderCorrection = computed(
+  () => props.details.status === 'Em andamento' && !!props.details.assignedEditor,
 )
 
 /** Checks vêm da API via details.validationChecks (ver process.mock.ts / GET /api/processes/{id}) */
 const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {
+  if (isUnderCorrection.value) return { label: 'Em Correção (Editor Alocado)', cls: 'warning' }
   const errorCount = checks.value.filter((c) => c.status === 'error').length
   if (errorCount === 0) return { label: 'Concluído (Sem Erros)', cls: 'success' }
-  if (errorCount < checks.value.length) return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
+  if (errorCount < checks.value.length)
+    return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
   return { label: 'Falhou', cls: 'error' }
 })
 </script>
@@ -52,12 +57,7 @@ const overallStatus = computed(() => {
 
       <div class="card-body">
         <ul class="checklist">
-          <li
-            v-for="check in checks"
-            :key="check.id"
-            class="checklist-item"
-            :class="check.status"
-          >
+          <li v-for="check in checks" :key="check.id" class="checklist-item" :class="check.status">
             <div class="check-icon" :class="check.status">
               <FiCheckCircle v-if="check.status === 'success'" size="18" />
               <FiXCircle v-else-if="check.status === 'error'" size="18" />
@@ -81,8 +81,11 @@ const overallStatus = computed(() => {
             <FiAlertTriangle size="22" />
           </div>
           <div class="alert-content">
-            <strong>Processo em Quarentena</strong>
+            <strong>Registros em Quarentena (Desvio Lateral)</strong>
             <p>{{ details.pauseReason }}</p>
+            <p style="font-size: 0.82rem; margin-top: 0.35rem; opacity: 0.7">
+              O editor deve corrigir o arquivo e subir novamente via upload.
+            </p>
           </div>
         </div>
       </div>
@@ -220,8 +223,12 @@ const overallStatus = computed(() => {
   margin-top: 0.1rem;
 }
 
-.check-detail.success { color: #16a34a; }
-.check-detail.error   { color: #dc3545; }
+.check-detail.success {
+  color: #16a34a;
+}
+.check-detail.error {
+  color: #dc3545;
+}
 
 /* BADGES */
 .badge {
@@ -252,8 +259,14 @@ const overallStatus = computed(() => {
   font-weight: 700;
 }
 
-.check-badge.success { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
-.check-badge.error   { background: rgba(220, 53, 69, 0.1);  color: #dc3545; }
+.check-badge.success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+.check-badge.error {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
 
 /* ERROR ALERT */
 .error-alert {

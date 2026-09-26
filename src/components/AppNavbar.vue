@@ -10,7 +10,7 @@ const pageTitles: Record<string, string> = {
   upload: 'Nova carga de dados',
   mapa: 'Mapa operacional',
   styleguide: 'Guia de estilos',
-  login: 'Acesso ao sistema',
+  'process-log': 'Acompanhar processamento de cargas',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')

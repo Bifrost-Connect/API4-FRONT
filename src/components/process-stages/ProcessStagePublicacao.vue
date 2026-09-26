@@ -24,28 +24,23 @@ const emit = defineEmits<{
 const router = useRouter()
 
 // ── Estados locais de decisão do auditor ──────────────────────────────────────
-// Nota: quando details.status === 'Concluída', o processo já foi aprovado
-// no backend. O estado local `isApproved` é usado apenas para aprovações feitas
-// nesta sessão (processo em "Em andamento" na etapa Publicação).
 const isApproved = ref(false)
 const isRejected = ref(false)
 const reviewNote = ref('')
 const showReviewInput = ref(false)
+const targetAuditStage = ref<'Tratamento' | 'Validação'>('Tratamento')
 
 // ── Computeds de estado ────────────────────────────────────────────────────────
-const isError = computed(
-  () => props.details.status === 'Falhou' || props.details.status === 'Em andamento',
-)
-/** Já concluído no backend (status da API = Concluída) */
+// Publicação NÃO tem erro intrínseco: apenas espera validação para publicar
 const isAlreadyPublished = computed(() => props.details.status === 'Concluída')
 /** Aprovado nesta sessão pelo auditor */
 const isJustApproved = computed(() => isApproved.value && !isAlreadyPublished.value)
-/** Exibe o card de sucesso em qualquer caso de publicação */
-const showSuccess = computed(() => isAlreadyPublished.value || isJustApproved.value)
-/** Exibe painel de decisão: processo em andamento, sem decisão local ainda */
+/** Exibe o card de sucesso apenas ao aprovar e publicar nesta sessão */
+const showSuccess = computed(() => isJustApproved.value)
+/** Exibe painel de decisão: processo em andamento esperando validação do auditor */
 const isAwaiting = computed(
   () =>
-    !isError.value &&
+    props.details.status === 'Em andamento' &&
     !isAlreadyPublished.value &&
     !isApproved.value &&
     !isRejected.value &&
@@ -60,6 +55,8 @@ const handleApprove = () => {
   isApproved.value = true
   isRejected.value = false
   showReviewInput.value = false
+  props.details.status = 'Concluída'
+  props.details.stage = 'Publicação'
 }
 
 const handleRejectRequest = () => {
@@ -70,6 +67,12 @@ const handleConfirmReject = () => {
   isRejected.value = true
   isApproved.value = false
   showReviewInput.value = false
+
+  // Envia para auditoria da etapa anterior selecionada (Tratamento ou Validação)
+  props.details.stage = targetAuditStage.value
+  props.details.status = 'Em andamento'
+  props.details.assignedEditor = 'Gestor Alocado'
+  props.details.pauseReason = `Revisão solicitada na Publicação para ${targetAuditStage.value}: ${reviewNote.value || 'Necessário ajuste manual nos dados.'}`
 }
 
 const handleUndo = () => {
@@ -77,6 +80,8 @@ const handleUndo = () => {
   isApproved.value = false
   showReviewInput.value = false
   reviewNote.value = ''
+  props.details.stage = 'Publicação'
+  props.details.status = 'Em andamento'
 }
 
 const goToDashboard = () => {
@@ -86,111 +91,131 @@ const goToDashboard = () => {
 
 <template>
   <div class="stage-container">
-
-    <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
-    <div class="card">
-      <div class="card-header">
-        <div class="header-left">
-          <h3>Dados Extraídos</h3>
-          <p class="header-desc">
-            Resultados do cálculo analítico gerado automaticamente pelo backend.
-          </p>
+    <template v-if="!showSuccess">
+      <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
+      <div class="card">
+        <div class="card-header">
+          <div class="header-left">
+            <h3>Dados Extraídos</h3>
+            <p class="header-desc">
+              Resultados do cálculo analítico gerado automaticamente pelo backend.
+            </p>
+          </div>
+          <span class="badge success">Cálculo Concluído</span>
         </div>
-        <span class="badge success">Cálculo Concluído</span>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Parâmetro / Algoritmo</th>
-                <th>Resultado</th>
-                <th>Referência (Lei)</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in extractedData" :key="row.param">
-                <td>{{ row.param }}</td>
-                <td class="result-cell">{{ row.result }}</td>
-                <td class="ref-cell">{{ row.reference }}</td>
-                <td>
-                  <span class="badge-sm" :class="row.status">{{ row.statusLabel }}</span>
-                </td>
-              </tr>
-              <tr v-if="extractedData.length === 0">
-                <td colspan="4" class="empty-row">Nenhum dado analítico disponível ainda.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ PAINEL DE DECISÃO: aguardando auditor ══════════════════════════════ -->
-    <div v-if="isAwaiting" class="action-panel">
-      <div class="action-content">
-        <div class="action-icon-wrap">
-          <FiSearch size="22" />
-        </div>
-        <div class="action-text">
-          <h3>Revisão do Auditor</h3>
-          <p>
-            Os dados foram processados e validados com sucesso. Deseja aprovar e consolidar
-            na base de produção?
-          </p>
+        <div class="card-body p-0">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Parâmetro / Algoritmo</th>
+                  <th>Resultado</th>
+                  <th>Referência (Lei)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in extractedData" :key="row.param">
+                  <td>{{ row.param }}</td>
+                  <td class="result-cell">{{ row.result }}</td>
+                  <td class="ref-cell">{{ row.reference }}</td>
+                  <td>
+                    <span class="badge-sm" :class="row.status">{{ row.statusLabel }}</span>
+                  </td>
+                </tr>
+                <tr v-if="extractedData.length === 0">
+                  <td colspan="4" class="empty-row">Nenhum dado analítico disponível ainda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div class="action-buttons">
-        <button class="btn btn-outline-danger" @click="handleRejectRequest">
-          <FiThumbsDown size="15" />
-          Solicitar Revisão
-        </button>
-        <button class="btn btn-primary" @click="handleApprove">
-          <FiCheck size="15" />
-          Aprovar e Publicar
-        </button>
-      </div>
-    </div>
 
-    <!-- ═══ INPUT DE NOTA DE REVISÃO ══════════════════════════════════════════ -->
-    <div v-if="showReviewInput" class="review-input-panel">
-      <h4>Motivo da Revisão</h4>
-      <p>Descreva o que precisa ser corrigido para o editor.</p>
-      <textarea
-        v-model="reviewNote"
-        class="review-textarea"
-        placeholder="Ex: O polígono 45 apresenta sobreposição com área de APP. Necessário ajuste manual..."
-        rows="3"
-      />
-      <div class="review-actions">
-        <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
-        <button class="btn btn-outline-danger" @click="handleConfirmReject">
-          <FiThumbsDown size="15" />
-          Confirmar e Enviar ao Editor
-        </button>
+      <!-- ═══ PAINEL DE DECISÃO: aguardando auditor ══════════════════════════════ -->
+      <div v-if="isAwaiting" class="action-panel">
+        <div class="action-content">
+          <div class="action-icon-wrap">
+            <FiSearch size="22" />
+          </div>
+          <div class="action-text">
+            <h3>Revisão do Gestor</h3>
+            <p>
+              Os dados foram processados e validados com sucesso. Deseja aprovar e consolidar na
+              base de produção?
+            </p>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-outline-danger" @click="handleRejectRequest">
+            <FiThumbsDown size="15" />
+            Solicitar Revisão
+          </button>
+          <button class="btn btn-primary" @click="handleApprove">
+            <FiCheck size="15" />
+            Aprovar e Publicar
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- ═══ REVISÃO ENVIADA (rejeitado nesta sessão) ════════════════════════════ -->
-    <div v-if="isRejected" class="alert-banner danger">
-      <div class="alert-icon-lg">
-        <FiAlertTriangle size="26" />
-      </div>
-      <div class="alert-text">
-        <strong>Enviado para o Editor (Quarentena)</strong>
+      <!-- ═══ INPUT DE NOTA DE REVISÃO / AUDITORIA DE ETAPA ANTERIOR ═════════ -->
+      <div v-if="showReviewInput" class="review-input-panel">
+        <h4>Solicitar Revisão de Etapa Anterior</h4>
         <p>
-          Este lote foi rejeitado pelo auditor e transferido para a área de edição.
-          <span v-if="reviewNote"><br /><em>Nota: {{ reviewNote }}</em></span>
+          Selecione a etapa anterior que necessita de revisão e informe o motivo. O editor deverá
+          corrigir e re-enviar o arquivo.
         </p>
-      </div>
-      <button class="btn-ghost-small" @click="handleUndo">
-        <FiRotateCcw size="13" />
-        Desfazer
-      </button>
-    </div>
 
-    <!-- ═══ SUCESSO: publicado (nesta sessão ou já concluído no backend) ════════ -->
+        <div style="margin-bottom: 0.85rem">
+          <label
+            style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 0.35rem"
+          >
+            Etapa a ser auditada:
+          </label>
+          <select v-model="targetAuditStage" class="input" style="max-width: 250px">
+            <option value="Tratamento">Tratamento</option>
+            <option value="Validação">Validação</option>
+          </select>
+        </div>
+
+        <textarea
+          v-model="reviewNote"
+          class="review-textarea"
+          placeholder="Ex: Identificado conflito de geometria nos polígonos. Necessário ajuste manual pelo editor..."
+          rows="3"
+        />
+        <div class="review-actions">
+          <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
+          <button class="btn btn-outline-danger" @click="handleConfirmReject">
+            <FiThumbsDown size="15" />
+            Confirmar e Enviar para Revisão
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══ REVISÃO ENVIADA (rejeitado nesta sessão) ════════════════════════════ -->
+      <div v-if="isRejected" class="alert-banner danger">
+        <div class="alert-icon-lg">
+          <FiAlertTriangle size="26" />
+        </div>
+        <div class="alert-text">
+          <strong>Revisão Solicitada para a etapa de {{ targetAuditStage }}</strong>
+          <p>
+            O processo foi encaminhado para revisão de <strong>{{ targetAuditStage }}</strong> com
+            gestor alocado. Status atualizado para <strong>Em andamento</strong>.
+            <span v-if="reviewNote"
+              ><br /><em>Instruções ao editor: {{ reviewNote }}</em></span
+            >
+          </p>
+        </div>
+        <button class="btn-ghost-small" @click="handleUndo">
+          <FiRotateCcw size="13" />
+          Desfazer
+        </button>
+      </div>
+    </template>
+
+    <!-- ═══ SUCESSO: publicado (nesta sessão) ════════ -->
     <div v-if="showSuccess" class="success-card">
       <div class="success-content">
         <div class="success-icon-wrap">
@@ -198,8 +223,8 @@ const goToDashboard = () => {
         </div>
         <h3>Carga Publicada com Sucesso!</h3>
         <p>
-          Os dados espaciais e tabulares já estão disponíveis no banco de produção e visíveis
-          nos dashboards de negócio.
+          Os dados espaciais e tabulares já estão disponíveis no banco de produção e visíveis nos
+          dashboards de negócio.
         </p>
         <div class="success-meta">
           <span>
@@ -242,21 +267,24 @@ const goToDashboard = () => {
       </div>
     </div>
 
-    <!-- ═══ ERRO / QUARENTENA ══════════════════════════════════════════════════ -->
+    <!-- ═══ ERRO / QUARENTENA (DESVIO LATERAL) ══════════════════════════════════ -->
     <div v-if="isError && details.pauseReason" class="alert-banner danger">
       <div class="alert-icon-lg">
         <FiAlertTriangle size="26" />
       </div>
       <div class="alert-text">
-        <strong>Processo em Quarentena — Publicação Bloqueada</strong>
+        <strong>Registros em Quarentena — Publicação Bloqueada</strong>
         <p>{{ details.pauseReason }}</p>
+        <p style="font-size: 0.82rem; margin-top: 0.35rem; opacity: 0.7">
+          Os registros rejeitados foram desviados para a quarentena. O editor deve corrigir o
+          arquivo e subir novamente.
+        </p>
       </div>
       <button class="btn-warning-outline" @click="emit('open-quarantine')">
         <FiAlertTriangle size="14" />
         Ver Quarentena
       </button>
     </div>
-
   </div>
 </template>
 
@@ -304,10 +332,14 @@ const goToDashboard = () => {
   gap: 1.25rem;
 }
 
-.card-body.p-0 { padding: 0; }
+.card-body.p-0 {
+  padding: 0;
+}
 
 /* TABLE */
-.table-wrapper { overflow-x: auto; }
+.table-wrapper {
+  overflow-x: auto;
+}
 
 .data-table {
   width: 100%;
@@ -332,9 +364,17 @@ const goToDashboard = () => {
   letter-spacing: 0.04em;
 }
 
-.data-table td { color: var(--color-text); }
-.result-cell { font-weight: 600; color: var(--color-heading) !important; }
-.ref-cell { font-size: 0.82rem !important; opacity: 0.7; }
+.data-table td {
+  color: var(--color-text);
+}
+.result-cell {
+  font-weight: 600;
+  color: var(--color-heading) !important;
+}
+.ref-cell {
+  font-size: 0.82rem !important;
+  opacity: 0.7;
+}
 
 .empty-row {
   text-align: center;
@@ -366,9 +406,18 @@ const goToDashboard = () => {
   display: inline-block;
 }
 
-.badge-sm.success { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
-.badge-sm.error   { background: rgba(220, 53, 69, 0.1);  color: #dc3545; }
-.badge-sm.warning { background: rgba(234, 179, 8, 0.12); color: #92400e; }
+.badge-sm.success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+.badge-sm.error {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+.badge-sm.warning {
+  background: rgba(234, 179, 8, 0.12);
+  color: #92400e;
+}
 
 /* ACTION PANEL */
 .action-panel {
@@ -494,7 +543,9 @@ const goToDashboard = () => {
   padding-top: 0.1rem;
 }
 
-.alert-text { flex-grow: 1; }
+.alert-text {
+  flex-grow: 1;
+}
 
 .alert-text strong {
   display: block;
@@ -567,7 +618,9 @@ const goToDashboard = () => {
   border: 1px solid rgba(22, 163, 74, 0.2);
 }
 
-.meta-divider { opacity: 0.4; }
+.meta-divider {
+  opacity: 0.4;
+}
 
 .success-actions {
   display: flex;
@@ -638,7 +691,9 @@ const goToDashboard = () => {
   color: var(--color-text);
 }
 
-.btn-ghost:hover { background: var(--color-background); }
+.btn-ghost:hover {
+  background: var(--color-background);
+}
 
 .btn-ghost-small {
   display: inline-flex;
@@ -657,7 +712,9 @@ const goToDashboard = () => {
   transition: all 0.2s;
 }
 
-.btn-ghost-small:hover { background: rgba(220, 53, 69, 0.08); }
+.btn-ghost-small:hover {
+  background: rgba(220, 53, 69, 0.08);
+}
 
 .btn-warning-outline {
   display: inline-flex;
@@ -676,5 +733,8 @@ const goToDashboard = () => {
   transition: all 0.2s;
 }
 
-.btn-warning-outline:hover { background: #f59e0b; color: #fff; }
+.btn-warning-outline:hover {
+  background: #f59e0b;
+  color: #fff;
+}
 </style>

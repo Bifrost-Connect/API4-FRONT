@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@types/leaflet':
+        specifier: ^1.9.22
+        version: 1.9.22
       axios:
         specifier: ^1.20.0
         version: 1.20.0
@@ -42,9 +45,6 @@ importers:
       '@types/jsdom':
         specifier: ^28.0.3
         version: 28.0.3
-      '@types/leaflet':
-        specifier: ^1.9.22
-        version: 1.9.22
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
