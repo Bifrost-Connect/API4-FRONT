@@ -34,14 +34,16 @@ export const mockArquivoOriginalSuccess = (file: File) => {
   const formatoDetectado = file.name.endsWith('.geojson') ? 'geojson' : 'zip';
   return {
     id: 1024,
+    processoId: 99,
+    usuarioUploadId: 1,
     nomeOriginal: file.name,
-    formato: formatoDetectado,
-    tamanho: file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '15.4 MB',
-    recordCount: 1542,
-    epsgDetected: '4674',
-    epsgDivergence: false,
+    extensao: formatoDetectado,
+    tipoMime: file.type || (formatoDetectado === 'zip' ? 'application/zip' : 'application/geo+json'),
+    tamanhoBytes: file.size || 15420000,
+    urlArmazenamento: '/storage/mock/' + file.name,
+    hashSha256: 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2',
+    imutavel: true,
     dataUpload: new Date().toISOString(),
-    status: 'PROCESSADO_COM_SUCESSO',
   };
 };
 
@@ -70,15 +72,18 @@ export const mockUploadOptions = {
   anos: ['2026', '2025', '2024', '2023', '2022', '2021', '2020'],
   epsgs: [
     { id: '4326', label: 'EPSG:4326 (WGS 84)' },
-    { id: '3857', label: 'EPSG:3857 (Pseudo-Mercator)' },
     { id: '4674', label: 'EPSG:4674 (SIRGAS 2000)' },
-    { id: '31983', label: 'EPSG:31983 (SIRGAS 2000 / UTM zone 23S)' },
+  ],
+  orgaos: [
+    { id: 1, label: 'IBGE' },
+    { id: 2, label: 'INCRA' },
+    { id: 3, label: 'ANA' },
   ],
   conjuntos: [
-    { id: 'imoveis', label: 'Imóveis rurais' },
-    { id: 'malha', label: 'Malha municipal' },
-    { id: 'reserva', label: 'Reserva legal' },
-    { id: 'uso_solo', label: 'Uso e cobertura do solo' },
-    { id: 'app_hidrografica', label: 'APP Hidrográfica' },
+    { id: 1, label: 'Imóveis rurais' },
+    { id: 2, label: 'Malha municipal' },
+    { id: 3, label: 'Reserva legal' },
+    { id: 4, label: 'Uso e cobertura do solo' },
+    { id: 5, label: 'APP Hidrográfica' },
   ],
 }

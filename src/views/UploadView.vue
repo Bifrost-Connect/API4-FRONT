@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, shallowRef, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle } from 'vue-icons-plus/fi'
 import { uploadService } from '@/services/upload'
@@ -33,6 +33,7 @@ const descricao = ref('')
 const formOptions = ref({
   anos: [] as string[],
   epsgs: [] as { id: string; label: string }[],
+  orgaos: [] as { id: string; label: string }[],
   conjuntos: [] as { id: string; label: string }[],
 })
 
@@ -60,15 +61,29 @@ onMounted(async () => {
   }
 })
 
-const arquivoSelecionado = ref<File | null>(null)
+const arquivoSelecionado = shallowRef<File | null>(null)
 const isUploading = ref(false)
 const erroMensagem = ref<{ titulo: string; texto: string } | null>(null)
 const isDragover = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadResult = ref<any>(null)
 
-const isStep1Valid = computed(() => nomeCamada.value.trim().length > 0)
+const isStep1Valid = computed(() => 
+  nomeCamada.value.trim().length > 0 &&
+  orgaoEmissor.value !== '' &&
+  anoReferencia.value !== '' &&
+  epsg.value !== '' &&
+  conjuntoDados.value !== ''
+)
 const isStep2Valid = computed(() => arquivoSelecionado.value !== null)
+
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 
 const triggerFileInput = () => {
   if (!isUploading.value) {
@@ -198,13 +213,12 @@ const resetForm = () => {
 
         <div class="form-group">
           <label class="label" for="upload-orgao">Órgão Emissor *</label>
-          <input
-            id="upload-orgao"
-            v-model="orgaoEmissor"
-            type="text"
-            class="input"
-            placeholder="Ex: IBGE, INCRA, MapBiomas..."
-          />
+          <select id="upload-orgao" v-model="orgaoEmissor" class="input">
+            <option value="">Selecione o órgão</option>
+            <option v-for="item in formOptions.orgaos" :key="item.id" :value="item.id">
+              {{ item.label }}
+            </option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -311,7 +325,7 @@ const resetForm = () => {
               {{ arquivoSelecionado.name }}
             </p>
             <p class="dropzone__subtitle">
-              {{ (arquivoSelecionado.size / 1024 / 1024).toFixed(2) }} MB
+              {{ formatFileSize(arquivoSelecionado.size) }}
             </p>
             <div class="dropzone__formats">
               <span
@@ -364,33 +378,27 @@ const resetForm = () => {
           </div>
           <div class="detail-row">
             <span>Formato Detectado:</span>
-            <strong style="text-transform: uppercase">{{ uploadResult.formato }}</strong>
+            <strong style="text-transform: uppercase">{{ uploadResult.extensao || uploadResult.formato }}</strong>
           </div>
           <div class="detail-row">
             <span>Tamanho do Arquivo:</span>
-            <strong>{{ uploadResult.tamanho }}</strong>
+            <strong>{{ uploadResult.tamanhoBytes ? formatFileSize(uploadResult.tamanhoBytes) : uploadResult.tamanho }}</strong>
           </div>
           <div class="detail-row">
-            <span>Contagem de Registros:</span>
-            <strong>{{ uploadResult.recordCount }}</strong>
+            <span>Hash de Integridade (SHA-256):</span>
+            <strong class="hash-text" :title="uploadResult.hashSha256">{{ uploadResult.hashSha256 || 'Calculando...' }}</strong>
           </div>
 
-          <div class="epsg-box">
+          <div class="epsg-box mt-3">
             <div class="epsg-box-item">
               <span class="epsg-label">EPSG Declarado</span>
               <strong class="epsg-val">{{
                 formOptions.epsgs.find((e) => e.id === epsg)?.label || epsg || 'N/A'
               }}</strong>
             </div>
-            <div class="epsg-box-item" :class="{ 'warning-bg': uploadResult.epsgDivergence }">
-              <span class="epsg-label">EPSG Detectado</span>
-              <strong class="epsg-val" :class="{ 'text-warning': uploadResult.epsgDivergence }">
-                {{
-                  formOptions.epsgs.find((e) => e.id === uploadResult.epsgDetected)?.label ||
-                  uploadResult.epsgDetected ||
-                  'N/A'
-                }}
-              </strong>
+            <div class="epsg-box-item">
+              <span class="epsg-label">Status da Carga</span>
+              <strong class="epsg-val" style="color: var(--vis-brand-orange)">Enviada para processamento</strong>
             </div>
           </div>
         </div>

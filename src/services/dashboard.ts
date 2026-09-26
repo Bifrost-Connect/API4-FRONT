@@ -1,5 +1,6 @@
-import api from './api'
-import { mockProcessosPage, mockMetricasResponse, mockFilterOptions, mockAvailableEditors } from './mocks/dashboard.mock'
+import api, { mockactive } from './api'
+import { mockProcessosPage, mockMetricasResponse } from './mocks/dashboard.mock'
+import { mockFilterOptions, mockAvailableEditors } from './mocks/filter.mock'
 
 export interface Page<T> {
   content: T[]
@@ -10,10 +11,10 @@ export interface Page<T> {
 }
 
 export interface ProcessoMetricasResponse {
-  total: number
-  concluidas: number
-  emAndamento: number
-  erros: number
+  totalProcessos: number
+  porSituacao: Record<string, number>
+  porEtapa: Record<string, number>
+  porConjunto: Record<string, number>
 }
 
 export interface DashboardSummary {
@@ -51,12 +52,40 @@ export interface DashboardFilters {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+export function mapStage(backendStage: string): string {
+  if (!backendStage) return 'Ingestão'
+  switch (backendStage) {
+    case 'INGESTAO': return 'Ingestão'
+    case 'TRATAMENTO': return 'Tratamento'
+    case 'VALIDACAO': return 'Validação'
+    case 'CALCULO_ANALITICO':
+    case 'PUBLICACAO':
+      return 'Publicação'
+    default:
+      return backendStage
+  }
+}
+
+export function mapStatus(backendStatus: string): any {
+  if (!backendStatus) return 'Em andamento'
+  switch (backendStatus) {
+    case 'CONCLUIDA': 
+    case 'COM_RESSALVA':
+      return 'Concluída'
+    case 'EM_ANDAMENTO': return 'Em andamento'
+    case 'EM_VALIDACAO': return 'Aguardando validação'
+    case 'FALHOU': return 'Falhou'
+    default: return backendStatus
+  }
+}
+
 export function mapMetricasToSummary(metricas: ProcessoMetricasResponse): DashboardSummary[] {
+  const getVal = (key: string) => metricas.porSituacao?.[key] || 0
   return [
-    { title: 'TOTAL DE CARGAS', value: metricas.total, type: 'orange', iconType: 'down' },
-    { title: 'CONCLUÍDAS', value: metricas.concluidas, type: 'success', iconType: 'check' },
-    { title: 'EM ANDAMENTO', value: metricas.emAndamento, type: 'info', iconType: 'down' },
-    { title: 'ERROS', value: metricas.erros, type: 'danger', iconType: 'error' },
+    { title: 'TOTAL DE CARGAS', value: metricas.totalProcessos || 0, type: 'orange', iconType: 'down' },
+    { title: 'CONCLUÍDAS', value: getVal('CONCLUIDA') + getVal('COM_RESSALVA') + getVal('Concluída'), type: 'success', iconType: 'check' },
+    { title: 'EM ANDAMENTO', value: getVal('EM_ANDAMENTO') + getVal('Em andamento'), type: 'info', iconType: 'down' },
+    { title: 'ERROS', value: getVal('FALHOU') + getVal('EM_VALIDACAO') + getVal('Falhou') + getVal('Aguardando validação'), type: 'danger', iconType: 'error' },
   ]
 }
 
@@ -65,8 +94,12 @@ export const dashboardService = {
     try {
       const res = await api.get('/processos/metricas')
       return mapMetricasToSummary(res.data)
-    } catch (err) {
-      console.warn('API indisponível, usando mock para métricas')
+    } catch (err: any) {
+      if (mockactive) throw err;
+      if (err.response && err.response.status !== 404) {
+        throw err.response.data || err;
+      }
+      console.warn('API indisponível (ou rota 404), usando mock para métricas')
       await delay(400)
       return mapMetricasToSummary(mockMetricasResponse)
     }
@@ -83,9 +116,19 @@ export const dashboardService = {
         if (filters.situacao) params.situacao = filters.situacao
       }
       const res = await api.get('/processos', { params })
+      if (res.data && res.data.content) {
+        res.data.content.forEach((item: any) => {
+          item.stage = mapStage(item.stage)
+          item.status = mapStatus(item.status)
+        })
+      }
       return res.data
-    } catch (err) {
-      console.warn('API indisponível, usando mock para processos do dashboard')
+    } catch (err: any) {
+      if (mockactive) throw err;
+      if (err.response && err.response.status !== 404) {
+        throw err.response.data || err;
+      }
+      console.warn('API indisponível (ou rota 404), usando mock para processos do dashboard')
       await delay(600)
 
       // Simulate filtering on mock data
@@ -117,25 +160,17 @@ export const dashboardService = {
   },
 
   async getFilterOptions() {
-    try {
-      const res = await api.get('/api/v1/dominios/processos')
-      return res.data
-    } catch (err) {
-      console.warn('API indisponível, usando mock para opções de filtro')
-      await delay(400)
-      return mockFilterOptions
-    }
+    // Retornando mock diretamente pois o endpoint não existe no backend ainda
+    // Isso evita o erro 404 no console
+    await delay(400)
+    return mockFilterOptions
   },
 
   async getAvailableEditors(): Promise<string[]> {
-    try {
-      const res = await api.get('/api/v1/usuarios?perfil=EDITOR')
-      return res.data
-    } catch (err) {
-      console.warn('API indisponível, usando mock para editores')
-      await delay(400)
-      return mockAvailableEditors
-    }
+    // Retornando mock diretamente pois o endpoint não existe no backend ainda
+    // Isso evita o erro 404 no console
+    await delay(400)
+    return mockAvailableEditors
   },
 
   /**
@@ -146,8 +181,12 @@ export const dashboardService = {
     try {
       const res = await api.put(`/processos/${processId}/editor`, { editorName })
       return res.data
-    } catch (err) {
-      console.warn('API indisponível, usando mock para alocação de editor')
+    } catch (err: any) {
+      if (mockactive) throw err;
+      if (err.response && err.response.status !== 404) {
+        throw err.response.data || err;
+      }
+      console.warn('API indisponível (ou rota 404), usando mock para alocação de editor')
       await delay(400)
       const process = mockProcessosPage.content.find((p) => p.id === processId)
       if (process) {
@@ -155,9 +194,11 @@ export const dashboardService = {
         process.status = 'Em andamento'
         process.pauseReason = `Editor ${editorName} alocado para correção do erro na etapa de ${process.stage}.`
         
-        // Update mocked metrics
-        mockMetricasResponse.emAndamento++
-        mockMetricasResponse.erros--
+        // Update mocked metrics safely
+        if (mockMetricasResponse.porSituacao) {
+          mockMetricasResponse.porSituacao['Em andamento'] = (mockMetricasResponse.porSituacao['Em andamento'] || 0) + 1
+          mockMetricasResponse.porSituacao['Falhou'] = Math.max(0, (mockMetricasResponse.porSituacao['Falhou'] || 0) - 1)
+        }
       }
       return process || null
     }

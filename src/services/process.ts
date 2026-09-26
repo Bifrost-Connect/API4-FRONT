@@ -1,4 +1,4 @@
-import api from './api'
+import api, { mockactive } from './api'
 import {
   mockProcessDetails,
   type ProcessLogDetails as MockProcessLogDetails,
@@ -12,39 +12,25 @@ export type ProcessAnalyticsRow = MockProcessAnalyticsRow
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+import { mapStage, mapStatus } from './dashboard'
+
 export const processService = {
   /**
    * Busca os detalhes completos de um processo, incluindo os checklists de
    * Validação/Tratamento e os dados analíticos de Publicação.
    *
    * API esperada: GET /api/processes/{id}
-   *
-   * Resposta esperada (JSON):
-   * {
-   *   "id": "string",
-   *   "dataset": "string",
-   *   "stage": "Ingestão" | "Validação" | "Tratamento" | "Publicação",
-   *   "status": "Concluída" | "Em andamento" | "Aguardando validação" | "Falhou",
-   *   "dateTime": "string (DD/MM/YYYY)",
-   *   "layerName": "string",
-   *   "source": "string",
-   *   "year": "string",
-   *   "epsg": "string",
-   *   "description": "string",
-   *   "originalFileUrl": "string (URL do arquivo para download)",
-   *   "mapCoordinates": [[lat, lng], ...],
-   *   "logs": { "Ingestão": ["string"], "Validação": ["string"], ... },
-   *   "pauseReason": "string | null",
-   *   "validationChecks": [ { id, label, description, status, detail } ],
-   *   "treatmentChecks":  [ { id, label, description, status, detail } ],
-   *   "analyticsData":    [ { param, result, reference, status, statusLabel } ]
-   * }
    */
   async getProcessDetails(id: string): Promise<ProcessLogDetails> {
     try {
       const res = await api.get(`/processos/${id}`)
+      if (res.data) {
+        res.data.stage = mapStage(res.data.stage)
+        res.data.status = mapStatus(res.data.status)
+      }
       return res.data
     } catch (err) {
+      if (mockactive) throw err;
       console.warn('API indisponível, usando mock para detalhes do processo')
       await delay(600)
       const details = mockProcessDetails[id]

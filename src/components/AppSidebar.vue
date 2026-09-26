@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { mockCurrentUser } from '../services/mocks/user.mock'
 
 const navigationItems = [
   { label: 'Dashboard', to: '/', icon: '▦' },
@@ -13,8 +14,8 @@ const navigationItems = [
     <div class="brand">
       <span class="brand-mark">A4</span>
       <div>
-        <strong>API4</strong>
-        <span>Operador</span>
+        <strong>{{ mockCurrentUser.name }}</strong>
+        <span>{{ mockCurrentUser.role }}</span>
       </div>
     </div>
 

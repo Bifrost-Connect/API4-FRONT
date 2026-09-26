@@ -105,37 +105,13 @@ export const mockProcessosPage: Page<ProcessLog> = {
 }
 
 export const mockMetricasResponse: ProcessoMetricasResponse = {
-  total: 8,
-  concluidas: 1,
-  emAndamento: 4,
-  erros: 3,
+  totalProcessos: 8,
+  porSituacao: {
+    'Concluída': 1,
+    'Em andamento': 4,
+    'Falhou': 3
+  },
+  porEtapa: {},
+  porConjunto: {}
 }
 
-export const mockFilterOptions = {
-  conjuntos: [
-    { id: 'imoveis', label: 'Imóveis rurais' },
-    { id: 'malha', label: 'Malha municipal' },
-    { id: 'reserva', label: 'Reserva legal' },
-    { id: 'uso_solo', label: 'Uso e cobertura do solo' },
-    { id: 'app_hidrografica', label: 'APP Hidrográfica' },
-  ],
-  etapas: [
-    { id: 'ingestao', label: 'Ingestão' },
-    { id: 'validacao', label: 'Validação' },
-    { id: 'tratamento', label: 'Tratamento' },
-    { id: 'publicacao', label: 'Publicação' },
-  ],
-  situacoes: [
-    { id: 'concluida', label: 'Concluída' },
-    { id: 'andamento', label: 'Em andamento' },
-    { id: 'validacao', label: 'Aguardando validação' },
-    { id: 'falhou', label: 'Falhou' },
-  ],
-}
-
-export const mockAvailableEditors = [
-  'Carlos Mendes (Topologia)',
-  'Mariana Silva (Validação Geométrica)',
-  'Roberto Alves (Auditor Geral)',
-  'Fernanda Lima (Atributos e Schema)',
-]
