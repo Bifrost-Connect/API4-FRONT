@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { AiOutlineEye, AiOutlineEyeInvisible } from 'vue-icons-plus/ai'
 const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
@@ -27,14 +29,16 @@ const fillLogin = (role: string) => {
           />
           <button
             type="button"
-            class="btn btn_outline btn_visualizar"
+            class="btn-visualizar"
             @click="showPassword = !showPassword"
+            title="Mostrar/Ocultar senha"
           >
-            {{ showPassword ? 'Ocultar' : 'Visualizar' }}
+            <AiOutlineEyeInvisible v-if="showPassword" size="20" />
+            <AiOutlineEye v-else size="20" />
           </button>
         </div>
       </div>
-      <button class="btn btn_primary">Entrar</button>
+      <router-link to="/" class="btn btn_primary">Entrar</router-link>
     </div>
 
     <div class="notice-card">
@@ -99,16 +103,33 @@ const fillLogin = (role: string) => {
 }
 
 .password-input-wrapper {
+  position: relative;
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
 }
+
 .password-input {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
+  padding-right: 2.5rem;
 }
-.btn_visualizar {
-  padding: 0 0.75rem;
-  font-size: 0.85rem;
+
+.btn-visualizar {
+  position: absolute;
+  right: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--color-text);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-visualizar:hover {
+  opacity: 1;
 }
 
 .login-card .btn {
