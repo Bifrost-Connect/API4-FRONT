@@ -75,15 +75,15 @@ export const mockUploadOptions = {
     { id: '4674', label: 'EPSG:4674 (SIRGAS 2000)' },
   ],
   orgaos: [
-    { id: '1', label: 'IBGE' },
-    { id: '2', label: 'INCRA' },
-    { id: '3', label: 'ANA' },
+    { id: '5', label: 'IBGE' },
+    { id: '6', label: 'INCRA' },
+    { id: '7', label: 'ANA' },
   ],
   conjuntos: [
-    { id: '1', label: 'Imóveis rurais' },
-    { id: '2', label: 'Malha municipal' },
-    { id: '3', label: 'Reserva legal' },
-    { id: '4', label: 'Uso e cobertura do solo' },
-    { id: '5', label: 'APP Hidrográfica' },
+  { id: '2', label: 'Imóveis rurais' },
+  { id: '3', label: 'Malha municipal' },
+  { id: '4', label: 'Reserva legal' },
+  { id: '5', label: 'Uso e cobertura do solo' },
+  { id: '6', label: 'APP Hidrográfica' },
   ],
 }
