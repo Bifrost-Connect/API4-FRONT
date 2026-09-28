@@ -157,8 +157,8 @@ export const dashboardService = {
         if (filters.dateBegin) params.dataInicio = filters.dateBegin
         if (filters.dateEnd) params.dataFim = filters.dateEnd
         if (filters.conjunto) params.conjuntoId = filters.conjunto
-        if (filters.etapa) params.etapa = filters.etapa
-        if (filters.situacao) params.situacao = filters.situacao
+        if (filters.etapa) params.etapaId = filters.etapa
+        if (filters.situacao) params.situacaoId = filters.situacao
       }
 
       const res = await api.get('/processos', { params })
@@ -210,9 +210,9 @@ export const dashboardService = {
   },
 
   async getFilterOptions() {
-    await delay(400)
-    return mockFilterOptions
-  },
+  const res = await api.get('/dominios/filtros')
+  return res.data
+},
 
   async getAvailableEditors(): Promise<{id: number, name: string}[]> {
     try {
