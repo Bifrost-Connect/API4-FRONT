@@ -182,15 +182,15 @@ export const dashboardService = {
 
       if (filters) {
         if (filters.conjunto) {
-          const option = mockFilterOptions.conjuntos.find((o) => o.id === filters.conjunto)
+          const option = mockFilterOptions.conjuntos.find((o) => String(o.id) === String(filters.conjunto))
           if (option) filteredProcesses = filteredProcesses.filter((p) => p.dataset === option.label)
         }
         if (filters.etapa) {
-          const option = mockFilterOptions.etapas.find((o) => o.id === filters.etapa)
+          const option = mockFilterOptions.etapas.find((o) => String(o.id) === String(filters.etapa))
           if (option) filteredProcesses = filteredProcesses.filter((p) => p.stage === option.label)
         }
         if (filters.situacao) {
-          const option = mockFilterOptions.situacoes.find((o) => o.id === filters.situacao)
+          const option = mockFilterOptions.situacoes.find((o) => String(o.id) === String(filters.situacao))
           if (option) filteredProcesses = filteredProcesses.filter((p) => p.status === option.label)
         }
       }
@@ -210,9 +210,15 @@ export const dashboardService = {
   },
 
   async getFilterOptions() {
-  const res = await api.get('/dominios/filtros')
-  return res.data
-},
+    try {
+      const res = await api.get('/dominios/filtros')
+      return res.data
+    } catch (err) {
+      console.warn('Endpoint /dominios/filtros não encontrado, usando mockFilterOptions')
+      await delay(400)
+      return mockFilterOptions
+    }
+  },
 
   async getAvailableEditors(): Promise<{id: number, name: string}[]> {
     try {

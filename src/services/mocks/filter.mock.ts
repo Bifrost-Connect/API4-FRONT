@@ -1,22 +1,24 @@
 export const mockFilterOptions = {
   conjuntos: [
-    { id: 'imoveis', label: 'Imóveis rurais' },
-    { id: 'malha', label: 'Malha municipal' },
-    { id: 'reserva', label: 'Reserva legal' },
-    { id: 'uso-solo', label: 'Uso e cobertura do solo' },
-    { id: 'app-hidrografica', label: 'APP Hidrográfica' },
+    { id: 1, label: 'Imóveis rurais' },
+    { id: 2, label: 'Malha municipal' },
+    { id: 3, label: 'Reserva legal' },
+    { id: 4, label: 'Uso e cobertura do solo' },
+    { id: 5, label: 'APP Hidrográfica' },
   ],
   etapas: [
-    { id: 'ingestao', label: 'Ingestão' },
-    { id: 'validacao', label: 'Validação' },
-    { id: 'tratamento', label: 'Tratamento' },
-    { id: 'publicacao', label: 'Publicação' },
+    { id: 1, label: 'Ingestão' },
+    { id: 2, label: 'Tratamento' },
+    { id: 3, label: 'Validação' },
+    { id: 4, label: 'Cálculo Analítico' },
+    { id: 5, label: 'Publicação' },
   ],
   situacoes: [
-    { id: 'concluida', label: 'Concluída' },
-    { id: 'andamento', label: 'Em andamento' },
-    { id: 'validacao', label: 'Aguardando validação' },
-    { id: 'falhou', label: 'Falhou' },
+    { id: 1, label: 'Em andamento' },
+    { id: 2, label: 'Aguardando validação' },
+    { id: 3, label: 'Com ressalva' },
+    { id: 4, label: 'Falhou' },
+    { id: 5, label: 'Concluída' },
   ],
 }
 

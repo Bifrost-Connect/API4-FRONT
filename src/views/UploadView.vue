@@ -8,6 +8,7 @@ import Stepper from '@/components/Stepper.vue'
 
 // Passos
 const currentStep = ref(1)
+const currentProcessoId = ref<number | null>(null)
 const route = useRoute()
 const reprocessId = ref<string | null>(null)
 
@@ -142,9 +143,15 @@ const handleUpload = async () => {
   }
 
   try {
-    const processo = await uploadService.cadastrarMetadados(metadataPayload)
-    if (arquivoSelecionado.value) {
-      const response = await uploadService.uploadArquivo(processo.id, arquivoSelecionado.value)
+    let processoId = currentProcessoId.value;
+    if (!processoId) {
+      const processo = await uploadService.cadastrarMetadados(metadataPayload)
+      processoId = processo.id
+      currentProcessoId.value = processoId
+    }
+
+    if (arquivoSelecionado.value && processoId) {
+      const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
       uploadResult.value = response
       console.log('Upload sucesso:', response)
       currentStep.value = 3
@@ -162,6 +169,7 @@ const handleUpload = async () => {
 
 const resetForm = () => {
   currentStep.value = 1
+  currentProcessoId.value = null
   arquivoSelecionado.value = null
   nomeCamada.value = ''
   orgaoEmissor.value = ''
