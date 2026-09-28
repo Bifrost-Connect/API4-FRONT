@@ -33,8 +33,8 @@ const router = useRouter()
 // Modal de alocação de editor
 const showAssignModal = ref(false)
 const selectedProcessForEditor = ref<ProcessLog | null>(null)
-const selectedEditorName = ref('')
-const availableEditors = ref<string[]>([])
+const selectedEditorId = ref<number | ''>('')
+const availableEditors = ref<{id: number, name: string}[]>([])
 const isAssigning = ref(false)
 const notificationMessage = ref<string | null>(null)
 
@@ -107,30 +107,34 @@ const hasErrorAwaitingEditor = (item: ProcessLog) => {
 
 const openAssignModal = (item: ProcessLog) => {
   selectedProcessForEditor.value = item
-  if (availableEditors.value.length > 0 && !selectedEditorName.value) {
+  if (availableEditors.value.length > 0 && selectedEditorId.value === '') {
     const firstEditor = availableEditors.value[0]
-    if (firstEditor) selectedEditorName.value = firstEditor
+    if (firstEditor) selectedEditorId.value = firstEditor.id
   }
   showAssignModal.value = true
 }
 
 const confirmAssignEditor = async () => {
-  if (!selectedProcessForEditor.value) return
+  if (!selectedProcessForEditor.value || selectedEditorId.value === '') return
   isAssigning.value = true
   try {
+    const editorObj = availableEditors.value.find(e => e.id === selectedEditorId.value)
+    const editorName = editorObj ? editorObj.name : 'Desconhecido'
+
     const updated = await dashboardService.assignEditor(
       selectedProcessForEditor.value.id,
-      selectedEditorName.value,
+      Number(selectedEditorId.value),
+      editorName
     )
     if (updated) {
-      selectedProcessForEditor.value.assignedEditor = selectedEditorName.value
+      selectedProcessForEditor.value.assignedEditor = editorName
       selectedProcessForEditor.value.status = 'Em andamento'
-      selectedProcessForEditor.value.pauseReason = `Editor ${selectedEditorName.value} alocado para correção do erro na etapa de ${selectedProcessForEditor.value.stage}.`
+      selectedProcessForEditor.value.pauseReason = `Editor ${editorName} alocado para correção do erro na etapa de ${selectedProcessForEditor.value.stage}.`
 
       // Atualiza os cards puxando as métricas do servidor
       await loadSummary()
 
-      notificationMessage.value = `Editor ${selectedEditorName.value} alocado para a carga ${selectedProcessForEditor.value.id}! Processo agora em andamento.`
+      notificationMessage.value = `Editor ${editorName} alocado para a carga ${selectedProcessForEditor.value.id}! Processo agora em andamento.`
       setTimeout(() => {
         notificationMessage.value = null
       }, 5000)
@@ -382,9 +386,9 @@ const requestAuditor = async (item: ProcessLog) => {
             </div>
             <div class="form-group">
               <label class="label">Selecione o Editor Especialista:</label>
-              <select class="input" v-model="selectedEditorName">
-                <option v-for="editor in availableEditors" :key="editor" :value="editor">
-                  {{ editor }}
+              <select class="input" v-model="selectedEditorId">
+                <option v-for="editor in availableEditors" :key="editor.id" :value="editor.id">
+                  {{ editor.name }}
                 </option>
               </select>
             </div>
@@ -446,8 +450,20 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(1, 1fr);
   gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .mt-4 {
@@ -477,12 +493,23 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .filters-container {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
+  padding: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .filters-container {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1200px) {
+  .filters-container {
+    grid-template-columns: auto 1fr 1fr 1fr auto;
+    align-items: stretch;
+  }
 }
 
 .filter-item {
@@ -536,8 +563,11 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .filter-actions {
   display: flex;
-  align-items: center;
-  margin-left: auto;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+.filter-actions .btn {
+  height: 100%;
 }
 
 .btn-upload {

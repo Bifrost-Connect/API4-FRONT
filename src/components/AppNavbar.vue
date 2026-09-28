@@ -40,11 +40,10 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
 
 <style scoped>
 .navbar {
-  position: fixed;
+  position: sticky;
   top: 0;
-  right: 0;
-  left: 252px;
-  z-index: 30;
+  z-index: 100;
+  width: 100%;
   min-height: 76px;
   padding: 0 32px;
   display: flex;
@@ -53,9 +52,6 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
   gap: 20px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
 }
 
 .breadcrumb,

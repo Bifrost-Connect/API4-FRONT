@@ -45,9 +45,6 @@ const navigationItems = [
 
 <style scoped>
 .sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 20;
   width: 252px;
   height: 100vh;
   position: sticky;

@@ -214,14 +214,28 @@ export const dashboardService = {
     return mockFilterOptions
   },
 
-  async getAvailableEditors(): Promise<string[]> {
-    await delay(400)
-    return mockAvailableEditors
+  async getAvailableEditors(): Promise<{id: number, name: string}[]> {
+    try {
+      const res = await api.get('/processos/usuarios/auditores')
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        return res.data.map((u: any) => ({
+          id: u.id || u.usuarioId, 
+          name: u.nome || u.name || 'Auditor Sem Nome'
+        }))
+      }
+      // Fallback pois o backend pode estar retornando List.of() vazio
+      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
+    } catch (err: any) {
+      if (mockactive) throw err
+      console.warn('API indisponível, usando mock para auditores')
+      await delay(400)
+      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
+    }
   },
 
-  async assignEditor(processId: string, editorName: string): Promise<ProcessLog | null> {
+  async assignEditor(processId: string, editorId: number, editorName: string): Promise<ProcessLog | null> {
     try {
-      const res = await api.put(`/processos/${processId}/editor`, { editorName })
+      const res = await api.put(`/processos/${processId}/editor`, { editorId })
       return res.data
     } catch (err: any) {
       if (mockactive) throw err

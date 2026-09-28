@@ -150,9 +150,10 @@ const handleUpload = async () => {
       currentStep.value = 3
     }
   } catch (err: any) {
+    const errorData = err.response?.data || err;
     erroMensagem.value = {
-      titulo: err.erro || 'Falha no Upload',
-      texto: err.mensagem || 'Ocorreu um erro desconhecido durante o upload.',
+      titulo: errorData.erro || 'Falha no Upload',
+      texto: errorData.mensagem || 'Ocorreu um erro desconhecido durante o upload.',
     }
   } finally {
     isUploading.value = false

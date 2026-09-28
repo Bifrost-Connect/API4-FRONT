@@ -27,6 +27,8 @@ export const processService = {
       if (res.data) {
         res.data.stage = mapStage(res.data.stage)
         res.data.status = mapStatus(res.data.status)
+        const baseURL = api.defaults.baseURL || 'http://localhost:8080'
+        res.data.originalFileUrl = `${baseURL}/carga/download/${id}`
       }
       return res.data
     } catch (err) {

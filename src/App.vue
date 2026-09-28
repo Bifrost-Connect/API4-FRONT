@@ -29,8 +29,6 @@ import Navbar from './components/AppNavbar.vue'
 .main-wrapper {
   flex: 1;
   min-width: 0;
-  margin-left: 252px;
-  padding-top: 76px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
