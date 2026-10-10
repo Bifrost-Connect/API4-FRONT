@@ -101,7 +101,7 @@ export interface ProcessLogDetails {
 // HELPERS — blocos de dados reutilizáveis
 // ==========================================
 
-const validationChecksOk: ProcessStageCheck[] = [
+export const validationChecksOk: ProcessStageCheck[] = [
   {
     id: 'limites',
     label: 'Check Limites Estaduais',
@@ -163,7 +163,7 @@ const validationChecksError: ProcessStageCheck[] = [
   },
 ]
 
-const treatmentChecksOk = (epsg: string): ProcessStageCheck[] => [
+export const treatmentChecksOk = (epsg: string): ProcessStageCheck[] => [
   {
     id: 'reproj',
     label: 'Reprojeção de Coordenadas',
@@ -225,7 +225,7 @@ const treatmentChecksInProgress = (epsg: string): ProcessStageCheck[] => [
   },
 ]
 
-const analyticsDataOk: ProcessAnalyticsRow[] = [
+export const analyticsDataOk: ProcessAnalyticsRow[] = [
   {
     param: 'Cálculo de Área Total Contínua',
     result: '12.540 ha',

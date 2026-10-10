@@ -182,15 +182,22 @@ export const dashboardService = {
 
       if (filters) {
         if (filters.conjunto) {
-          const option = mockFilterOptions.conjuntos.find((o) => String(o.id) === String(filters.conjunto))
-          if (option) filteredProcesses = filteredProcesses.filter((p) => p.dataset === option.label)
+          const option = mockFilterOptions.conjuntos.find(
+            (o) => String(o.id) === String(filters.conjunto),
+          )
+          if (option)
+            filteredProcesses = filteredProcesses.filter((p) => p.dataset === option.label)
         }
         if (filters.etapa) {
-          const option = mockFilterOptions.etapas.find((o) => String(o.id) === String(filters.etapa))
+          const option = mockFilterOptions.etapas.find(
+            (o) => String(o.id) === String(filters.etapa),
+          )
           if (option) filteredProcesses = filteredProcesses.filter((p) => p.stage === option.label)
         }
         if (filters.situacao) {
-          const option = mockFilterOptions.situacoes.find((o) => String(o.id) === String(filters.situacao))
+          const option = mockFilterOptions.situacoes.find(
+            (o) => String(o.id) === String(filters.situacao),
+          )
           if (option) filteredProcesses = filteredProcesses.filter((p) => p.status === option.label)
         }
       }
@@ -220,13 +227,13 @@ export const dashboardService = {
     }
   },
 
-  async getAvailableEditors(): Promise<{id: number, name: string}[]> {
+  async getAvailableEditors(): Promise<{ id: number; name: string }[]> {
     try {
       const res = await api.get('/processos/usuarios/auditores')
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         return res.data.map((u: any) => ({
-          id: u.id || u.usuarioId, 
-          name: u.nome || u.name || 'Auditor Sem Nome'
+          id: u.id || u.usuarioId,
+          name: u.nome || u.name || 'Auditor Sem Nome',
         }))
       }
       // Fallback pois o backend pode estar retornando List.of() vazio
@@ -239,7 +246,11 @@ export const dashboardService = {
     }
   },
 
-  async assignEditor(processId: string, editorId: number, editorName: string): Promise<ProcessLog | null> {
+  async assignEditor(
+    processId: string,
+    editorId: number,
+    editorName: string,
+  ): Promise<ProcessLog | null> {
     try {
       const res = await api.put(`/processos/${processId}/editor`, { editorId })
       return res.data
@@ -269,4 +280,3 @@ export const dashboardService = {
     }
   },
 }
-

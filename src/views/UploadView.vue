@@ -69,12 +69,13 @@ const isDragover = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadResult = ref<any>(null)
 
-const isStep1Valid = computed(() => 
-  nomeCamada.value.trim().length > 0 &&
-  orgaoEmissor.value !== '' &&
-  anoReferencia.value !== '' &&
-  epsg.value !== '' &&
-  conjuntoDados.value !== ''
+const isStep1Valid = computed(
+  () =>
+    nomeCamada.value.trim().length > 0 &&
+    orgaoEmissor.value !== '' &&
+    anoReferencia.value !== '' &&
+    epsg.value !== '' &&
+    conjuntoDados.value !== '',
 )
 const isStep2Valid = computed(() => arquivoSelecionado.value !== null)
 
@@ -119,8 +120,7 @@ const handleDrop = (event: DragEvent) => {
       } else {
         erroMensagem.value = {
           titulo: 'Arquivo Inválido',
-          texto:
-            'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson).',
+          texto: 'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson).',
         }
       }
     }
@@ -139,11 +139,11 @@ const handleUpload = async () => {
     anoReferencia: anoReferencia.value,
     epsg: epsg.value,
     conjuntoDados: conjuntoDados.value,
-    descricao: descricao.value
+    descricao: descricao.value,
   }
 
   try {
-    let processoId = currentProcessoId.value;
+    let processoId = currentProcessoId.value
     if (!processoId) {
       const processo = await uploadService.cadastrarMetadados(metadataPayload)
       processoId = processo.id
@@ -153,11 +153,19 @@ const handleUpload = async () => {
     if (arquivoSelecionado.value && processoId) {
       const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
       uploadResult.value = response
+
+      // Chama o gatilho para iniciar o processamento no back-end
+      try {
+        await processService.iniciarProcessamento(processoId, arquivoSelecionado.value.name)
+      } catch (procErr) {
+        console.warn('Falha ao acionar inicio de processamento:', procErr)
+      }
+
       console.log('Upload sucesso:', response)
       currentStep.value = 3
     }
   } catch (err: any) {
-    const errorData = err.response?.data || err;
+    const errorData = err.response?.data || err
     erroMensagem.value = {
       titulo: errorData.erro || 'Falha no Upload',
       texto: errorData.mensagem || 'Ocorreu um erro desconhecido durante o upload.',
@@ -193,10 +201,24 @@ const resetForm = () => {
 
     <!-- Passo 1: Metadados -->
     <div v-show="currentStep === 1" class="upload-card step-card animate-in">
-      
-      <div v-if="reprocessId" class="alert-info mb-4" style="background-color: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; padding: 1rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
-        <FiInfo size="18" style="color: #3b82f6;" />
-        <span style="color: var(--color-text);">Reprocessando Carga #{{ reprocessId }} - O arquivo enviado substituirá os registros rejeitados na quarentena.</span>
+      <div
+        v-if="reprocessId"
+        class="alert-info mb-4"
+        style="
+          background-color: rgba(59, 130, 246, 0.1);
+          border-left: 3px solid #3b82f6;
+          padding: 1rem;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        "
+      >
+        <FiInfo size="18" style="color: #3b82f6" />
+        <span style="color: var(--color-text)"
+          >Reprocessando Carga #{{ reprocessId }} - O arquivo enviado substituirá os registros
+          rejeitados na quarentena.</span
+        >
       </div>
 
       <div class="card-header">
@@ -387,15 +409,23 @@ const resetForm = () => {
           </div>
           <div class="detail-row">
             <span>Formato Detectado:</span>
-            <strong style="text-transform: uppercase">{{ uploadResult.extensao || uploadResult.formato }}</strong>
+            <strong style="text-transform: uppercase">{{
+              uploadResult.extensao || uploadResult.formato
+            }}</strong>
           </div>
           <div class="detail-row">
             <span>Tamanho do Arquivo:</span>
-            <strong>{{ uploadResult.tamanhoBytes ? formatFileSize(uploadResult.tamanhoBytes) : uploadResult.tamanho }}</strong>
+            <strong>{{
+              uploadResult.tamanhoBytes
+                ? formatFileSize(uploadResult.tamanhoBytes)
+                : uploadResult.tamanho
+            }}</strong>
           </div>
           <div class="detail-row">
             <span>Hash de Integridade (SHA-256):</span>
-            <strong class="hash-text" :title="uploadResult.hashSha256">{{ uploadResult.hashSha256 || 'Calculando...' }}</strong>
+            <strong class="hash-text" :title="uploadResult.hashSha256">{{
+              uploadResult.hashSha256 || 'Calculando...'
+            }}</strong>
           </div>
 
           <div class="epsg-box mt-3">
@@ -407,7 +437,9 @@ const resetForm = () => {
             </div>
             <div class="epsg-box-item">
               <span class="epsg-label">Status da Carga</span>
-              <strong class="epsg-val" style="color: var(--vis-brand-orange)">Enviada para processamento</strong>
+              <strong class="epsg-val" style="color: var(--vis-brand-orange)"
+                >Enviada para processamento</strong
+              >
             </div>
           </div>
         </div>

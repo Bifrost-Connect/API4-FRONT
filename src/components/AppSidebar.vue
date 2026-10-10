@@ -7,6 +7,7 @@ const navigationItems = [
   { label: 'Dashboard', to: '/', icon: '▦' },
   { label: 'Upload de carga', to: '/upload', icon: '↑' },
   { label: 'Mapa operacional', to: '/mapa', icon: '⌖' },
+  { label: 'Auditoria', to: '/auditoria', icon: '⚲' },
 ]
 </script>
 
@@ -120,7 +121,10 @@ const navigationItems = [
   font-size: 0.9rem;
   text-decoration: none;
   border-left: 3px solid transparent;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
 }
 
 .navigation-link:hover,
@@ -167,7 +171,7 @@ const navigationItems = [
   .sidebar-section-title {
     display: none;
   }
-  
+
   .sidebar-footer {
     display: flex;
     padding-top: 8px;

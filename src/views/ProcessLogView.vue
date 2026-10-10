@@ -81,31 +81,35 @@ const currentComponent = computed(() => {
       return ProcessStageIngestao
   }
 })
-
-const cancelLoad = () => {
-  if (confirm('Tem certeza que deseja cancelar/invalidar esta carga?')) {
-    if (details.value) {
-      // Cast to any to bypass strict type if 'Invalidada' isn't in union
-      details.value.status = 'Invalidada' as any
-      details.value.pauseReason = 'Carga invalidada pelo operador'
-    }
-  }
-}
 </script>
 
 <template>
   <div class="process-log-view">
     <div class="process-header">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="margin: 0; color: var(--color-heading);">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        "
+      >
+        <h2 style="margin: 0; color: var(--color-heading)">
           Detalhes da Carga {{ processId }}
-          <span v-if="details" style="font-size: 0.9rem; margin-left: 0.5rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: var(--color-surface); border: 1px solid var(--color-border);">
+          <span
+            v-if="details"
+            style="
+              font-size: 0.9rem;
+              margin-left: 0.5rem;
+              padding: 0.2rem 0.6rem;
+              border-radius: 4px;
+              background: var(--color-surface);
+              border: 1px solid var(--color-border);
+            "
+          >
             {{ details.status }}
           </span>
         </h2>
-        <button v-if="details" class="btn btn_outline" style="color: #dc2626; border-color: #dc2626;" @click="cancelLoad">
-          Cancelar Carga
-        </button>
       </div>
       <Stepper
         :currentStep="activeStepIndex"
@@ -132,8 +136,6 @@ const cancelLoad = () => {
                 Voltar ao Fluxo
               </button>
             </div>
-
-
 
             <div class="quarantine-body">
               <ProcessStageQuarentena v-if="details" :details="details" />

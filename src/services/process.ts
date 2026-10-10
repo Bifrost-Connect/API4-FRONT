@@ -1,6 +1,9 @@
 import api, { mockactive } from './api'
 import {
   mockProcessDetails,
+  validationChecksOk,
+  treatmentChecksOk,
+  analyticsDataOk,
   type ProcessLogDetails as MockProcessLogDetails,
   type ProcessStageCheck as MockProcessStageCheck,
   type ProcessAnalyticsRow as MockProcessAnalyticsRow,
@@ -29,10 +32,21 @@ export const processService = {
         res.data.status = mapStatus(res.data.status)
         const baseURL = api.defaults.baseURL || 'http://localhost:8080'
         res.data.originalFileUrl = `${baseURL}/carga/download/${id}`
+
+        // Fake data since backend doesn't populate these yet
+        if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
+          res.data.validationChecks = validationChecksOk
+        }
+        if (!res.data.treatmentChecks || res.data.treatmentChecks.length === 0) {
+          res.data.treatmentChecks = treatmentChecksOk(res.data.epsg || 'EPSG:4674')
+        }
+        if (!res.data.analyticsData || res.data.analyticsData.length === 0) {
+          res.data.analyticsData = analyticsDataOk
+        }
       }
       return res.data
     } catch (err) {
-      if (mockactive) throw err;
+      if (mockactive) throw err
       console.warn('API indisponível, usando mock para detalhes do processo')
       await delay(600)
       const details = mockProcessDetails[id]
@@ -62,6 +76,42 @@ export const processService = {
       }
 
       return details
+    }
+  },
+
+    async getTraceability(id: string | number): Promise<any> {
+    const res = await api.get(`/indicadores/${id}/linhagem`);
+    return res.data;
+  },
+
+  async iniciarProcessamento(id: string | number, nomeArquivo?: string): Promise<any> {
+    try {
+      const params = nomeArquivo ? { nomeArquivo } : {}
+      const res = await api.post(`/processos/${id}/processar`, null, { params })
+      return res.data
+    } catch (err: any) {
+      if (mockactive) throw err
+      if (err.response && err.response.status !== 404) {
+        throw err.response.data || err
+      }
+      console.warn('API indisponível, mockando sucesso do início de processamento')
+      await delay(500)
+      return { success: true }
+    }
+  },
+
+  async getLogEspacial(id: string | number): Promise<any> {
+    try {
+      const res = await api.get(`/processos/${id}/log-espacial`)
+      return res.data
+    } catch (err: any) {
+      if (mockactive) throw err
+      if (err.response && err.response.status !== 404) {
+        throw err.response.data || err
+      }
+      console.warn('API indisponível, mockando log espacial')
+      await delay(300)
+      return { type: 'FeatureCollection', features: [] }
     }
   },
 }
