@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ProcessVersion } from '@/services/mocks/auditoria.mock'
+import type { ProcessVersion } from '@/services/auditoria'
 
 interface Props {
   versions: ProcessVersion[]

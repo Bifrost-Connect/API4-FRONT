@@ -10,10 +10,11 @@ import ProcessStageTratamento from '../components/process-stages/ProcessStageTra
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
 import {
-  mockAuditCargas,
+  auditoriaService,
   type ProcessVersion,
   type AuditProcessCarga,
-} from '@/services/mocks/auditoria.mock'
+} from '@/services/auditoria'
+import { mockAuditCargas } from '@/services/mocks/auditoria.mock'
 
 interface Props {
   processId?: string
@@ -25,17 +26,45 @@ const props = defineProps<Props>()
 const route = useRoute()
 const router = useRouter()
 
+const AUDIT_STORAGE_KEY = 'audit_panel_open'
+
+const getInitialAuditOpenState = (): boolean => {
+  try {
+    const saved = localStorage.getItem(AUDIT_STORAGE_KEY)
+    return saved !== null ? saved !== 'false' : true
+  } catch {
+    return true
+  }
+}
+
+const saveAuditOpenState = (open: boolean) => {
+  isAuditOpen.value = open
+  try {
+    localStorage.setItem(AUDIT_STORAGE_KEY, String(open))
+  } catch {
+    // Ignora erro caso localStorage esteja indisponível
+  }
+}
+
+const toggleAuditPanel = () => {
+  saveAuditOpenState(!isAuditOpen.value)
+}
+
+const closeAuditPanel = () => {
+  saveAuditOpenState(false)
+}
+
 const processId = computed(() => props.processId || (route?.params?.id as string) || '')
 const isLoading = ref(!props.detailsData)
 const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 
-// Controle do componente Auditoria (que pode ou não ser usado)
+// Controle do componente Auditoria (salvo e aberto por padrão)
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
-const isAuditOpen = ref(true)
+const isAuditOpen = ref<boolean>(getInitialAuditOpenState())
 
 const currentCargaId = computed(() => {
-  return currentCarga.value?.id || details.value?.id || processId.value
+  return details.value?.id || currentCarga.value?.id || processId.value
 })
 
 const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
@@ -66,38 +95,43 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Verifica se o ID corresponde a uma das cargas do mock de auditoria
-    const foundCarga = mockAuditCargas.find(
+    // 1. Verifica se o ID corresponde diretamente a uma carga do mock de auditoria
+    const foundMockCarga = mockAuditCargas.find(
       (c) =>
         c.id.toLowerCase() === idToLoad.toLowerCase() ||
         c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
     )
 
-    if (foundCarga) {
-      currentCarga.value = foundCarga
-      auditVersions.value = foundCarga.versions
+    if (foundMockCarga) {
+      currentCarga.value = foundMockCarga
+      auditVersions.value = foundMockCarga.versions
 
-      // Se o ID for de uma versão específica, seleciona ela; caso contrário, a primeira (mais recente)
       const targetVersion =
-        foundCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-        foundCarga.versions[0]
+        foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
+        foundMockCarga.versions[0]
 
-      details.value = targetVersion
-      activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-      selectedQuarantineStage.value = targetVersion.stage
-      isAuditOpen.value = true
+      if (targetVersion) {
+        details.value = targetVersion
+        activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+        selectedQuarantineStage.value = targetVersion.stage
+      }
       return
     }
 
-    // 2. Fallback para o processService padrão caso não seja mock de auditoria
-    auditVersions.value = []
-    currentCarga.value = null
-    isAuditOpen.value = false
-    details.value = await processService.getProcessDetails(idToLoad)
+    // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
+    const loadedDetails = await processService.getProcessDetails(idToLoad)
+    details.value = loadedDetails
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-    if (details.value) {
-      selectedQuarantineStage.value = details.value.stage
+    if (loadedDetails) {
+      selectedQuarantineStage.value = loadedDetails.stage
     }
+
+    const { carga, versions } = await auditoriaService.getVersionsForProcess(
+      idToLoad,
+      loadedDetails,
+    )
+    currentCarga.value = carga
+    auditVersions.value = versions
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
   } finally {
@@ -107,13 +141,17 @@ const loadData = async (idToLoad: string) => {
 
 watch(
   () => props.detailsData,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       details.value = newVal
       isLoading.value = false
       activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
       selectedQuarantineStage.value = newVal.stage
       isQuarantineMode.value = false
+
+      const { carga, versions } = await auditoriaService.getVersionsForProcess(newVal.id, newVal)
+      currentCarga.value = carga
+      auditVersions.value = versions
     }
   },
   { immediate: true },
@@ -122,7 +160,11 @@ watch(
 watch(
   () => processId.value,
   (newId) => {
-    if (newId && !props.detailsData) {
+    if (
+      newId &&
+      !props.detailsData &&
+      String(details.value?.id).toLowerCase() !== String(newId).toLowerCase()
+    ) {
       loadData(newId)
     }
   },
@@ -153,10 +195,30 @@ const openQuarantine = () => {
   isQuarantineMode.value = true
 }
 
-const handleVersionChange = (newVersion: ProcessVersion) => {
-  details.value = newVersion
+const handleVersionChange = async (newVersion: ProcessVersion) => {
+  const isMockVersion = mockAuditCargas.some((c) =>
+    c.versions.some((v) => v.id === newVersion.id),
+  )
+
+  if (!isMockVersion) {
+    try {
+      const fullDetails = await processService.getProcessDetails(newVersion.id)
+      details.value = {
+        ...fullDetails,
+        id: newVersion.id,
+      }
+      if (!props.processId && route?.params?.id !== newVersion.id) {
+        router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
+      }
+    } catch {
+      details.value = newVersion
+    }
+  } else {
+    details.value = newVersion
+  }
+
   activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-  selectedQuarantineStage.value = newVersion.stage
+  selectedQuarantineStage.value = details.value.stage
   isQuarantineMode.value = false
 }
 
@@ -164,7 +226,7 @@ const goBack = () => {
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push('/auditoria')
+    router.push('/')
   }
 }
 
@@ -202,12 +264,12 @@ const currentComponent = computed(() => {
             </h2>
           </div>
 
-          <!-- Botão para alternar a exibição da Auditoria (se disponível) -->
+          <!-- Botão para alternar a exibição da Auditoria (salvo por padrão) -->
           <div v-if="auditVersions.length > 0" class="process-nav-right">
             <button
               class="btn btn_outline btn-sm audit-toggle-btn"
               :class="{ 'btn-active': isAuditOpen }"
-              @click="isAuditOpen = !isAuditOpen"
+              @click="toggleAuditPanel"
             >
               <svg class="audit-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -265,7 +327,7 @@ const currentComponent = computed(() => {
       </main>
     </div>
 
-    <!-- Componente Auditoria (Usado como painel lateral opcional) -->
+    <!-- Componente Auditoria (Usado como painel lateral salvo por padrão) -->
     <div v-if="isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
       <Auditoria
         :versions="auditVersions"
@@ -275,7 +337,7 @@ const currentComponent = computed(() => {
         :layerName="details?.layerName"
         :canClose="true"
         @select-version="handleVersionChange"
-        @close="isAuditOpen = false"
+        @close="closeAuditPanel"
       />
     </div>
   </div>

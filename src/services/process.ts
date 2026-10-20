@@ -33,6 +33,18 @@ export const processService = {
         const baseURL = api.defaults.baseURL || 'http://localhost:8080'
         res.data.originalFileUrl = `${baseURL}/carga/download/${id}`
 
+        if (res.data.logs && typeof res.data.logs === 'object') {
+          const normalizedLogs: Record<string, string[]> = {}
+          for (const [key, val] of Object.entries(res.data.logs)) {
+            const mappedKey = mapStage(key)
+            normalizedLogs[mappedKey] = [
+              ...(normalizedLogs[mappedKey] || []),
+              ...(Array.isArray(val) ? (val as string[]) : []),
+            ]
+          }
+          res.data.logs = normalizedLogs
+        }
+
         // Fake data since backend doesn't populate these yet
         if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
           res.data.validationChecks = validationChecksOk

@@ -7,7 +7,6 @@ const navigationItems = [
   { label: 'Dashboard', to: '/', icon: '▦' },
   { label: 'Upload de carga', to: '/upload', icon: '↑' },
   { label: 'Mapa operacional', to: '/mapa', icon: '⌖' },
-  { label: 'Auditoria', to: '/auditoria', icon: '⚲' },
 ]
 </script>
 

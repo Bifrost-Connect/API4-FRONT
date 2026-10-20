@@ -66,13 +66,21 @@ export const uploadService = {
   },
 
   /**
-   * Busca as opções dinâmicas para preenchimento do formulário (anos, epsg, conjuntos)
+   * Busca as opções dinâmicas para preenchimento do formulário (anos, epsg, conjuntos, órgãos)
    */
   async getUploadOptions() {
-    // Retornando os mocks diretamente para evitar o erro 404 de "Not Found" no console,
-    // já que o endpoint /dominios/carga ainda não existe no back-end.
-    await delay(300)
-    return mockUploadOptions
+    try {
+      const res = await api.get('/dominios/carga')
+      if (res.data) {
+        return res.data
+      }
+      return mockUploadOptions
+    } catch (err: any) {
+      if (mockactive) throw err
+      console.warn('Endpoint /dominios/carga indisponível, usando mockUploadOptions')
+      await delay(300)
+      return mockUploadOptions
+    }
   },
 
   async downloadArquivoOriginal(processoId: number): Promise<Blob> {

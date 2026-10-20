@@ -5,7 +5,6 @@ import LoginView from '../views/LoginView.vue'
 import UploadView from '../views/UploadView.vue'
 import ProcessLogView from '../views/ProcessLogView.vue'
 import MapView from '../views/MapView.vue'
-import CargaListView from '../views/CargaListView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,8 +16,7 @@ const router = createRouter({
     },
     {
       path: '/auditoria',
-      name: 'auditoria',
-      component: CargaListView,
+      redirect: '/',
     },
     {
       path: '/processo/:id',
