@@ -179,7 +179,11 @@ onBeforeUnmount(() => {
   <main class="map-view">
     <div class="page-heading">
       <div>
-
+        <p class="eyebrow">Visualização territorial compartilhada</p>
+        <h1>Mapa territorial</h1>
+        <p class="page-description">
+          Consulte as bases e os limites geográficos disponíveis. As áreas seguem a geometria dos documentos, incluindo contornos irregulares e multipartes.
+        </p>
       </div>
       <button class="btn btn_outline locate-button" type="button" @click="locateUser">
         <span aria-hidden="true">⌖</span>
