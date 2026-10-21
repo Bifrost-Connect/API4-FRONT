@@ -13,6 +13,18 @@ export type ProcessLogDetails = MockProcessLogDetails
 export type ProcessStageCheck = MockProcessStageCheck
 export type ProcessAnalyticsRow = MockProcessAnalyticsRow
 
+export interface ProcessTraceability {
+  indicadorId: number
+  processoId: number
+  arquivoOriginalId: number
+  nomeArquivoOriginal: string
+  hashSha256: string
+  parametrosProcessamento: string
+  dataCarga: string
+}
+
+export type IndicatorExportFormat = 'geojson' | 'csv'
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 import { mapStage, mapStatus } from './dashboard'
@@ -28,6 +40,7 @@ export const processService = {
     try {
       const res = await api.get(`/processos/${id}`)
       if (res.data) {
+        res.data.dataSource = 'API'
         res.data.stage = mapStage(res.data.stage)
         res.data.status = mapStatus(res.data.status)
         const baseURL = api.defaults.baseURL || 'http://localhost:8080'
@@ -53,6 +66,7 @@ export const processService = {
       if (!details) {
         return {
           id,
+          dataSource: 'DEMONSTRACAO',
           dataset: 'Conjunto Desconhecido',
           stage: 'Ingestão',
           status: 'Em andamento',
@@ -75,13 +89,21 @@ export const processService = {
         } as ProcessLogDetails
       }
 
-      return details
+      return { ...details, dataSource: 'DEMONSTRACAO' }
     }
   },
 
-    async getTraceability(id: string | number): Promise<any> {
-    const res = await api.get(`/indicadores/${id}/linhagem`);
-    return res.data;
+  async getTraceability(id: string | number): Promise<ProcessTraceability> {
+    const res = await api.get<ProcessTraceability>(`/indicadores/${encodeURIComponent(id)}/linhagem`)
+    return res.data
+  },
+
+  async exportIndicator(id: string | number, format: IndicatorExportFormat): Promise<Blob> {
+    const res = await api.get(`/indicadores/${encodeURIComponent(id)}/exportar`, {
+      params: { formato: format },
+      responseType: 'blob',
+    })
+    return res.data as Blob
   },
 
   async iniciarProcessamento(id: string | number, nomeArquivo?: string): Promise<any> {

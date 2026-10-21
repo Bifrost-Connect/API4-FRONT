@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { processService, type ProcessLogDetails } from '../services/process.ts'
+import {
+  processService,
+  type IndicatorExportFormat,
+  type ProcessLogDetails,
+  type ProcessTraceability,
+} from '../services/process'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -33,10 +38,70 @@ const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
 const isAuditOpen = ref(true)
+const traceability = ref<ProcessTraceability | null>(null)
+const isTraceabilityLoading = ref(false)
+const traceabilityError = ref('')
+const exportError = ref('')
+const exportingFormat = ref<IndicatorExportFormat | null>(null)
+let traceabilityRequestId = 0
 
 const currentCargaId = computed(() => {
   return currentCarga.value?.id || details.value?.id || processId.value
 })
+
+const isBackendProcess = computed(
+  () =>
+    details.value?.dataSource === 'API' &&
+    !currentCarga.value &&
+    /^\d+$/.test(String(details.value.id)),
+)
+const isClosed = computed(() => details.value?.status.toLowerCase().includes('fechad') ?? false)
+
+const loadTraceability = async (id: string, backendProcess: boolean) => {
+  const requestId = ++traceabilityRequestId
+  traceability.value = null
+  traceabilityError.value = ''
+  if (!backendProcess) {
+    isTraceabilityLoading.value = false
+    return
+  }
+
+  isTraceabilityLoading.value = true
+  try {
+    const result = await processService.getTraceability(id)
+    if (requestId === traceabilityRequestId) traceability.value = result
+  } catch (error: any) {
+    if (requestId === traceabilityRequestId) {
+      traceabilityError.value =
+        error?.response?.status === 404
+          ? 'A linhagem deste processo ainda não está disponível.'
+          : 'Não foi possível carregar a linhagem do arquivo.'
+    }
+  } finally {
+    if (requestId === traceabilityRequestId) isTraceabilityLoading.value = false
+  }
+}
+
+const exportIndicator = async (format: IndicatorExportFormat) => {
+  if (!isBackendProcess.value || !details.value) return
+  exportingFormat.value = format
+  exportError.value = ''
+  try {
+    const file = await processService.exportIndicator(details.value.id, format)
+    const objectUrl = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = `indicador_${details.value.id}.${format}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    exportError.value = 'Não foi possível exportar esta versão. Tente novamente mais tarde.'
+  } finally {
+    exportingFormat.value = null
+  }
+}
 
 const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
 
@@ -82,10 +147,18 @@ const loadData = async (idToLoad: string) => {
         foundCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
         foundCarga.versions[0]
 
+      if (!targetVersion) {
+        details.value = null
+        currentCarga.value = null
+        auditVersions.value = []
+        return
+      }
+
       details.value = targetVersion
       activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
       selectedQuarantineStage.value = targetVersion.stage
       isAuditOpen.value = true
+      await loadTraceability(idToLoad, false)
       return
     }
 
@@ -98,6 +171,7 @@ const loadData = async (idToLoad: string) => {
     if (details.value) {
       selectedQuarantineStage.value = details.value.stage
     }
+    await loadTraceability(idToLoad, details.value?.dataSource === 'API')
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
   } finally {
@@ -107,13 +181,14 @@ const loadData = async (idToLoad: string) => {
 
 watch(
   () => props.detailsData,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       details.value = newVal
       isLoading.value = false
       activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
       selectedQuarantineStage.value = newVal.stage
       isQuarantineMode.value = false
+      await loadTraceability(newVal.id, newVal.dataSource === 'API')
     }
   },
   { immediate: true },
@@ -134,6 +209,7 @@ onMounted(async () => {
     isLoading.value = false
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
     selectedQuarantineStage.value = props.detailsData.stage
+    await loadTraceability(props.detailsData.id, props.detailsData.dataSource === 'API')
     return
   }
 
@@ -203,21 +279,32 @@ const currentComponent = computed(() => {
           </div>
 
           <!-- Botão para alternar a exibição da Auditoria (se disponível) -->
-          <div v-if="auditVersions.length > 0" class="process-nav-right">
-            <button
-              class="btn btn_outline btn-sm audit-toggle-btn"
-              :class="{ 'btn-active': isAuditOpen }"
-              @click="isAuditOpen = !isAuditOpen"
-            >
-              <svg class="audit-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                <path d="M3 3v5h5" />
-                <path d="M12 7v5l4 2" />
-              </svg>
-              <span class="audit-label">{{ isAuditOpen ? 'Ocultar Auditoria' : 'Auditoria de Versões' }}</span>
-              <span class="audit-count-badge">{{ auditVersions.length }}</span>
-            </button>
+          <div v-if="isBackendProcess || auditVersions.length > 0" class="process-nav-right">
+            <div class="process-actions">
+              <template v-if="isBackendProcess">
+                <button class="btn btn_outline btn-sm" :disabled="!!exportingFormat" @click="exportIndicator('geojson')">
+                  {{ exportingFormat === 'geojson' ? 'Exportando…' : 'Exportar GeoJSON' }}
+                </button>
+                <button class="btn btn_outline btn-sm" :disabled="!!exportingFormat" @click="exportIndicator('csv')">
+                  {{ exportingFormat === 'csv' ? 'Exportando…' : 'Exportar CSV' }}
+                </button>
+              </template>
+              <button
+                v-if="auditVersions.length > 0"
+                class="btn btn_outline btn-sm audit-toggle-btn"
+                :class="{ 'btn-active': isAuditOpen }"
+                @click="isAuditOpen = !isAuditOpen"
+              >
+                <svg class="audit-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M12 7v5l4 2" />
+                </svg>
+                <span class="audit-label">{{ isAuditOpen ? 'Ocultar Auditoria' : 'Auditoria de Versões' }}</span>
+                <span class="audit-count-badge">{{ auditVersions.length }}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -231,6 +318,10 @@ const currentComponent = computed(() => {
       </div>
 
       <main class="page-content">
+        <div v-if="exportError" class="traceability-error" role="alert">{{ exportError }}</div>
+        <div v-if="isClosed" class="closed-version-banner" role="status">
+          Versão histórica fechada. O conteúdo está disponível somente para consulta.
+        </div>
         <div v-if="isLoading" class="loading-state">
           <div class="spinner"></div>
           <p>Carregando informações da carga...</p>
@@ -248,15 +339,34 @@ const currentComponent = computed(() => {
               </div>
 
               <div class="quarantine-body">
-                <ProcessStageQuarentena v-if="details" :details="details" />
+              <ProcessStageQuarentena v-if="details" :details="details" :read-only="isClosed" />
               </div>
             </div>
           </div>
 
           <!-- Visão Normal -->
           <div v-else class="tab-content">
-            <component :is="currentComponent" :details="details" @open-quarantine="openQuarantine" />
+            <component :is="currentComponent" :details="details" :read-only="isClosed" @open-quarantine="openQuarantine" />
           </div>
+
+          <section v-if="isBackendProcess" class="traceability-card" aria-labelledby="traceability-heading">
+            <div class="traceability-heading">
+              <div>
+                <p class="traceability-eyebrow">US05 · Rastreabilidade</p>
+                <h3 id="traceability-heading">Origem do indicador</h3>
+              </div>
+              <span v-if="traceability" class="traceability-id">Processo {{ traceability.processoId }}</span>
+            </div>
+            <p v-if="isTraceabilityLoading" class="traceability-state" role="status">Carregando linhagem do arquivo…</p>
+            <p v-else-if="traceabilityError" class="traceability-state traceability-error" role="alert">{{ traceabilityError }}</p>
+            <dl v-else-if="traceability" class="traceability-grid">
+              <div><dt>Arquivo original</dt><dd>{{ traceability.nomeArquivoOriginal }}</dd></div>
+              <div><dt>ID do arquivo</dt><dd>{{ traceability.arquivoOriginalId }}</dd></div>
+              <div><dt>Data da carga</dt><dd>{{ traceability.dataCarga || '—' }}</dd></div>
+              <div><dt>Parâmetros</dt><dd>{{ traceability.parametrosProcessamento || '—' }}</dd></div>
+              <div class="traceability-hash"><dt>Hash SHA-256</dt><dd>{{ traceability.hashSha256 || '—' }}</dd></div>
+            </dl>
+          </section>
         </div>
 
         <div v-else class="loading-state">
@@ -354,6 +464,14 @@ const currentComponent = computed(() => {
   margin-left: auto;
 }
 
+.process-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .btn-back {
   white-space: nowrap;
   flex-shrink: 0;
@@ -412,6 +530,12 @@ const currentComponent = computed(() => {
   border-color: rgba(220, 38, 38, 0.3);
 }
 
+.status-badge.fechado {
+  color: #713f12;
+  border-color: #f59e0b;
+  background: #fef3c7;
+}
+
 .audit-toggle-btn {
   display: inline-flex;
   align-items: center;
@@ -455,6 +579,35 @@ const currentComponent = computed(() => {
   padding: 2rem;
   flex-grow: 1;
 }
+
+.traceability-card {
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.traceability-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.traceability-heading h3 { margin: 0; color: var(--color-heading); font-size: 1rem; }
+.traceability-eyebrow { margin: 0 0 4px; color: var(--vis-brand-orange); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.traceability-id { color: var(--vis-c-text-dark-2); font-size: .78rem; }
+.traceability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 1rem 0 0; }
+.traceability-grid div { min-width: 0; }
+.traceability-grid dt { margin-bottom: 4px; color: var(--vis-c-text-dark-2); font-size: .72rem; font-weight: 700; }
+.traceability-grid dd { margin: 0; color: var(--color-heading); font-size: .82rem; overflow-wrap: anywhere; }
+.traceability-hash { grid-column: 1 / -1; }
+.traceability-state { margin: 1rem 0 0; color: var(--vis-c-text-dark-2); font-size: .84rem; }
+.traceability-error { color: var(--vis-c-danger); }
+.closed-version-banner { margin-bottom: 1rem; padding: 11px 14px; color: #713f12; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: .84rem; font-weight: 700; }
 
 .details-container {
   max-width: 1200px;
@@ -528,5 +681,7 @@ const currentComponent = computed(() => {
     margin: -20px -16px;
     height: calc(100% + 40px);
   }
+  .traceability-grid { grid-template-columns: 1fr; }
+  .traceability-hash { grid-column: auto; }
 }
 </style>

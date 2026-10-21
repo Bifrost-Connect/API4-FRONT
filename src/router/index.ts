@@ -41,6 +41,7 @@ const router = createRouter({
       path: '/processo/:id',
       name: 'process-log',
       component: ProcessLogView,
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Administrador'] },
     },
     {
       path: '/upload',

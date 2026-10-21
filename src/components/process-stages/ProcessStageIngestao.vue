@@ -2,9 +2,10 @@
 import { ref } from 'vue'
 import type { ProcessLogDetails } from '../../services/process'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   details: ProcessLogDetails
-}>()
+  readOnly?: boolean
+}>(), { readOnly: false })
 
 const isEditing = ref(false)
 const formData = ref({
@@ -37,7 +38,7 @@ const toggleEdit = () => {
         <h3>Dados Iniciais (Ingestão)</h3>
         <span class="badge badge_success">Concluída</span>
       </div>
-      <button class="btn btn_outline btn-sm" @click="toggleEdit">
+      <button v-if="!readOnly" class="btn btn_outline btn-sm" @click="toggleEdit">
         {{ isEditing ? 'Salvar' : 'Editar' }}
       </button>
     </div>
@@ -45,38 +46,38 @@ const toggleEdit = () => {
     <div class="form-grid">
       <div class="form-group form-group--full">
         <label>Nome da Fonte de Dados / Camada</label>
-        <input v-if="isEditing" type="text" v-model="formData.layerName" class="form-control" />
+        <input v-if="isEditing && !readOnly" type="text" v-model="formData.layerName" class="form-control" />
         <p v-else class="form-value">{{ details.layerName }}</p>
       </div>
 
       <div class="form-group">
         <label>Conjunto de Dados</label>
-        <input v-if="isEditing" type="text" v-model="formData.dataset" class="form-control" />
+        <input v-if="isEditing && !readOnly" type="text" v-model="formData.dataset" class="form-control" />
         <p v-else class="form-value">{{ details.dataset }}</p>
       </div>
 
       <div class="form-group">
         <label>Fonte / Origem</label>
-        <input v-if="isEditing" type="text" v-model="formData.source" class="form-control" />
+        <input v-if="isEditing && !readOnly" type="text" v-model="formData.source" class="form-control" />
         <p v-else class="form-value">{{ details.source }}</p>
       </div>
 
       <div class="form-group">
         <label>Ano Base</label>
-        <input v-if="isEditing" type="text" v-model="formData.year" class="form-control" />
+        <input v-if="isEditing && !readOnly" type="text" v-model="formData.year" class="form-control" />
         <p v-else class="form-value">{{ details.year }}</p>
       </div>
 
       <div class="form-group">
         <label>EPSG</label>
-        <input v-if="isEditing" type="text" v-model="formData.epsg" class="form-control" />
+        <input v-if="isEditing && !readOnly" type="text" v-model="formData.epsg" class="form-control" />
         <p v-else class="form-value">{{ details.epsg }}</p>
       </div>
 
       <div class="form-group form-group--full">
         <label>Descrição</label>
         <textarea
-          v-if="isEditing"
+          v-if="isEditing && !readOnly"
           v-model="formData.description"
           class="form-control textarea"
         ></textarea>

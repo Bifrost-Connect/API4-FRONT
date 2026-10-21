@@ -68,9 +68,10 @@ export interface QuarantineRecord {
 
 export interface ProcessLogDetails {
   id: string
+  dataSource?: 'API' | 'DEMONSTRACAO'
   dataset: string
   stage: string
-  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou'
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou' | 'Fechado'
   dateTime: string
   layerName: string
   source: string

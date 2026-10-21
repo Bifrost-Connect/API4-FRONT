@@ -177,11 +177,30 @@ const handleLogin = () => {
 
 .roles-container .btn {
   width: 100%;
+  color: #000;
+  border-color: var(--color-border);
+  background: transparent;
+}
+
+.roles-container .btn::before {
+  display: none;
+}
+
+.roles-container .btn:hover:not(:disabled),
+.roles-container .btn:focus-visible,
+.roles-container .role-selected {
+  color: #000;
+  border-color: var(--color-border);
+  background: transparent;
+}
+
+.roles-container .btn:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px var(--color-border);
 }
 
 .roles-container .role-selected {
-  color: white;
-  background: var(--vis-brand-primary);
-  border-color: var(--vis-brand-primary);
+  color: #000;
 }
 </style>

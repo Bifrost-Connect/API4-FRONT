@@ -1,48 +1,56 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { FiSearch } from 'vue-icons-plus/fi'
-import {
-  mockAuditCargas,
-  type AuditProcessCarga,
-} from '@/services/mocks/auditoria.mock'
+import { dashboardService, type ProcessLog } from '@/services/dashboard'
 
 const router = useRouter()
 const searchQuery = ref('')
+const processos = ref<ProcessLog[]>([])
+const isLoading = ref(true)
+const loadError = ref(false)
+const dataSource = ref<'API' | 'DEMONSTRACAO' | ''>('')
+const currentPage = ref(0)
+const totalPages = ref(1)
 
-// Todas as cargas disponíveis, priorizando ou filtrando as concluídas para a auditoria
-const cargas = ref<AuditProcessCarga[]>(mockAuditCargas)
+const loadPage = async (pageNumber: number) => {
+  isLoading.value = true
+  loadError.value = false
+  try {
+    const page = await dashboardService.getDashboardProcesses({ page: pageNumber, size: 10 })
+    processos.value = page.content
+    dataSource.value = page.source ?? 'API'
+    currentPage.value = page.number
+    totalPages.value = Math.max(1, page.totalPages)
+  } catch (error) {
+    console.error('Não foi possível carregar as cargas para auditoria:', error)
+    loadError.value = true
+  } finally {
+    isLoading.value = false
+  }
+}
 
-const filteredCargas = computed(() => {
+onMounted(() => void loadPage(0))
+
+const filteredProcessos = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  return cargas.value.filter((c) => {
-    // Foco em cargas concluídas ou com versões finalizadas
-    const matchesQuery =
-      !q ||
-      c.id.toLowerCase().includes(q) ||
-      c.dataset.toLowerCase().includes(q) ||
-      c.source.toLowerCase().includes(q) ||
-      c.layerName.toLowerCase().includes(q)
-    return matchesQuery
-  })
+  if (!q) return processos.value
+  return processos.value.filter((process) =>
+    [process.id, process.dataset, process.source, process.stage, process.status]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q)),
+  )
 })
 
-const navigateToProcess = (cargaId: string) => {
-  router.push(`/processo/${encodeURIComponent(cargaId)}`)
+const navigateToProcess = (processId: string) => {
+  router.push({ name: 'process-log', params: { id: processId } })
 }
 
 const handleSearch = () => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return
-  const found = filteredCargas.value.find(
-    (c) =>
-      c.id.toLowerCase() === q ||
-      c.id.toLowerCase().includes(q) ||
-      c.dataset.toLowerCase().includes(q),
-  )
-  if (found) {
-    navigateToProcess(found.id)
-  }
+  const found = filteredProcessos.value[0]
+  if (found) navigateToProcess(found.id)
 }
 
 const getStatusClass = (status: string) => {
@@ -52,6 +60,7 @@ const getStatusClass = (status: string) => {
   if (normalized.includes('aguardando') || normalized.includes('valida'))
     return 'status-aguardando-validacao'
   if (normalized.includes('falh')) return 'status-falhou'
+  if (normalized.includes('fechad')) return 'status-concluida'
   return ''
 }
 </script>
@@ -62,20 +71,21 @@ const getStatusClass = (status: string) => {
       <div class="header-section">
         <h1 class="page-title">Auditoria de Cargas</h1>
         <p class="page-subtitle">
-          Pesquise e consulte o histórico de rastreabilidade, versões e logs das cargas geoespaciais finalizadas.
+          Pesquise cargas e consulte os detalhes, a linhagem do arquivo e os logs disponíveis.
         </p>
+        <span v-if="dataSource === 'DEMONSTRACAO'" class="demo-label">Lista demonstrativa</span>
       </div>
 
       <!-- Barra de Busca -->
       <div class="card-box mb-8 border-brand-left">
-        <h3 class="mb-4 mt-0 text-lg">Buscar Carga Concluída</h3>
+          <h3 class="mb-4 mt-0 text-lg">Buscar carga</h3>
         <div class="flex items-center gap-4">
           <div class="search-wrapper w-full">
             <FiSearch class="search-icon" size="20" />
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Digite o ID da carga (ex: CARG-2026-9001), dataset ou fonte..."
+              placeholder="Digite o ID da carga, conjunto de dados ou etapa..."
               class="input pl-10"
               @keyup.enter="handleSearch"
             />
@@ -88,33 +98,41 @@ const getStatusClass = (status: string) => {
 
       <!-- Grid de Cargas Prontas para Auditoria -->
       <div class="recent-list">
-        <div v-if="filteredCargas.length === 0" class="empty-state">
-          <p>Nenhuma carga concluída encontrada para o termo pesquisado.</p>
+        <div v-if="isLoading" class="empty-state" role="status">
+          Carregando cargas...
+        </div>
+        <div v-else-if="loadError" class="empty-state" role="alert">
+          Não foi possível carregar as cargas. Tente novamente mais tarde.
+        </div>
+        <div v-else-if="filteredProcessos.length === 0" class="empty-state">
+          <p>Nenhuma carga encontrada para a pesquisa.</p>
         </div>
 
         <div v-else class="processes-grid">
           <div
-            v-for="carga in filteredCargas"
-            :key="carga.id"
+            v-for="process in filteredProcessos"
+            :key="process.id"
             class="process-card card-box"
-            @click="navigateToProcess(carga.id)"
+            role="button"
+            tabindex="0"
+            @click="navigateToProcess(process.id)"
+            @keydown.enter="navigateToProcess(process.id)"
+            @keydown.space.prevent="navigateToProcess(process.id)"
           >
             <div class="process-header">
-              <strong class="carga-id">{{ carga.id }}</strong>
-              <span class="version-count-badge">
-                {{ carga.versions.length }} {{ carga.versions.length === 1 ? 'versão' : 'versões' }}
-              </span>
+              <strong class="carga-id">{{ process.id }}</strong>
+              <span class="version-count-badge">Linhagem e logs</span>
             </div>
 
-            <h4 class="process-dataset">{{ carga.dataset }}</h4>
-            <p class="process-layer">{{ carga.layerName }} &bull; {{ carga.source }}</p>
+            <h4 class="process-dataset">{{ process.dataset }}</h4>
+            <p class="process-layer">{{ process.stage }}<template v-if="process.source"> &bull; {{ process.source }}</template></p>
 
             <div class="process-footer">
               <div class="status-indicator">
-                <span class="location-dot" :class="getStatusClass(carga.currentStatus)"></span>
-                <span class="status-text">{{ carga.currentStatus }}</span>
+                <span class="location-dot" :class="getStatusClass(process.status)"></span>
+                <span class="status-text">{{ process.status }}</span>
               </div>
-              <span class="process-date">{{ carga.lastUpdate }}</span>
+              <span class="process-date">{{ process.dateTime }}</span>
             </div>
 
             <div class="action-hint">
@@ -122,6 +140,15 @@ const getStatusClass = (status: string) => {
             </div>
           </div>
         </div>
+        <nav v-if="!isLoading && !loadError && totalPages > 1" class="page-controls" aria-label="Paginação das cargas">
+          <button class="btn btn_outline" type="button" :disabled="currentPage === 0" @click="loadPage(currentPage - 1)">
+            Anterior
+          </button>
+          <span>Página {{ currentPage + 1 }} de {{ totalPages }}</span>
+          <button class="btn btn_outline" type="button" :disabled="currentPage + 1 >= totalPages" @click="loadPage(currentPage + 1)">
+            Próxima
+          </button>
+        </nav>
       </div>
     </div>
   </div>
@@ -178,6 +205,9 @@ const getStatusClass = (status: string) => {
 .border-brand-left {
   border-left: 4px solid var(--vis-brand-orange);
 }
+
+.page-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 20px 0 8px; color: var(--vis-c-text-dark-2); font-size: .82rem; }
+.page-controls button:disabled { opacity: .5; cursor: not-allowed; }
 
 .search-wrapper {
   position: relative;

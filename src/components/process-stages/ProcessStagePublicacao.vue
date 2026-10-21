@@ -13,9 +13,10 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   details: ProcessLogDetails
-}>()
+  readOnly?: boolean
+}>(), { readOnly: false })
 
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
@@ -40,6 +41,7 @@ const showSuccess = computed(() => isJustApproved.value)
 /** Exibe painel de decisão: processo em andamento esperando validação do auditor */
 const isAwaiting = computed(
   () =>
+    !props.readOnly &&
     props.details.status === 'Em andamento' &&
     !isAlreadyPublished.value &&
     !isApproved.value &&
@@ -49,9 +51,10 @@ const isAwaiting = computed(
 
 const isError = computed(
   () =>
-    props.details.status === 'Falhou' ||
+    !props.readOnly &&
+    (props.details.status === 'Falhou' ||
     props.details.status === 'Aguardando validação' ||
-    !!props.details.pauseReason,
+    !!props.details.pauseReason),
 )
 
 /** Dados analíticos vêm da API via details.analyticsData */
@@ -98,6 +101,9 @@ const goToDashboard = () => {
 
 <template>
   <div class="stage-container">
+    <div v-if="readOnly" class="closed-version-banner" role="status">
+      Esta versão foi fechada e está disponível somente para consulta.
+    </div>
     <template v-if="!showSuccess">
       <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
       <div class="card">
@@ -166,7 +172,7 @@ const goToDashboard = () => {
       </div>
 
       <!-- ═══ INPUT DE NOTA DE REVISÃO / AUDITORIA DE ETAPA ANTERIOR ═════════ -->
-      <div v-if="showReviewInput" class="review-input-panel">
+      <div v-if="!readOnly && showReviewInput" class="review-input-panel">
         <h4>Solicitar Revisão de Etapa Anterior</h4>
         <p>
           Selecione a etapa anterior que necessita de revisão e informe o motivo. O editor deverá
@@ -201,7 +207,7 @@ const goToDashboard = () => {
       </div>
 
       <!-- ═══ REVISÃO ENVIADA (rejeitado nesta sessão) ════════════════════════════ -->
-      <div v-if="isRejected" class="alert-banner danger">
+      <div v-if="!readOnly && isRejected" class="alert-banner danger">
         <div class="alert-icon-lg">
           <FiAlertTriangle size="26" />
         </div>
@@ -243,7 +249,7 @@ const goToDashboard = () => {
         </div>
 
         <!-- Ações pós-publicação -->
-        <div class="success-actions">
+        <div v-if="!readOnly" class="success-actions">
           <button class="btn btn-outline-danger" @click="handleRejectRequest">
             <FiThumbsDown size="15" />
             Solicitar Revisão
@@ -255,7 +261,7 @@ const goToDashboard = () => {
         </div>
 
         <!-- Input de revisão pós-publicação -->
-        <div v-if="showReviewInput" class="post-publish-review">
+        <div v-if="!readOnly && showReviewInput" class="post-publish-review">
           <h4>Motivo da Revisão</h4>
           <textarea
             v-model="reviewNote"
@@ -275,7 +281,7 @@ const goToDashboard = () => {
     </div>
 
     <!-- ═══ ERRO / QUARENTENA (DESVIO LATERAL) ══════════════════════════════════ -->
-    <div v-if="details.quarantineRecords?.length > 0 && details.pauseReason" class="alert-banner danger">
+    <div v-if="(details.quarantineRecords?.length ?? 0) > 0 && details.pauseReason" class="alert-banner danger">
       <div class="alert-icon-lg">
         <FiAlertTriangle size="26" />
       </div>
@@ -300,6 +306,16 @@ const goToDashboard = () => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.closed-version-banner {
+  padding: 12px 16px;
+  color: #713f12;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 /* CARD */

@@ -3,9 +3,10 @@ import { FiAlertTriangle, FiDownload, FiRefreshCw } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
 import { useRouter } from 'vue-router'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   details: ProcessLogDetails
-}>()
+  readOnly?: boolean
+}>(), { readOnly: false })
 
 const router = useRouter()
 
@@ -83,7 +84,7 @@ const reprocessLoad = () => {
       
       <div class="mt-4 border-top pt-4">
         <p class="mb-3 text-sm text-muted">Após corrigir o arquivo, você deve reprocessar a carga submetendo o novo arquivo corrigido.</p>
-        <button class="btn btn-primary" @click="reprocessLoad">
+        <button v-if="!readOnly" class="btn btn-primary" @click="reprocessLoad">
           <FiRefreshCw size="14" />
           Reprocessar Carga (Re-upload)
         </button>

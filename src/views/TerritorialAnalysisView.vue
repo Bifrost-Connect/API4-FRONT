@@ -33,6 +33,7 @@ let map: L.Map | null = null
 let activeBaseLayer: L.TileLayer | null = null
 let renderedLayers: L.Layer[] = []
 let mapRequestSequence = 0
+let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
 const carDocuments = computed(() => documents.value.filter((item) => item.category === 'CAR'))
 const restrictionDocuments = computed(() =>
@@ -371,22 +372,37 @@ const addGeoJSONDocument = async (event: Event) => {
     if (declaredCrs && !/(4326|crs:?84|wgs.?84)/i.test(declaredCrs)) {
       throw new Error('Reprojete o GeoJSON para EPSG:4326 antes de adicioná-lo ao mapa.')
     }
-    const hasCoordinatesOutsideWebCrs = (coordinates: unknown): boolean => {
-      if (!Array.isArray(coordinates)) return false
-      if (typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number') {
-        const longitude = coordinates[0]
-        const latitude = coordinates[1]
-        if (typeof longitude !== 'number' || typeof latitude !== 'number') return false
-        return Math.abs(longitude) > 180 || Math.abs(latitude) > 90
-      }
-      return coordinates.some(hasCoordinatesOutsideWebCrs)
+    const isPosition = (position: unknown): position is number[] =>
+      Array.isArray(position) &&
+      position.length >= 2 &&
+      position.every((ordinate) => typeof ordinate === 'number' && Number.isFinite(ordinate)) &&
+      Math.abs(position[0] ?? Infinity) <= 180 &&
+      Math.abs(position[1] ?? Infinity) <= 90
+    const isClosedRing = (ring: unknown): ring is number[][] => {
+      if (!Array.isArray(ring) || ring.length < 4 || !ring.every(isPosition)) return false
+      const first = ring[0]
+      const last = ring[ring.length - 1]
+      return !!first && !!last && first[0] === last[0] && first[1] === last[1]
     }
-    const outOfRange = featureCollection.features.some((feature) => {
+    const hasValidPolygonRings = (coordinates: unknown): boolean =>
+      Array.isArray(coordinates) &&
+      coordinates.length > 0 &&
+      coordinates.every(isClosedRing)
+    const hasInvalidGeometry = featureCollection.features.some((feature) => {
       const geometry = feature.geometry
-      return !geometry || !('coordinates' in geometry) || hasCoordinatesOutsideWebCrs(geometry.coordinates)
+      if (!geometry || !('coordinates' in geometry)) return true
+      if (geometry.type === 'Polygon') return !hasValidPolygonRings(geometry.coordinates)
+      if (geometry.type === 'MultiPolygon') {
+        return (
+          !Array.isArray(geometry.coordinates) ||
+          geometry.coordinates.length === 0 ||
+          !geometry.coordinates.every(hasValidPolygonRings)
+        )
+      }
+      return true
     })
-    if (outOfRange) {
-      throw new Error('As coordenadas precisam estar em longitude/latitude (EPSG:4326).')
+    if (hasInvalidGeometry) {
+      throw new Error('As geometrias devem ter anéis fechados e coordenadas válidas em EPSG:4326.')
     }
 
     const documentId = `local-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`
@@ -421,6 +437,15 @@ const initializeMap = () => {
   map = L.map(mapElement.value, { zoomControl: false }).setView([-15.79, -47.91], 11)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
   setBaseLayer()
+  map.on('moveend zoomend', scheduleVisibleMapRefresh)
+}
+
+const scheduleVisibleMapRefresh = () => {
+  if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
+  mapRefreshTimer = setTimeout(() => {
+    mapRefreshTimer = null
+    void updateMapLayers()
+  }, 250)
 }
 
 watch(
@@ -464,6 +489,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
   map?.remove()
   map = null
   activeBaseLayer = null

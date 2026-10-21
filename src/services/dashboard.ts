@@ -8,6 +8,7 @@ export interface Page<T> {
   totalPages: number
   size: number
   number: number
+  source?: 'API' | 'DEMONSTRACAO'
 }
 
 export interface ProcessoMetricasResponse {
@@ -36,6 +37,7 @@ export interface ProcessLog {
     | 'Em validação'
     | 'Falhou'
     | 'Em quarentena'
+    | 'Fechado'
   source?: string
   year?: string
   epsg?: string
@@ -58,6 +60,8 @@ export interface DashboardFilters {
   conjunto?: string
   etapa?: string
   situacao?: string
+  page?: number
+  size?: number
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -92,6 +96,8 @@ export function mapStatus(backendStatus: string): string {
       return 'Aguardando validação'
     case 'FALHOU':
       return 'Falhou'
+    case 'FECHADO':
+      return 'Fechado'
     case 'EM_QUARENTENA':
       return 'Em quarentena'
     default:
@@ -159,6 +165,8 @@ export const dashboardService = {
         if (filters.conjunto) params.conjuntoId = filters.conjunto
         if (filters.etapa) params.etapaId = filters.etapa
         if (filters.situacao) params.situacaoId = filters.situacao
+        if (filters.page !== undefined) params.page = filters.page
+        if (filters.size !== undefined) params.size = filters.size
       }
 
       const res = await api.get('/processos', { params })
@@ -169,7 +177,7 @@ export const dashboardService = {
         })
       }
 
-      return res.data
+      return { ...res.data, source: 'API' }
     } catch (err: any) {
       if (mockactive) throw err
       if (err.response && err.response.status !== 404) {
@@ -208,6 +216,7 @@ export const dashboardService = {
         totalPages: 1,
         size: mockProcessosPage.size,
         number: mockProcessosPage.number,
+        source: 'DEMONSTRACAO',
       }
     }
   },
