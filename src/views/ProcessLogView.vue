@@ -7,6 +7,7 @@ import {
   type ProcessLogDetails,
   type ProcessTraceability,
 } from '../services/process'
+import { userService } from '../services/user'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -15,10 +16,11 @@ import ProcessStageTratamento from '../components/process-stages/ProcessStageTra
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
 import {
-  mockAuditCargas,
+  auditoriaService,
   type ProcessVersion,
   type AuditProcessCarga,
-} from '@/services/mocks/auditoria.mock'
+} from '@/services/auditoria'
+import { mockAuditCargas } from '@/services/mocks/auditoria.mock'
 
 interface Props {
   processId?: string
@@ -30,14 +32,45 @@ const props = defineProps<Props>()
 const route = useRoute()
 const router = useRouter()
 
+const AUDIT_STORAGE_KEY = 'audit_panel_open'
+
+const getInitialAuditOpenState = (): boolean => {
+  try {
+    const saved = localStorage.getItem(AUDIT_STORAGE_KEY)
+    return saved !== null ? saved !== 'false' : true
+  } catch {
+    return true
+  }
+}
+
+const isAuditOpen = ref<boolean>(getInitialAuditOpenState())
+
+const saveAuditOpenState = (open: boolean) => {
+  isAuditOpen.value = open
+  try {
+    localStorage.setItem(AUDIT_STORAGE_KEY, String(open))
+  } catch {
+    // Ignora erro caso localStorage esteja indisponível
+  }
+}
+
+const toggleAuditPanel = () => {
+  saveAuditOpenState(!isAuditOpen.value)
+}
+
+const closeAuditPanel = () => {
+  saveAuditOpenState(false)
+}
+
 const processId = computed(() => props.processId || (route?.params?.id as string) || '')
 const isLoading = ref(!props.detailsData)
 const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 
-// Controle do componente Auditoria (que pode ou não ser usado)
+// Controle do componente Auditoria
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
-const isAuditOpen = ref(true)
+
+// Rastreabilidade e Exportação (US05 e US07)
 const traceability = ref<ProcessTraceability | null>(null)
 const isTraceabilityLoading = ref(false)
 const traceabilityError = ref('')
@@ -46,16 +79,18 @@ const exportingFormat = ref<IndicatorExportFormat | null>(null)
 let traceabilityRequestId = 0
 
 const currentCargaId = computed(() => {
-  return currentCarga.value?.id || details.value?.id || processId.value
+  return details.value?.id || currentCarga.value?.id || processId.value
 })
 
 const isBackendProcess = computed(
   () =>
     details.value?.dataSource === 'API' &&
-    !currentCarga.value &&
     /^\d+$/.test(String(details.value.id)),
 )
-const isClosed = computed(() => details.value?.status.toLowerCase().includes('fechad') ?? false)
+
+const isClosed = computed(() => details.value?.status?.toLowerCase().includes('fechad') ?? false)
+const isAuditor = computed(() => userService.getCurrentUser().role === 'Auditor')
+const isReadOnly = computed(() => isClosed.value || isAuditor.value)
 
 const loadTraceability = async (id: string, backendProcess: boolean) => {
   const requestId = ++traceabilityRequestId
@@ -131,46 +166,45 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Verifica se o ID corresponde a uma das cargas do mock de auditoria
-    const foundCarga = mockAuditCargas.find(
+    // 1. Verifica se o ID corresponde diretamente a uma carga do mock de auditoria
+    const foundMockCarga = mockAuditCargas.find(
       (c) =>
         c.id.toLowerCase() === idToLoad.toLowerCase() ||
         c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
     )
 
-    if (foundCarga) {
-      currentCarga.value = foundCarga
-      auditVersions.value = foundCarga.versions
+    if (foundMockCarga) {
+      currentCarga.value = foundMockCarga
+      auditVersions.value = foundMockCarga.versions
 
-      // Se o ID for de uma versão específica, seleciona ela; caso contrário, a primeira (mais recente)
       const targetVersion =
-        foundCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-        foundCarga.versions[0]
+        foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
+        foundMockCarga.versions[0]
 
-      if (!targetVersion) {
-        details.value = null
-        currentCarga.value = null
-        auditVersions.value = []
-        return
+      if (targetVersion) {
+        details.value = targetVersion
+        activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+        selectedQuarantineStage.value = targetVersion.stage
       }
-
-      details.value = targetVersion
-      activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-      selectedQuarantineStage.value = targetVersion.stage
-      isAuditOpen.value = true
       await loadTraceability(idToLoad, false)
       return
     }
 
-    // 2. Fallback para o processService padrão caso não seja mock de auditoria
-    auditVersions.value = []
-    currentCarga.value = null
-    isAuditOpen.value = false
-    details.value = await processService.getProcessDetails(idToLoad)
+    // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
+    const loadedDetails = await processService.getProcessDetails(idToLoad)
+    details.value = loadedDetails
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-    if (details.value) {
-      selectedQuarantineStage.value = details.value.stage
+    if (loadedDetails) {
+      selectedQuarantineStage.value = loadedDetails.stage
     }
+
+    const { carga, versions } = await auditoriaService.getVersionsForProcess(
+      idToLoad,
+      loadedDetails,
+    )
+    currentCarga.value = carga
+    auditVersions.value = versions
+
     await loadTraceability(idToLoad, details.value?.dataSource === 'API')
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
@@ -188,6 +222,11 @@ watch(
       activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
       selectedQuarantineStage.value = newVal.stage
       isQuarantineMode.value = false
+
+      const { carga, versions } = await auditoriaService.getVersionsForProcess(newVal.id, newVal)
+      currentCarga.value = carga
+      auditVersions.value = versions
+
       await loadTraceability(newVal.id, newVal.dataSource === 'API')
     }
   },
@@ -197,7 +236,11 @@ watch(
 watch(
   () => processId.value,
   (newId) => {
-    if (newId && !props.detailsData) {
+    if (
+      newId &&
+      !props.detailsData &&
+      String(details.value?.id).toLowerCase() !== String(newId).toLowerCase()
+    ) {
       loadData(newId)
     }
   },
@@ -229,18 +272,40 @@ const openQuarantine = () => {
   isQuarantineMode.value = true
 }
 
-const handleVersionChange = (newVersion: ProcessVersion) => {
-  details.value = newVersion
+const handleVersionChange = async (newVersion: ProcessVersion) => {
+  const isMockVersion = mockAuditCargas.some((c) =>
+    c.versions.some((v) => v.id === newVersion.id),
+  )
+
+  if (!isMockVersion) {
+    try {
+      const fullDetails = await processService.getProcessDetails(newVersion.id)
+      details.value = {
+        ...fullDetails,
+        id: newVersion.id,
+      }
+      if (!props.processId && route?.params?.id !== newVersion.id) {
+        router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
+      }
+    } catch {
+      details.value = newVersion
+    }
+  } else {
+    details.value = newVersion
+  }
+
   activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-  selectedQuarantineStage.value = newVersion.stage
+  selectedQuarantineStage.value = details.value.stage
   isQuarantineMode.value = false
+
+  await loadTraceability(newVersion.id, details.value?.dataSource === 'API')
 }
 
 const goBack = () => {
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push('/auditoria')
+    router.push('/')
   }
 }
 
@@ -278,33 +343,22 @@ const currentComponent = computed(() => {
             </h2>
           </div>
 
-          <!-- Botão para alternar a exibição da Auditoria (se disponível) -->
-          <div v-if="isBackendProcess || auditVersions.length > 0" class="process-nav-right">
-            <div class="process-actions">
-              <template v-if="isBackendProcess">
-                <button class="btn btn_outline btn-sm" :disabled="!!exportingFormat" @click="exportIndicator('geojson')">
-                  {{ exportingFormat === 'geojson' ? 'Exportando…' : 'Exportar GeoJSON' }}
-                </button>
-                <button class="btn btn_outline btn-sm" :disabled="!!exportingFormat" @click="exportIndicator('csv')">
-                  {{ exportingFormat === 'csv' ? 'Exportando…' : 'Exportar CSV' }}
-                </button>
-              </template>
-              <button
-                v-if="auditVersions.length > 0"
-                class="btn btn_outline btn-sm audit-toggle-btn"
-                :class="{ 'btn-active': isAuditOpen }"
-                @click="isAuditOpen = !isAuditOpen"
-              >
-                <svg class="audit-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                  <path d="M12 7v5l4 2" />
-                </svg>
-                <span class="audit-label">{{ isAuditOpen ? 'Ocultar Auditoria' : 'Auditoria de Versões' }}</span>
-                <span class="audit-count-badge">{{ auditVersions.length }}</span>
-              </button>
-            </div>
+          <!-- Botão para alternar a exibição da Auditoria -->
+          <div v-if="auditVersions.length > 0" class="process-nav-right">
+            <button
+              class="btn btn_outline btn-sm audit-toggle-btn"
+              :class="{ 'btn-active': isAuditOpen }"
+              @click="toggleAuditPanel"
+            >
+              <svg class="audit-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M12 7v5l4 2" />
+              </svg>
+              <span class="audit-label">{{ isAuditOpen ? 'Ocultar Auditoria' : 'Auditoria de Versões' }}</span>
+              <span class="audit-count-badge">{{ auditVersions.length }}</span>
+            </button>
           </div>
         </div>
 
@@ -318,7 +372,22 @@ const currentComponent = computed(() => {
       </div>
 
       <main class="page-content">
-        <div v-if="exportError" class="traceability-error" role="alert">{{ exportError }}</div>
+        <div
+          v-if="exportError"
+          class="traceability-error"
+          role="alert"
+          data-testid="export-error-toast"
+        >
+          {{ exportError }}
+        </div>
+        <div
+          v-if="traceabilityError"
+          class="traceability-error"
+          role="alert"
+          data-testid="traceability-error-toast"
+        >
+          {{ traceabilityError }}
+        </div>
         <div v-if="isClosed" class="closed-version-banner" role="status">
           Versão histórica fechada. O conteúdo está disponível somente para consulta.
         </div>
@@ -339,34 +408,25 @@ const currentComponent = computed(() => {
               </div>
 
               <div class="quarantine-body">
-              <ProcessStageQuarentena v-if="details" :details="details" :read-only="isClosed" />
+                <ProcessStageQuarentena v-if="details" :details="details" :read-only="isReadOnly" />
               </div>
             </div>
           </div>
 
           <!-- Visão Normal -->
           <div v-else class="tab-content">
-            <component :is="currentComponent" :details="details" :read-only="isClosed" @open-quarantine="openQuarantine" />
+            <component
+              :is="currentComponent"
+              :details="details"
+              :read-only="isReadOnly"
+              :traceability="traceability"
+              :exporting-format="exportingFormat"
+              :can-export="isBackendProcess"
+              :versions="auditVersions"
+              @open-quarantine="openQuarantine"
+              @export="exportIndicator"
+            />
           </div>
-
-          <section v-if="isBackendProcess" class="traceability-card" aria-labelledby="traceability-heading">
-            <div class="traceability-heading">
-              <div>
-                <p class="traceability-eyebrow">US05 · Rastreabilidade</p>
-                <h3 id="traceability-heading">Origem do indicador</h3>
-              </div>
-              <span v-if="traceability" class="traceability-id">Processo {{ traceability.processoId }}</span>
-            </div>
-            <p v-if="isTraceabilityLoading" class="traceability-state" role="status">Carregando linhagem do arquivo…</p>
-            <p v-else-if="traceabilityError" class="traceability-state traceability-error" role="alert">{{ traceabilityError }}</p>
-            <dl v-else-if="traceability" class="traceability-grid">
-              <div><dt>Arquivo original</dt><dd>{{ traceability.nomeArquivoOriginal }}</dd></div>
-              <div><dt>ID do arquivo</dt><dd>{{ traceability.arquivoOriginalId }}</dd></div>
-              <div><dt>Data da carga</dt><dd>{{ traceability.dataCarga || '—' }}</dd></div>
-              <div><dt>Parâmetros</dt><dd>{{ traceability.parametrosProcessamento || '—' }}</dd></div>
-              <div class="traceability-hash"><dt>Hash SHA-256</dt><dd>{{ traceability.hashSha256 || '—' }}</dd></div>
-            </dl>
-          </section>
         </div>
 
         <div v-else class="loading-state">
@@ -375,7 +435,7 @@ const currentComponent = computed(() => {
       </main>
     </div>
 
-    <!-- Componente Auditoria (Usado como painel lateral opcional) -->
+    <!-- Componente Auditoria (Painel lateral integrado) -->
     <div v-if="isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
       <Auditoria
         :versions="auditVersions"
@@ -385,7 +445,7 @@ const currentComponent = computed(() => {
         :layerName="details?.layerName"
         :canClose="true"
         @select-version="handleVersionChange"
-        @close="isAuditOpen = false"
+        @close="closeAuditPanel"
       />
     </div>
   </div>
@@ -467,9 +527,8 @@ const currentComponent = computed(() => {
 .process-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: 0.5rem;
 }
 
 .btn-back {
@@ -530,10 +589,11 @@ const currentComponent = computed(() => {
   border-color: rgba(220, 38, 38, 0.3);
 }
 
-.status-badge.fechado {
-  color: #713f12;
-  border-color: #f59e0b;
-  background: #fef3c7;
+.status-badge.fechado,
+.status-badge.fechada {
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.3);
+  background: rgba(100, 116, 139, 0.08);
 }
 
 .audit-toggle-btn {
@@ -575,39 +635,106 @@ const currentComponent = computed(() => {
   color: var(--vis-brand-orange);
 }
 
-.page-content {
-  padding: 2rem;
-  flex-grow: 1;
+.closed-version-banner {
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .traceability-card {
-  margin-top: 1.25rem;
-  padding: 1.25rem;
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
 }
 
 .traceability-heading {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
-  padding-bottom: 0.9rem;
-  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 1rem;
 }
 
-.traceability-heading h3 { margin: 0; color: var(--color-heading); font-size: 1rem; }
-.traceability-eyebrow { margin: 0 0 4px; color: var(--vis-brand-orange); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.traceability-id { color: var(--vis-c-text-dark-2); font-size: .78rem; }
-.traceability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 1rem 0 0; }
-.traceability-grid div { min-width: 0; }
-.traceability-grid dt { margin-bottom: 4px; color: var(--vis-c-text-dark-2); font-size: .72rem; font-weight: 700; }
-.traceability-grid dd { margin: 0; color: var(--color-heading); font-size: .82rem; overflow-wrap: anywhere; }
-.traceability-hash { grid-column: 1 / -1; }
-.traceability-state { margin: 1rem 0 0; color: var(--vis-c-text-dark-2); font-size: .84rem; }
-.traceability-error { color: var(--vis-c-danger); }
-.closed-version-banner { margin-bottom: 1rem; padding: 11px 14px; color: #713f12; background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px; font-size: .84rem; font-weight: 700; }
+.traceability-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.traceability-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vis-brand-orange);
+  font-weight: 700;
+}
+
+.traceability-heading h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  color: var(--color-heading);
+}
+
+.traceability-id {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+}
+
+.traceability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.traceability-grid dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.25rem;
+}
+
+.traceability-grid dd {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.traceability-hash {
+  grid-column: 1 / -1;
+}
+
+.traceability-hash dd {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.traceability-state {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.traceability-error {
+  color: #dc2626;
+}
+
+.page-content {
+  padding: 2rem;
+  flex-grow: 1;
+}
 
 .details-container {
   max-width: 1200px;
@@ -681,7 +808,5 @@ const currentComponent = computed(() => {
     margin: -20px -16px;
     height: calc(100% + 40px);
   }
-  .traceability-grid { grid-template-columns: 1fr; }
-  .traceability-hash { grid-column: auto; }
 }
 </style>

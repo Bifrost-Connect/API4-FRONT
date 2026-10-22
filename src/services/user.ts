@@ -1,8 +1,8 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { mockCurrentUser } from './mocks/user.mock'
 
 export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador'
-type DemoUser = { id: number; name: string; role: UserRole }
+export type DemoUser = { id: number; name: string; role: UserRole }
 
 const demoUsers: Record<UserRole, DemoUser> = {
   Operador: { id: 1, name: 'João Silva', role: 'Operador' },
@@ -18,10 +18,10 @@ const readStoredUser = (): DemoUser => {
   return storedRole && demoUsers[storedRole] ? demoUsers[storedRole] : (mockCurrentUser as DemoUser)
 }
 
-const currentUser = ref(readStoredUser())
+const currentUser = ref<DemoUser>(readStoredUser())
 
 export const userService = {
-  getCurrentUser() {
+  getCurrentUser(): DemoUser {
     return currentUser.value
   },
 
@@ -37,5 +37,29 @@ export const userService = {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('api4-demo-role')
     }
+  },
+
+  /**
+   * Verifica se o usuário atual tem perfil de Administrador.
+   */
+  isAdmin(): boolean {
+    return currentUser.value.role === 'Administrador'
+  },
+
+  /**
+   * Verifica se o usuário atual possui permissão para acessar determinado recurso/rota.
+   * Administrador possui acesso irrestrito a todas as funcionalidades do sistema.
+   */
+  canAccess(allowedRoles?: UserRole[] | string[]): boolean {
+    if (this.isAdmin()) return true
+    if (!allowedRoles || allowedRoles.length === 0) return true
+    return (allowedRoles as string[]).includes(currentUser.value.role)
+  },
+
+  /**
+   * Retorna os usuários de demonstração disponíveis para troca rápida de perfil.
+   */
+  getDemoUsers(): Record<UserRole, DemoUser> {
+    return demoUsers
   },
 }

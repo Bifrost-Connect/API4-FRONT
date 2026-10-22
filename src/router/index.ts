@@ -8,7 +8,7 @@ import MapView from '../views/MapView.vue'
 import CargaListView from '../views/CargaListView.vue'
 import AuditorDashboardView from '../views/AuditorDashboardView.vue'
 import TerritorialAnalysisView from '../views/TerritorialAnalysisView.vue'
-import { userService } from '../services/user'
+import { userService, type UserRole } from '../services/user'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,31 +17,31 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
-      meta: { allowedRoles: ['Operador', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/analise-territorial',
       name: 'analise-territorial',
       component: TerritorialAnalysisView,
-      meta: { allowedRoles: ['Analista'] },
+      meta: { allowedRoles: ['Analista', 'Administrador'] },
     },
     {
       path: '/auditor',
       name: 'auditor',
-      component: AuditorDashboardView,
-      meta: { allowedRoles: ['Auditor'] },
+      component: DashboardView,
+      meta: { allowedRoles: ['Auditor', 'Administrador'] },
     },
     {
-      path: '/auditoria',
-      name: 'auditoria',
+      path: '/catalogo',
+      name: 'catalogo',
       component: CargaListView,
-      meta: { allowedRoles: ['Auditor'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/processo/:id',
       name: 'process-log',
       component: ProcessLogView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/upload',
@@ -74,8 +74,15 @@ export default router
 router.beforeEach((to) => {
   if (to.name === 'login') return true
 
-  const currentRole = userService.getCurrentUser().role
-  const allowedRoles = to.meta.allowedRoles as string[] | undefined
+  const currentUser = userService.getCurrentUser()
+  const currentRole = currentUser.role
+
+  // Administrador tem acesso a todas as telas do sistema
+  if (userService.isAdmin()) {
+    return true
+  }
+
+  const allowedRoles = to.meta.allowedRoles as UserRole[] | undefined
   const homeByRole: Record<string, string> = {
     Auditor: 'auditor',
     Analista: 'analise-territorial',
@@ -84,11 +91,11 @@ router.beforeEach((to) => {
   }
   const home = homeByRole[currentRole] ?? 'dashboard'
 
-  if (allowedRoles && !allowedRoles.includes(currentRole)) {
+  if (allowedRoles && !userService.canAccess(allowedRoles)) {
     return { name: home }
   }
 
-  if (to.name === 'dashboard' && currentRole !== 'Operador' && currentRole !== 'Administrador') {
+  if (to.name === 'dashboard' && currentRole !== 'Operador') {
     return { name: home }
   }
 

@@ -222,7 +222,11 @@ export const dashboardService = {
   },
 
   async requestAuditor(processId: string): Promise<void> {
-    await api.post(`/dashboard/processes/${encodeURIComponent(processId)}/auditor`)
+    const numericId = Number(String(processId).replace(/\D/g, '')) || 1
+    await api.post('/notificacoes/auditor', {
+      processoId: numericId,
+      mensagem: `Solicitação de auditoria para o processo ${processId}`,
+    })
   },
 
   async getFilterOptions() {

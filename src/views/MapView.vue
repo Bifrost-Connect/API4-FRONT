@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { mapService } from '../services/map'
@@ -20,6 +21,7 @@ interface TerritoryProperties {
   source: string
 }
 
+const route = useRoute()
 const mapElement = ref<HTMLElement | null>(null)
 const searchTerm = ref('')
 const selectedLocation = ref<MapLocation | null>(null)
@@ -159,6 +161,21 @@ onMounted(async () => {
       .on('click', () => selectLocation(location))
     marker.addTo(markers as L.LayerGroup)
   })
+
+  const requestedBase = String(route.query?.base || '').trim()
+  if (requestedBase) {
+    searchTerm.value = requestedBase
+    const match = locations.value.find(
+      (item) =>
+        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
+        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
+    )
+    if (match) {
+      selectLocation(match)
+    } else if (locations.value[0]) {
+      selectLocation(locations.value[0])
+    }
+  }
 
   map.on('click', ({ latlng }) => {
     selectedLocation.value = null

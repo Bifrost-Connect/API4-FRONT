@@ -1,27 +1,58 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import {
+  FiGrid,
+  FiUploadCloud,
+  FiDatabase,
+  FiMap,
+  FiPieChart,
+  FiShield,
+  FiRotateCcw,
+} from 'vue-icons-plus/fi'
 import { userService } from '../services/user'
 
 const currentUser = computed(() => userService.getCurrentUser())
-const navigationItems = computed(() =>
-  currentUser.value.role === 'Analista'
-    ? [
-        { label: 'Mapa territorial', to: '/mapa', icon: '⌖' },
-        { label: 'Análise territorial', to: '/analise-territorial', icon: '⌗' },
-      ]
-    : currentUser.value.role === 'Auditor'
-      ? [
-        { label: 'Painel do auditor', to: '/auditor', icon: '✓' },
-        { label: 'Auditoria de cargas', to: '/auditoria', icon: '↺' },
-        { label: 'Mapa operacional', to: '/mapa', icon: '⌖' },
-      ]
-      : [
-          { label: 'Dashboard', to: '/', icon: '▦' },
-          { label: 'Upload de carga', to: '/upload', icon: '↑' },
-          { label: 'Mapa operacional', to: '/mapa', icon: '⌖' },
-        ],
-)
+
+const navigationItems = computed(() => {
+  const role = currentUser.value.role
+
+  // Administrador tem acesso irrestrito a todas as telas do sistema
+  if (role === 'Administrador') {
+    return [
+      { label: 'Dashboard', to: '/', icon: FiGrid },
+      { label: 'Upload de carga', to: '/upload', icon: FiUploadCloud },
+      { label: 'Catálogo de Bases', to: '/catalogo', icon: FiDatabase },
+      { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
+      { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
+      { label: 'Painel do auditor', to: '/auditor', icon: FiShield },
+    ]
+  }
+
+  if (role === 'Analista') {
+    return [
+      { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
+      { label: 'Mapa territorial', to: '/mapa', icon: FiMap },
+      { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
+    ]
+  }
+
+  if (role === 'Auditor') {
+    return [
+      { label: 'Painel do auditor', to: '/', icon: FiShield },
+      { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
+      { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
+    ]
+  }
+
+  // Operador (padrão)
+  return [
+    { label: 'Dashboard', to: '/', icon: FiGrid },
+    { label: 'Upload de carga', to: '/upload', icon: FiUploadCloud },
+    { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
+    { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
+  ]
+})
 </script>
 
 <template>
@@ -43,14 +74,18 @@ const navigationItems = computed(() =>
         class="navigation-link"
         active-class="navigation-link-active"
       >
-        <span class="navigation-icon" aria-hidden="true">{{ item.icon }}</span>
+        <span class="navigation-icon" aria-hidden="true">
+          <component :is="item.icon" size="18" />
+        </span>
         <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
 
     <div class="sidebar-footer">
       <RouterLink to="/login" class="login-link">
-        <span class="navigation-icon" aria-hidden="true">↪</span>
+        <span class="navigation-icon" aria-hidden="true">
+          <FiRotateCcw size="17" />
+        </span>
         <span>Trocar perfil</span>
       </RouterLink>
     </div>
@@ -103,7 +138,7 @@ const navigationItems = computed(() =>
 .navigation-link:hover,
 .login-link:hover,
 .navigation-link-active { color: white; background: rgba(242, 101, 34, 0.16); border-left-color: var(--vis-brand-orange); }
-.navigation-icon { width: 20px; color: var(--vis-brand-orange-light); font-size: 1.15rem; line-height: 1; text-align: center; }
+.navigation-icon { width: 20px; color: var(--vis-brand-orange-light); display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
 .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--vis-c-divider-dark-2); }
 
 @media (max-width: 760px) {
