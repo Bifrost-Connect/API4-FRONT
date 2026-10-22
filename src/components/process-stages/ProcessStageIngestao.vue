@@ -295,15 +295,30 @@ const lineageTree = computed(() => {
         </div>
 
         <div class="form-group">
-          <label>Formato / Classificação de Acesso</label>
-          <p class="form-value">GeoJSON / Shapefile • Público Institucional</p>
+          <label>Competência</label>
+          <p class="form-value" data-testid="meta-competencia">{{ details.competencia || '—' }}</p>
         </div>
 
         <div class="form-group">
-          <label>Cobertura Espacial / Responsável</label>
-          <p class="form-value">
-            Território Nacional • {{ details.assignedEditor || 'Operador de Carga' }}
+          <label>Formato / Classificação de Acesso</label>
+          <p class="form-value" data-testid="meta-formato">
+            {{ details.formato || '—' }} • {{ details.classificacaoAcesso || '—' }}
           </p>
+        </div>
+
+        <div class="form-group form-group--full">
+          <label>Cobertura Espacial / Temporal</label>
+          <p class="form-value" data-testid="meta-cobertura">
+            {{ details.coberturaEspacial || '—' }}
+            <template v-if="details.coberturaTemporalInicio || details.coberturaTemporalFim">
+              • {{ details.coberturaTemporalInicio || '…' }} a {{ details.coberturaTemporalFim || '…' }}
+            </template>
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label>Responsável</label>
+          <p class="form-value">{{ details.assignedEditor || 'Operador de Carga' }}</p>
         </div>
 
         <div v-if="traceability?.parametrosProcessamento" class="form-group form-group--full">

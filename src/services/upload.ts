@@ -18,6 +18,12 @@ export const uploadService = {
         conjuntoId: parseInt(payload.conjuntoDados) || 1,
         anoSafra: payload.anoReferencia,
         epsgOrigem: payload.epsg,
+        competencia: payload.competencia,
+        formato: payload.formato,
+        classificacaoAcesso: payload.classificacaoAcesso,
+        coberturaEspacial: payload.coberturaEspacial,
+        coberturaTemporalInicio: payload.coberturaTemporalInicio || undefined,
+        coberturaTemporalFim: payload.coberturaTemporalFim || undefined,
       }
       const res = await api.post('/carga/metadados', backendPayload)
       return res.data

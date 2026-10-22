@@ -9,6 +9,7 @@ import {
   FiPieChart,
   FiShield,
   FiRotateCcw,
+  FiCheckCircle,
 } from 'vue-icons-plus/fi'
 import { userService } from '../services/user'
 
@@ -26,6 +27,14 @@ const navigationItems = computed(() => {
       { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
       { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
       { label: 'Painel do auditor', to: '/auditor', icon: FiShield },
+    ]
+  }
+
+  if (role === 'Gestor') {
+    return [
+      { label: 'Dashboard', to: '/', icon: FiGrid },
+      { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
+      { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
     ]
   }
 

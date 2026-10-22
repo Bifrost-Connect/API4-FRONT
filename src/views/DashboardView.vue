@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import CardContainer from '../components/CardContainer.vue'
 import DataTable from '../components/DataTable.vue'
 import type { Column } from '../components/DataTable.vue'
@@ -734,9 +734,9 @@ const requestAuditor = async (item: ProcessLog) => {
 
       <!-- Botão de Upload: Apenas para quem tem permissão (Operador e Administrador no modo operacional) -->
       <div v-if="canUpload" class="bottom-action">
-        <router-link to="/upload" class="btn-upload">
+        <RouterLink to="/upload" class="btn-upload">
           + NOVA CARGA DE DADOS (Upload)
-        </router-link>
+        </RouterLink>
       </div>
     </template>
   </main>

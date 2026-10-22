@@ -30,6 +30,16 @@ const anoReferencia = ref('')
 const epsg = ref('')
 const conjuntoDados = ref('')
 const descricao = ref('')
+// Expansão de metadados (US05)
+const competencia = ref('')
+const formato = ref('')
+const classificacaoAcesso = ref('')
+const coberturaEspacial = ref('')
+const coberturaTemporalInicio = ref('')
+const coberturaTemporalFim = ref('')
+
+const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'GeoPackage', 'KML']
+const classificacaoOptions = ['Público', 'Restrito', 'Confidencial']
 
 const formOptions = ref({
   anos: [] as string[],
@@ -75,7 +85,14 @@ const isStep1Valid = computed(
     orgaoEmissor.value !== '' &&
     anoReferencia.value !== '' &&
     epsg.value !== '' &&
-    conjuntoDados.value !== '',
+    conjuntoDados.value !== '' &&
+    competencia.value !== '' &&
+    formato.value !== '' &&
+    classificacaoAcesso.value !== '' &&
+    coberturaEspacial.value.trim().length > 0 &&
+    (!coberturaTemporalInicio.value ||
+      !coberturaTemporalFim.value ||
+      coberturaTemporalInicio.value <= coberturaTemporalFim.value),
 )
 const isStep2Valid = computed(() => arquivoSelecionado.value !== null)
 
@@ -140,6 +157,12 @@ const handleUpload = async () => {
     epsg: epsg.value,
     conjuntoDados: conjuntoDados.value,
     descricao: descricao.value,
+    competencia: competencia.value,
+    formato: formato.value,
+    classificacaoAcesso: classificacaoAcesso.value,
+    coberturaEspacial: coberturaEspacial.value,
+    coberturaTemporalInicio: coberturaTemporalInicio.value,
+    coberturaTemporalFim: coberturaTemporalFim.value,
   }
 
   try {
@@ -185,6 +208,12 @@ const resetForm = () => {
   epsg.value = ''
   conjuntoDados.value = ''
   descricao.value = ''
+  competencia.value = ''
+  formato.value = ''
+  classificacaoAcesso.value = ''
+  coberturaEspacial.value = ''
+  coberturaTemporalInicio.value = ''
+  coberturaTemporalFim.value = ''
 }
 </script>
 
@@ -278,6 +307,48 @@ const resetForm = () => {
               {{ item.label }}
             </option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-competencia">Competência *</label>
+          <input id="upload-competencia" v-model="competencia" type="month" class="input" />
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-formato">Formato *</label>
+          <select id="upload-formato" v-model="formato" class="input">
+            <option value="">Selecione o formato</option>
+            <option v-for="f in formatoOptions" :key="f" :value="f">{{ f }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-classificacao">Classificação de Acesso *</label>
+          <select id="upload-classificacao" v-model="classificacaoAcesso" class="input">
+            <option value="">Selecione a classificação</option>
+            <option v-for="c in classificacaoOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-cobertura-espacial">Cobertura Espacial *</label>
+          <input
+            id="upload-cobertura-espacial"
+            v-model="coberturaEspacial"
+            type="text"
+            class="input"
+            placeholder="Ex: Estado de Goiás, Bioma Cerrado"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-cobertura-ini">Cobertura Temporal (início)</label>
+          <input id="upload-cobertura-ini" v-model="coberturaTemporalInicio" type="date" class="input" />
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="upload-cobertura-fim">Cobertura Temporal (fim)</label>
+          <input id="upload-cobertura-fim" v-model="coberturaTemporalFim" type="date" class="input" />
         </div>
 
         <div class="form-group form-group--full">

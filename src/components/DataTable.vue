@@ -10,6 +10,7 @@ const props = defineProps<{
   columns: Column[]
   data: any[]
   rowKey?: string
+  rowTestIdKey?: string
 }>()
 
 const emit = defineEmits(['row-click'])
@@ -34,6 +35,13 @@ const getKey = (item: any, index: number) => {
   return index
 }
 
+const getRowTestId = (item: any) => {
+  if (props.rowTestIdKey && item[props.rowTestIdKey] !== undefined) {
+    return item[props.rowTestIdKey]
+  }
+  return item.rowTestId || undefined
+}
+
 const handleRowClick = (item: any, event: Event) => {
   if ((event.target as HTMLElement).closest('.table-actions')) return
   emit('row-click', item)
@@ -53,7 +61,11 @@ const handleRowClick = (item: any, event: Event) => {
       </thead>
       <tbody>
         <template v-for="(item, index) in data" :key="getKey(item, index)">
-          <tr @click="handleRowClick(item, $event)" class="clickable-row">
+          <tr
+            @click="handleRowClick(item, $event)"
+            class="clickable-row"
+            :data-testid="getRowTestId(item)"
+          >
             <td v-for="col in columns" :key="col.key">
               <slot :name="'cell-' + col.key" :item="item" :value="item[col.key]" :isExpanded="expandedRows.has(getKey(item, index))">
                 {{ item[col.key] }}

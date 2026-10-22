@@ -79,6 +79,13 @@ export interface ProcessLogDetails {
   epsg: string
   epsgDetected?: string
   description: string
+  /** Metadados expandidos (US05) */
+  competencia?: string
+  formato?: string
+  classificacaoAcesso?: string
+  coberturaEspacial?: string
+  coberturaTemporalInicio?: string
+  coberturaTemporalFim?: string
   /** Hash do arquivo original — exibido apenas na tela de Ingestão, NÃO no dashboard */
   integrityHash?: string
   originalFileUrl: string

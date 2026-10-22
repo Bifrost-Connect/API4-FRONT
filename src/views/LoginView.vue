@@ -22,7 +22,9 @@ const handleLogin = () => {
       ? '/auditor'
       : selectedRole.value === 'Analista'
         ? '/analise-territorial'
-        : '/'
+        : selectedRole.value === 'Gestor'
+          ? '/gestor'
+          : '/'
   router.replace(destination)
 }
 </script>
@@ -64,6 +66,7 @@ const handleLogin = () => {
         <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Operador' }" @click="fillLogin('Operador')">Entrar Operador</button>
         <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Analista' }" @click="fillLogin('Analista')">Entrar Analista</button>
         <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Auditor' }" @click="fillLogin('Auditor')">Entrar Auditor</button>
+        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Gestor' }" @click="fillLogin('Gestor')">Entrar Gestor</button>
         <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Administrador' }" @click="fillLogin('Administrador')">
           Entrar Administrador
         </button>

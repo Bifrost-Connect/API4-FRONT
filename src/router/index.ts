@@ -17,7 +17,7 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
     },
     {
       path: '/analise-territorial',
@@ -32,16 +32,20 @@ const router = createRouter({
       meta: { allowedRoles: ['Auditor', 'Administrador'] },
     },
     {
+      path: '/gestor',
+      redirect: '/',
+    },
+    {
       path: '/catalogo',
       name: 'catalogo',
       component: CargaListView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
     },
     {
       path: '/processo/:id',
       name: 'process-log',
       component: ProcessLogView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
     },
     {
       path: '/upload',
@@ -53,7 +57,7 @@ const router = createRouter({
       path: '/mapa',
       name: 'mapa',
       component: MapView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
     },
     {
       path: '/styleguide',
@@ -86,6 +90,7 @@ router.beforeEach((to) => {
   const homeByRole: Record<string, string> = {
     Auditor: 'auditor',
     Analista: 'analise-territorial',
+    Gestor: 'gestor-dashboard',
     Operador: 'dashboard',
     Administrador: 'dashboard',
   }

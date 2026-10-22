@@ -44,7 +44,7 @@ const mockBases: ProcessLog[] = [
   },
 ]
 
-describe('CargaListView (Catálogo de Bases - Sprint 9)', () => {
+describe('CargaListView (Catálogo de Bases)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.spyOn(dashboardService, 'getFilterOptions').mockResolvedValue({
