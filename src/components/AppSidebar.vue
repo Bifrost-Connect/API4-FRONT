@@ -30,14 +30,6 @@ const navigationItems = computed(() => {
     ]
   }
 
-  if (role === 'Gestor') {
-    return [
-      { label: 'Dashboard', to: '/', icon: FiGrid },
-      { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
-      { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
-    ]
-  }
-
   if (role === 'Analista') {
     return [
       { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
@@ -62,6 +54,10 @@ const navigationItems = computed(() => {
     { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
   ]
 })
+
+const displayRole = computed(() => {
+  return currentUser.value.role === 'Administrador' ? 'Gestor' : currentUser.value.role
+})
 </script>
 
 <template>
@@ -70,7 +66,7 @@ const navigationItems = computed(() => {
       <span class="brand-mark">A4</span>
       <div>
         <strong>{{ currentUser.name }}</strong>
-        <span>{{ currentUser.role }}</span>
+        <span>{{ displayRole }}</span>
       </div>
     </div>
 

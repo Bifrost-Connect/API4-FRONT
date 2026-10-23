@@ -11,6 +11,7 @@ import {
 import type { ProcessLogDetails } from '../../services/process'
 import { dashboardService } from '../../services/dashboard'
 import { userService } from '../../services/user'
+import { uploadService } from '../../services/upload'
 
 const props = withDefaults(
   defineProps<{
@@ -47,8 +48,13 @@ const signalStatus = ref<'idle' | 'loading' | 'signaled'>('idle')
 const signalOperatorReprocess = async () => {
   signalStatus.value = 'loading'
   toastError.value = null
+  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
   try {
-    await dashboardService.requestAuditor(props.details.id)
+    if (numericId) {
+      await uploadService.notificarOperadorQuarentena(numericId)
+    } else {
+      await dashboardService.requestAuditor(props.details.id)
+    }
     signalStatus.value = 'signaled'
     showSuccessToast(
       `Sinalização operacional enviada ao Operador para reprocessamento da carga ${props.details.id}.`,
@@ -109,39 +115,59 @@ const handleFileSelect = (event: Event) => {
   selectedFile.value = target.files?.[0] ?? null
 }
 
-const confirmReprocess = () => {
+const confirmReprocess = async () => {
   if (!selectedFile.value) {
     showErrorToast(
       'Anexe um novo arquivo corrigido válido (.geojson, .zip ou .shp) antes de reprocessar a carga.',
     )
     return
   }
+  const fileToUpload = selectedFile.value
   showReprocessModal.value = false
   props.details.status = 'Em andamento'
-  props.details.pauseReason = `Reprocessamento iniciado com o arquivo ${selectedFile.value.name}.`
+  props.details.pauseReason = `Reprocessamento iniciado com o arquivo ${fileToUpload.name}.`
   showSuccessToast(
-    `Arquivo "${selectedFile.value.name}" vinculado à carga ${props.details.id} e enviado para reprocessamento.`,
+    `Arquivo "${fileToUpload.name}" vinculado à carga ${props.details.id} e enviado para reprocessamento.`,
   )
   selectedFile.value = null
   reprocessNote.value = ''
+
+  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
+  if (numericId) {
+    try {
+      await uploadService.reprocessarCarga(numericId, fileToUpload)
+    } catch (e: any) {
+      console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
+    }
+  }
 }
 
 // Tarefa 8: Modal de Cancelar / Invalidar Carga com justificativa obrigatória e aviso de preservação de Hash
 const showCancelModal = ref(false)
 const cancelJustification = ref('')
 
-const confirmCancelLoad = () => {
+const confirmCancelLoad = async () => {
   if (!cancelJustification.value.trim()) {
     showErrorToast('Informe uma justificativa textual obrigatória para cancelar/invalidar o envio.')
     return
   }
+  const justification = cancelJustification.value.trim()
   showCancelModal.value = false
   props.details.status = 'Fechado'
-  props.details.pauseReason = `Envio invalidado pelo operador. Justificativa: ${cancelJustification.value.trim()}`
+  props.details.pauseReason = `Envio invalidado pelo operador. Justificativa: ${justification}`
   showSuccessToast(
     `Carga ${props.details.id} invalidada. O arquivo bruto original e seu Hash SHA-256 foram preservados para auditoria.`,
   )
   cancelJustification.value = ''
+
+  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
+  if (numericId) {
+    try {
+      await uploadService.cancelarCarga(numericId, justification)
+    } catch (e: any) {
+      console.warn('Erro ao chamar endpoint de cancelamento, simulando localmente:', e)
+    }
+  }
 }
 </script>
 

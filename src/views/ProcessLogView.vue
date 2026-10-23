@@ -8,7 +8,7 @@ import {
   type ProcessTraceability,
 } from '../services/process'
 import { userService } from '../services/user'
-import { gestorService } from '../services/gestor'
+import { dashboardService } from '../services/dashboard'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -123,7 +123,7 @@ const exportIndicator = async (format: IndicatorExportFormat) => {
   exportingFormat.value = format
   exportError.value = ''
   try {
-    const file = await gestorService.exportarVersao(details.value as any, format)
+    const file = await dashboardService.exportarVersao(details.value as any, format)
     const objectUrl = URL.createObjectURL(file)
     const link = document.createElement('a')
     link.href = objectUrl

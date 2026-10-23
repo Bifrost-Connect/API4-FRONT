@@ -1,15 +1,14 @@
 import { ref, computed } from 'vue'
 import { mockCurrentUser } from './mocks/user.mock'
 
-export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor'
+export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador'
 export type DemoUser = { id: number; name: string; role: UserRole }
 
 const demoUsers: Record<UserRole, DemoUser> = {
-  Operador: { id: 1, name: 'João Silva', role: 'Operador' },
+  Operador: { id: 1, name: 'João Silva (Técnico)', role: 'Operador' },
   Auditor: { id: 2, name: 'Daniel Natan', role: 'Auditor' },
   Analista: { id: 3, name: 'Maria Oliveira', role: 'Analista' },
-  Administrador: { id: 4, name: 'Admin API4', role: 'Administrador' },
-  Gestor: { id: 5, name: 'Carlos Gestor', role: 'Gestor' },
+  Administrador: { id: 4, name: 'Gestor API4', role: 'Administrador' },
 }
 
 const readStoredUser = (): DemoUser => {
@@ -45,13 +44,6 @@ export const userService = {
    */
   isAdmin(): boolean {
     return currentUser.value.role === 'Administrador'
-  },
-
-  /**
-   * Verifica se o usuário atual tem perfil de Gestor.
-   */
-  isGestor(): boolean {
-    return currentUser.value.role === 'Gestor'
   },
 
   /**

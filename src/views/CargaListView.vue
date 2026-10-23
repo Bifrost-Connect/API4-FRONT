@@ -17,7 +17,8 @@ import { userService } from '@/services/user'
 const router = useRouter()
 
 // Filtros rápidos por categoria/status
-type QuickCategory = 'CONCLUIDAS' | 'TODAS' | 'ATTENTION' | 'QUARENTENA' | 'VALIDACAO' | 'TRATAMENTO' | 'EM_CORRECAO'
+type QuickCategory =
+  'CONCLUIDAS' | 'TODAS' | 'ATTENTION' | 'QUARENTENA' | 'VALIDACAO' | 'TRATAMENTO' | 'EM_CORRECAO'
 // Por padrão, selecionado para mostrar somente as cargas concluídas
 const selectedCategory = ref<QuickCategory>('CONCLUIDAS')
 
@@ -53,9 +54,9 @@ const dataSource = ref<'API' | 'DEMONSTRACAO' | ''>('')
 const currentPage = ref(0)
 const totalPages = ref(1)
 
-// Permissão para abrir auditoria detalhada
+// Permissão para abrir auditoria detalhada e visualização de processo
 const currentUser = computed(() => userService.getCurrentUser())
-const canAuditProcess = computed(() => currentUser.value.role !== 'Operador')
+const canAuditProcess = computed(() => true)
 
 /**
  * Identifica se um processo possui erro, inconsistência ou retenção.
@@ -109,7 +110,12 @@ const resolveSource = (process: ProcessLog): string => {
     return String(process.source).trim()
   }
   const ds = (process.dataset || '').toLowerCase()
-  if (ds.includes('car') || ds.includes('imóveis') || ds.includes('imoveis') || ds.includes('reserva')) {
+  if (
+    ds.includes('car') ||
+    ds.includes('imóveis') ||
+    ds.includes('imoveis') ||
+    ds.includes('reserva')
+  ) {
     return 'SICAR / SFB'
   }
   if (ds.includes('app') || ds.includes('hidro') || ds.includes('preserva')) {
@@ -123,7 +129,12 @@ const resolveSource = (process: ProcessLog): string => {
  */
 const isVigente = (process: ProcessLog): boolean => {
   const norm = (process.status || '').toLowerCase()
-  return norm.includes('conclu') || norm.includes('fechad') || norm.includes('publicad') || norm.includes('vigente')
+  return (
+    norm.includes('conclu') ||
+    norm.includes('fechad') ||
+    norm.includes('publicad') ||
+    norm.includes('vigente')
+  )
 }
 
 /**
@@ -193,7 +204,9 @@ const loadPage = async (pageNumber: number, currentFilters?: any) => {
     loadError.value = true
     const isTimeout =
       error?.code === 'ECONNABORTED' ||
-      String(error?.message || '').toLowerCase().includes('timeout')
+      String(error?.message || '')
+        .toLowerCase()
+        .includes('timeout')
     toastErrorMessage.value = isTimeout
       ? 'Tempo limite excedido (timeout) ao carregar o catálogo de bases. Tente novamente.'
       : 'Erro ao carregar o catálogo de bases. Verifique a conexão com o servidor.'
@@ -257,17 +270,25 @@ const filteredProcessos = computed(() => {
     }
 
     // 2. Filtros Tradicionais
-    if (targetConjuntoLabel && itemDataset !== targetConjuntoLabel && !itemDataset.includes(targetConjuntoLabel)) {
+    if (
+      targetConjuntoLabel &&
+      itemDataset !== targetConjuntoLabel &&
+      !itemDataset.includes(targetConjuntoLabel)
+    ) {
       return false
     }
 
     if (filters.value.etapa) {
-      const opt = filterOptions.value.etapas.find((e) => String(e.id) === String(filters.value.etapa))
+      const opt = filterOptions.value.etapas.find(
+        (e) => String(e.id) === String(filters.value.etapa),
+      )
       if (opt && !stage.includes(opt.label.toLowerCase())) return false
     }
 
     if (filters.value.situacao) {
-      const opt = filterOptions.value.situacoes.find((s) => String(s.id) === String(filters.value.situacao))
+      const opt = filterOptions.value.situacoes.find(
+        (s) => String(s.id) === String(filters.value.situacao),
+      )
       if (opt && !status.includes(opt.label.toLowerCase())) return false
     }
 
@@ -308,7 +329,12 @@ const handleConjuntoChange = async () => {
 }
 
 const clearFilters = async () => {
-  const hadServerFilter = /^\d+$/.test(filters.value.conjunto) || filters.value.etapa || filters.value.situacao || filters.value.dateBeggin || filters.value.dateEnd
+  const hadServerFilter =
+    /^\d+$/.test(filters.value.conjunto) ||
+    filters.value.etapa ||
+    filters.value.situacao ||
+    filters.value.dateBeggin ||
+    filters.value.dateEnd
   searchQuery.value = ''
   selectedCategory.value = 'CONCLUIDAS'
   selectedSource.value = ''
@@ -373,7 +399,12 @@ const getStatusBadgeClass = (status: string) => {
           <button type="button" class="btn-toast-retry" @click="loadPage(currentPage)">
             <FiRefreshCw size="14" /> Tentar novamente
           </button>
-          <button type="button" class="btn-toast-close" aria-label="Fechar alerta" @click="dismissToast">
+          <button
+            type="button"
+            class="btn-toast-close"
+            aria-label="Fechar alerta"
+            @click="dismissToast"
+          >
             &times;
           </button>
         </div>
@@ -386,7 +417,8 @@ const getStatusBadgeClass = (status: string) => {
         <p class="eyebrow">Catálogo Territorial & Auditoria</p>
         <h1 class="page-title">Catálogo de Bases Geoespaciais</h1>
         <p class="page-subtitle">
-          Consulte os conjuntos disponíveis (Imóveis Rurais, Reserva Legal, APP), filtre por etapa, situação, órgão ou safra, visualize no mapa ou audite a linhagem completa.
+          Consulte os conjuntos disponíveis (Imóveis Rurais, Reserva Legal, APP), filtre por etapa,
+          situação, órgão ou safra, visualize no mapa ou audite a linhagem completa.
         </p>
       </div>
       <span v-if="dataSource === 'DEMONSTRACAO'" class="demo-label">Base demonstrativa</span>
@@ -401,7 +433,7 @@ const getStatusBadgeClass = (status: string) => {
         data-testid="tab-concluidas"
         @click="selectedCategory = 'CONCLUIDAS'"
       >
-        Concluídas / Vigentes ({{ processos.filter(isVigente).length }})
+        Concluídas ({{ processos.filter(isVigente).length }})
       </button>
       <button
         type="button"
@@ -427,7 +459,11 @@ const getStatusBadgeClass = (status: string) => {
         :class="{ active: selectedCategory === 'QUARENTENA' }"
         @click="selectedCategory = 'QUARENTENA'"
       >
-        Quarentena ({{ processos.filter((p) => (p.status || '').toLowerCase().includes('quarentena') || p.quarantined).length }})
+        Quarentena ({{
+          processos.filter(
+            (p) => (p.status || '').toLowerCase().includes('quarentena') || p.quarantined,
+          ).length
+        }})
       </button>
       <button
         type="button"
@@ -435,7 +471,9 @@ const getStatusBadgeClass = (status: string) => {
         :class="{ active: selectedCategory === 'VALIDACAO' }"
         @click="selectedCategory = 'VALIDACAO'"
       >
-        Validação ({{ processos.filter((p) => (p.stage || '').toLowerCase().includes('valida')).length }})
+        Validação ({{
+          processos.filter((p) => (p.stage || '').toLowerCase().includes('valida')).length
+        }})
       </button>
       <button
         type="button"
@@ -443,7 +481,9 @@ const getStatusBadgeClass = (status: string) => {
         :class="{ active: selectedCategory === 'TRATAMENTO' }"
         @click="selectedCategory = 'TRATAMENTO'"
       >
-        Tratamento ({{ processos.filter((p) => (p.stage || '').toLowerCase().includes('trata')).length }})
+        Tratamento ({{
+          processos.filter((p) => (p.stage || '').toLowerCase().includes('trata')).length
+        }})
       </button>
       <button
         type="button"
@@ -469,7 +509,17 @@ const getStatusBadgeClass = (status: string) => {
           />
         </div>
         <button
-          v-if="searchQuery || filters.conjunto || filters.etapa || filters.situacao || filters.dateBeggin || filters.dateEnd || selectedSource || selectedYear || selectedCategory !== 'CONCLUIDAS'"
+          v-if="
+            searchQuery ||
+            filters.conjunto ||
+            filters.etapa ||
+            filters.situacao ||
+            filters.dateBeggin ||
+            filters.dateEnd ||
+            selectedSource ||
+            selectedYear ||
+            selectedCategory !== 'CONCLUIDAS'
+          "
           type="button"
           class="btn btn_outline btn-clear"
           data-testid="clear-filters"
@@ -511,7 +561,7 @@ const getStatusBadgeClass = (status: string) => {
         </div>
       </div>
 
-       <div class="card-content filters-container">
+      <div class="card-content filters-container">
         <div class="filter-item filter-dates">
           <div class="date-row">
             <label for="dateBeggin">Início:</label>
@@ -604,10 +654,21 @@ const getStatusBadgeClass = (status: string) => {
       <FiDatabase size="40" class="empty-icon" />
       <h3>Nenhuma base de dados encontrada com estes filtros</h3>
       <p>
-        Tente ajustar os termos pesquisados, selecionar a aba "Todas as Cargas" ou limpar os filtros de data, conjunto e órgão.
+        Tente ajustar os termos pesquisados, selecionar a aba "Todas as Cargas" ou limpar os filtros
+        de data, conjunto e órgão.
       </p>
       <button
-        v-if="searchQuery || filters.conjunto || filters.etapa || filters.situacao || filters.dateBeggin || filters.dateEnd || selectedSource || selectedYear || selectedCategory !== 'CONCLUIDAS'"
+        v-if="
+          searchQuery ||
+          filters.conjunto ||
+          filters.etapa ||
+          filters.situacao ||
+          filters.dateBeggin ||
+          filters.dateEnd ||
+          selectedSource ||
+          selectedYear ||
+          selectedCategory !== 'CONCLUIDAS'
+        "
         type="button"
         class="btn btn_outline mt-3"
         @click="clearFilters"
@@ -629,11 +690,7 @@ const getStatusBadgeClass = (status: string) => {
           <div class="card-top">
             <span class="carga-id">Base #{{ process.id }}</span>
             <div class="card-badges">
-              <span
-                v-if="isVigente(process)"
-                class="badge-vigente"
-                data-testid="badge-vigente"
-              >
+              <span v-if="isVigente(process)" class="badge-vigente" data-testid="badge-vigente">
                 <FiCheckCircle size="12" /> Vigente
               </span>
               <span :class="getStatusBadgeClass(process.status)">
@@ -644,7 +701,9 @@ const getStatusBadgeClass = (status: string) => {
 
           <!-- Nome do Conjunto / Categoria -->
           <h2 class="card-dataset">{{ process.dataset }}</h2>
-          <p class="card-stage">Etapa atual: <strong>{{ process.stage }}</strong></p>
+          <p class="card-stage">
+            Etapa atual: <strong>{{ process.stage }}</strong>
+          </p>
 
           <!-- Metadados Resumidos (Tarefa 2) -->
           <dl class="card-metadata">

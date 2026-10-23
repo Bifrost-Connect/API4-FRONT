@@ -18,7 +18,7 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
 import { userService } from '../../services/user'
-import { gestorService } from '../../services/gestor'
+import { dashboardService } from '../../services/dashboard'
 
 const props = withDefaults(
   defineProps<{
@@ -41,9 +41,9 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Segregação de Funções (Tarefa 8): Apenas Gestor vê e aciona Aprovar/Reprovar e Fechar Versão
+// Apenas Administrador vê e aciona Aprovar/Reprovar e Fechar Versão
 const currentUser = computed(() => userService.getCurrentUser())
-const isGestor = computed(() => currentUser.value.role === 'Gestor')
+const canApprove = computed(() => userService.isAdmin())
 
 // Estados de submissão e decisão
 const isSubmitting = ref(false)
@@ -62,12 +62,12 @@ const rejectionError = ref('')
 // ── Computeds de estado ────────────────────────────────────────────────────────
 const isClosed = computed(() => (props.details.status || '').toLowerCase().includes('fechad'))
 const isAlreadyPublished = computed(() => props.details.status === 'Concluída' || isClosed.value)
-/** Aprovado nesta sessão pelo gestor */
+/** Aprovado nesta sessão */
 const isJustApproved = computed(() => isApproved.value && !isClosed.value)
 /** Exibe o card de sucesso apenas ao aprovar e publicar nesta sessão */
 const showSuccess = computed(() => isJustApproved.value)
 
-/** Exibe painel de decisão: processo em andamento esperando validação do Gestor */
+/** Exibe painel de decisão: processo em andamento esperando homologação */
 const isAwaiting = computed(
   () =>
     !props.readOnly &&
@@ -104,7 +104,7 @@ const confirmPublishAndClose = async () => {
 
   isSubmitting.value = true
   try {
-    await gestorService.aprovarEFecharVersao(
+    await dashboardService.aprovarEFecharVersao(
       {
         id: String(props.details.id),
         dataset: props.details.dataset,
@@ -155,7 +155,7 @@ const confirmReject = async () => {
 
   isSubmitting.value = true
   try {
-    await gestorService.reprovarCarga(
+    await dashboardService.reprovarCarga(
       {
         id: String(props.details.id),
         dataset: props.details.dataset,
@@ -180,7 +180,7 @@ const confirmReject = async () => {
       props.details.pauseReason = `Reprovação na Publicação: ${rejectionReason.value.trim()}. Retornado ao Operador.`
     } else {
       props.details.status = 'Falhou'
-      props.details.pauseReason = `Carga invalidada na Publicação pelo Gestor: ${rejectionReason.value.trim()}.`
+      props.details.pauseReason = `Carga invalidada na Publicação: ${rejectionReason.value.trim()}.`
     }
     closeRejectModal()
   } catch (error: any) {
@@ -199,7 +199,7 @@ const handleUndo = () => {
 }
 
 const goToDashboard = () => {
-  router.push({ name: isGestor.value ? 'gestor-dashboard' : 'dashboard' })
+  router.push({ name: 'dashboard' })
 }
 </script>
 
@@ -249,14 +249,14 @@ const goToDashboard = () => {
         </div>
       </div>
 
-      <!-- ═══ PAINEL DE DECISÃO: aguardando Gestor (Tarefa 2, 7 e 8) ══════════════════════════════ -->
-      <div v-if="isGestor && isAwaiting" class="action-panel" data-testid="gestor-decision-panel">
+      <!-- ═══ PAINEL DE DECISÃO: aguardando homologação (Tarefa 2, 7 e 8) ══════════════════════════════ -->
+      <div v-if="canApprove && isAwaiting" class="action-panel" data-testid="gestor-decision-panel">
         <div class="action-content">
           <div class="action-icon-wrap">
             <FiSearch size="22" />
           </div>
           <div class="action-text">
-            <h3>Homologação e Publicação pelo Gestor</h3>
+            <h3>Homologação e Publicação da Versão Oficial</h3>
             <p>
               Os dados foram processados e validados com sucesso. Deseja homologar a versão oficial
               e consolidar na base definitiva de produção?
@@ -331,7 +331,7 @@ const goToDashboard = () => {
           <strong>Revisão Solicitada para a etapa de {{ targetAuditStage }}</strong>
           <p>
             O processo foi encaminhado para revisão de <strong>{{ targetAuditStage }}</strong> com
-            gestor alocado. Status atualizado para <strong>Em andamento</strong>.
+            responsável alocado. Status atualizado para <strong>Em andamento</strong>.
             <span v-if="reviewNote"
               ><br /><em>Instruções ao editor: {{ reviewNote }}</em></span
             >
@@ -462,7 +462,7 @@ const goToDashboard = () => {
 
           <div class="form-group">
             <label class="form-label">
-              Parecer Técnico do Gestor <span class="required-mark">*</span>
+              Parecer Técnico de Homologação <span class="required-mark">*</span>
             </label>
             <textarea
               v-model="rejectionReason"
@@ -530,7 +530,7 @@ const goToDashboard = () => {
               <span>{{ details.dataset }}</span>
             </div>
             <div class="meta-row">
-              <span class="meta-label">Gestor Responsável:</span>
+              <span class="meta-label">Responsável pela Publicação:</span>
               <strong>{{ currentUser.name }}</strong>
             </div>
           </div>

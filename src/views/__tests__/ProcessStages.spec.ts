@@ -247,13 +247,13 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
   })
 
   describe('Etapa de Publicação e Homologação Final (ProcessStagePublicacao)', () => {
-    it('integra homologação do Gestor com modal de confirmação e alerta de versão permanente', async () => {
+    it('integra homologação com modal de confirmação e alerta de versão permanente', async () => {
       const createObjectURLSpy = vi.fn().mockReturnValue('blob:mock-url')
       const revokeObjectURLSpy = vi.fn()
       window.URL.createObjectURL = createObjectURLSpy
       window.URL.revokeObjectURL = revokeObjectURLSpy
 
-      userService.setCurrentUserRole('Gestor')
+      userService.setCurrentUserRole('Administrador')
       const wrapper = mount(ProcessStagePublicacao, {
         props: {
           details: { ...samplePublicacaoDetails },
@@ -289,7 +289,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
     })
 
     it('modal de reprovação exige justificativa técnica obrigatória e registra motivo na carga', async () => {
-      userService.setCurrentUserRole('Gestor')
+      userService.setCurrentUserRole('Administrador')
       const details = { ...samplePublicacaoDetails }
       const wrapper = mount(ProcessStagePublicacao, {
         props: {
@@ -317,7 +317,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
       expect(details.pauseReason).toContain('Divergência métrica nas áreas')
     })
 
-    it('oculta o painel de homologação para usuários sem privilégios de gestão', () => {
+    it('oculta o painel de homologação para usuários sem privilégios de administração', () => {
       userService.setCurrentUserRole('Auditor')
       const audStage = mount(ProcessStagePublicacao, {
         props: {

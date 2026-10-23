@@ -13,11 +13,11 @@ export const uploadService = {
   async cadastrarMetadados(payload: Record<string, any>): Promise<any> {
     try {
       const backendPayload = {
-        operadorId: userService.getCurrentUser().id,
+        operadorId: userService.getCurrentUser().id || 1,
         orgaoId: parseInt(payload.orgaoEmissor) || 1,
         conjuntoId: parseInt(payload.conjuntoDados) || 1,
-        anoSafra: payload.anoReferencia,
-        epsgOrigem: payload.epsg,
+        anoSafra: String(payload.anoReferencia || '2026').trim(),
+        epsgOrigem: String(payload.epsg || '4674').replace(/\D/g, '') || '4674',
         competencia: payload.competencia,
         formato: payload.formato,
         classificacaoAcesso: payload.classificacaoAcesso,
@@ -103,5 +103,53 @@ export const uploadService = {
       console.warn('API indisponível (ou rota 404), mock indisponível para download.')
       throw err
     }
+  },
+
+  async reprocessarCarga(
+    processoId: number,
+    file: File,
+    usuarioId: number = userService.getCurrentUser().id,
+  ): Promise<any> {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (usuarioId) {
+      formData.append('usuarioId', usuarioId.toString())
+    }
+    const res = await api.post(`/carga/${processoId}/reprocessar`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return res.data
+  },
+
+  async cancelarCarga(
+    processoId: number,
+    motivo: string,
+    usuarioId: number = userService.getCurrentUser().id,
+  ): Promise<void> {
+    await api.patch(
+      `/carga/${processoId}/cancelar`,
+      { motivo },
+      {
+        params: { usuarioId },
+      },
+    )
+  },
+
+  async notificarOperadorQuarentena(
+    processoId: number,
+    usuarioId: number = userService.getCurrentUser().id,
+  ): Promise<void> {
+    await api.post(`/carga/${processoId}/quarentena/notificar-operador`, null, {
+      params: { usuarioId },
+    })
+  },
+
+  async exportarRejeicoesCsv(processoId: number): Promise<Blob> {
+    const res = await api.get(`/carga/${processoId}/rejeicoes/exportar`, {
+      responseType: 'blob',
+    })
+    return res.data
   },
 }

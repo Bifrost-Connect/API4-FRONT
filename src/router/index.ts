@@ -6,7 +6,6 @@ import UploadView from '../views/UploadView.vue'
 import ProcessLogView from '../views/ProcessLogView.vue'
 import MapView from '../views/MapView.vue'
 import CargaListView from '../views/CargaListView.vue'
-import AuditorDashboardView from '../views/AuditorDashboardView.vue'
 import TerritorialAnalysisView from '../views/TerritorialAnalysisView.vue'
 import { userService, type UserRole } from '../services/user'
 
@@ -17,7 +16,7 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/analise-territorial',
@@ -32,20 +31,16 @@ const router = createRouter({
       meta: { allowedRoles: ['Auditor', 'Administrador'] },
     },
     {
-      path: '/gestor',
-      redirect: '/',
-    },
-    {
       path: '/catalogo',
       name: 'catalogo',
       component: CargaListView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/processo/:id',
       name: 'process-log',
       component: ProcessLogView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/upload',
@@ -57,7 +52,7 @@ const router = createRouter({
       path: '/mapa',
       name: 'mapa',
       component: MapView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Gestor', 'Administrador'] },
+      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
     },
     {
       path: '/styleguide',
@@ -76,12 +71,24 @@ const router = createRouter({
 export default router
 
 router.beforeEach((to) => {
+  // 1. Se a rota de destino já for o login, permite o acesso direto
   if (to.name === 'login') return true
 
+  // 2. Busca o usuário atual simulado
   const currentUser = userService.getCurrentUser()
+
+  // 3. Verifica se nenhum usuário foi selecionado
+  // (valida tanto se currentUser for nulo/indefinido quanto se não houver role/id definido)
+  if (!currentUser || !currentUser.role) {
+    return {
+      name: 'login',
+      query: { redirect: to.fullPath }, // Opcional: salva a rota para voltar após selecionar o login
+    }
+  }
+
   const currentRole = currentUser.role
 
-  // Administrador tem acesso a todas as telas do sistema
+  // 4. Administrador tem acesso a todas as telas do sistema
   if (userService.isAdmin()) {
     return true
   }
@@ -90,7 +97,6 @@ router.beforeEach((to) => {
   const homeByRole: Record<string, string> = {
     Auditor: 'auditor',
     Analista: 'analise-territorial',
-    Gestor: 'gestor-dashboard',
     Operador: 'dashboard',
     Administrador: 'dashboard',
   }

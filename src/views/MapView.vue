@@ -15,10 +15,14 @@ interface MapLocation {
 }
 
 interface TerritoryProperties {
-  name: string
-  category: string
-  status: string
-  source: string
+  id?: number | string
+  processoId?: number | string
+  codigoImovel?: string
+  anoSafra?: string
+  name?: string
+  category?: string
+  status?: string
+  source?: string
 }
 
 const route = useRoute()
@@ -47,14 +51,24 @@ const selectLocation = (location: MapLocation) => {
   map?.flyTo([location.latitude, location.longitude], 8, { duration: 0.8 })
 }
 
-const findLocation = () => {
+const findLocation = async () => {
   const normalizedTerm = searchTerm.value.trim().toLowerCase()
   if (!normalizedTerm) return
 
   const location = locations.value.find((item) => item.name.toLowerCase().includes(normalizedTerm))
   if (location) {
     selectLocation(location)
-    return
+  }
+
+  // US09: Atualiza as camadas territoriais filtradas por busca textual no servidor
+  try {
+    const fetchedTerritories = await mapService.getTerritories({ busca: searchTerm.value.trim() })
+    if (territories && map) {
+      map.removeLayer(territories)
+      territories = createTerritoryLayer(fetchedTerritories as any).addTo(map)
+    }
+  } catch (err) {
+    console.warn('Falha ao filtrar camadas no mapa:', err)
   }
 
   const coordinates = normalizedTerm.split(',').map(Number)
@@ -76,7 +90,9 @@ const findLocation = () => {
     }
   }
 
-  mapError.value = 'Informe uma base cadastrada ou coordenadas no formato latitude, longitude.'
+  if (location) {
+    mapError.value = ''
+  }
 }
 
 const locateUser = () => {
@@ -113,8 +129,18 @@ const createTerritoryLayer = (data: GeoJSON.GeoJsonObject) =>
       const properties = feature.properties as TerritoryProperties | null
       if (!properties) return
 
+      const title =
+        properties.codigoImovel || properties.name || `Feição #${properties.id || ''}`
+      const details = [
+        properties.category ? properties.category : null,
+        properties.anoSafra ? `Safra: ${properties.anoSafra}` : null,
+        properties.processoId ? `Processo: #${properties.processoId}` : null,
+        properties.status ? `Status: ${properties.status}` : null,
+        properties.source ? `<small>${properties.source}</small>` : null,
+      ].filter(Boolean)
+
       layer.bindPopup(
-        `<strong>${properties.name}</strong><br />${properties.category}<br />Status: ${properties.status}<br /><small>${properties.source}</small>`,
+        `<strong>${title}</strong>${details.length ? '<br />' + details.join('<br />') : ''}`,
       )
     },
   })
@@ -163,8 +189,9 @@ onMounted(async () => {
   })
 
   const requestedBase = String(route.query?.base || '').trim()
-  if (requestedBase) {
-    searchTerm.value = requestedBase
+  const requestedYear = String(route.query?.year || '').trim()
+  if (requestedBase || requestedYear) {
+    if (requestedBase) searchTerm.value = requestedBase
     const match = locations.value.find(
       (item) =>
         item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
@@ -174,6 +201,20 @@ onMounted(async () => {
       selectLocation(match)
     } else if (locations.value[0]) {
       selectLocation(locations.value[0])
+    }
+
+    // US09: Atualiza camadas do mapa com os filtros vindos do catálogo de bases
+    try {
+      const filteredTerritories = await mapService.getTerritories({
+        busca: requestedBase || undefined,
+        anoSafra: requestedYear || undefined,
+      })
+      if (territories && map) {
+        map.removeLayer(territories)
+        territories = createTerritoryLayer(filteredTerritories as any).addTo(map)
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar delimitações da base solicitada:', err)
     }
   }
 

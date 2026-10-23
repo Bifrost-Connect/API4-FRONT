@@ -164,8 +164,8 @@ describe('DashboardView - Painel Operacional Unificado', () => {
     })
   })
 
-  it('permite acesso de visualização das cargas operacionais para usuário com perfil Gestor', async () => {
-    userService.setCurrentUserRole('Gestor')
+  it('permite acesso de visualização das cargas operacionais para usuário com perfil Administrador', async () => {
+    userService.setCurrentUserRole('Administrador')
     const wrapper = mount(DashboardView)
     await flushPromises()
 

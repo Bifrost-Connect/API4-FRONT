@@ -1,23 +1,35 @@
 export interface TerritoryProperties {
-  name: string
-  category: string
-  status: string
-  source: string
+  id?: number | string
+  processoId?: number | string
+  codigoImovel?: string
+  anoSafra?: string
+  name?: string
+  category?: string
+  status?: string
+  source?: string
 }
 
-export const mockTerritories: GeoJSON.FeatureCollection<GeoJSON.Geometry, TerritoryProperties> = {
-  type: 'FeatureCollection',
+export const mockTerritories = {
+  type: 'FeatureCollection' as const,
+  page: 0,
+  size: 100,
+  totalElements: 2,
+  totalPages: 1,
   features: [
     {
-      type: 'Feature',
+      type: 'Feature' as const,
       properties: {
+        id: 101,
+        processoId: 9001,
+        codigoImovel: 'MS-2804505-CAR123',
+        anoSafra: '2026',
         name: 'Território demonstrativo Brasília',
         category: 'Área de proteção',
-        status: 'Em validação',
+        status: 'Concluída',
         source: 'Documento fictício de exemplo',
       },
       geometry: {
-        type: 'Polygon',
+        type: 'Polygon' as const,
         coordinates: [[
           [-48.12, -15.76], [-48.06, -15.69], [-47.96, -15.71], [-47.91, -15.77],
           [-47.84, -15.79], [-47.78, -15.86], [-47.81, -15.92], [-47.91, -15.94],
@@ -26,15 +38,19 @@ export const mockTerritories: GeoJSON.FeatureCollection<GeoJSON.Geometry, Territ
       },
     },
     {
-      type: 'Feature',
+      type: 'Feature' as const,
       properties: {
+        id: 102,
+        processoId: 9002,
+        codigoImovel: 'AM-1302603-CAR999',
+        anoSafra: '2025',
         name: 'Território demonstrativo Manaus',
         category: 'Reserva indígena',
-        status: 'Processado',
+        status: 'Concluída',
         source: 'Documento fictício de exemplo',
       },
       geometry: {
-        type: 'MultiPolygon',
+        type: 'MultiPolygon' as const,
         coordinates: [
           [[
             [-60.28, -2.98], [-60.21, -2.91], [-60.12, -2.93], [-60.07, -3.00],

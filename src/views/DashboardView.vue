@@ -65,8 +65,8 @@ const availableEditors = ref<{ id: number; name: string }[]>([])
 const isAssigning = ref(false)
 const notificationMessage = ref<string | null>(null)
 
-// Operador (técnico) só visualiza o stepper; não abre o processo completo
-const canViewFullProcess = computed(() => !isOperadorRole.value)
+// Acesso à visualização completa do processo e linhagem para todos os perfis
+const canViewFullProcess = computed(() => true)
 
 const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
 
@@ -411,7 +411,7 @@ const requestAuditor = async (item: ProcessLog) => {
       </div>
       <div v-else-if="isAdmin" class="admin-badge-header">
         <FiShield size="16" />
-        <span>Acesso Geral (Administrador)</span>
+        <span>Acesso Geral (Gestor)</span>
       </div>
     </header>
 

@@ -9,6 +9,7 @@ const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
 const selectedRole = ref<UserRole>(userService.getCurrentUser().role)
+
 const fillLogin = (role: UserRole) => {
   selectedRole.value = role
   email.value = `${role.toLowerCase()}@georural.com.br`
@@ -16,15 +17,24 @@ const fillLogin = (role: UserRole) => {
 }
 
 const handleLogin = () => {
+  const emailLower = email.value.trim().toLowerCase()
+  if (emailLower.includes('operador') || emailLower.includes('tecnico')) {
+    selectedRole.value = 'Operador'
+  } else if (emailLower.includes('analista')) {
+    selectedRole.value = 'Analista'
+  } else if (emailLower.includes('auditor')) {
+    selectedRole.value = 'Auditor'
+  } else if (emailLower.includes('admin')) {
+    selectedRole.value = 'Administrador'
+  }
+
   userService.setCurrentUserRole(selectedRole.value)
   const destination =
     selectedRole.value === 'Auditor'
       ? '/auditor'
       : selectedRole.value === 'Analista'
         ? '/analise-territorial'
-        : selectedRole.value === 'Gestor'
-          ? '/gestor'
-          : '/'
+        : '/'
   router.replace(destination)
 }
 </script>
@@ -63,12 +73,33 @@ const handleLogin = () => {
       <h3 class="aviso">Sistema em fase de testes</h3>
       <p>Escolha um perfil de demonstração para abrir a área correspondente.</p>
       <div class="roles-container">
-        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Operador' }" @click="fillLogin('Operador')">Entrar Operador</button>
-        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Analista' }" @click="fillLogin('Analista')">Entrar Analista</button>
-        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Auditor' }" @click="fillLogin('Auditor')">Entrar Auditor</button>
-        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Gestor' }" @click="fillLogin('Gestor')">Entrar Gestor</button>
-        <button class="btn btn_outline" :class="{ 'role-selected': selectedRole === 'Administrador' }" @click="fillLogin('Administrador')">
-          Entrar Administrador
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Operador' }"
+          @click="fillLogin('Operador')"
+        >
+          Entrar Operador
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Analista' }"
+          @click="fillLogin('Analista')"
+        >
+          Entrar Analista
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Auditor' }"
+          @click="fillLogin('Auditor')"
+        >
+          Entrar Auditor
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Administrador' }"
+          @click="fillLogin('Administrador')"
+        >
+          Entrar Gestor
         </button>
       </div>
     </div>
