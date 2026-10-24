@@ -429,6 +429,7 @@ const currentComponent = computed(() => {
               :versions="auditVersions"
               @open-quarantine="openQuarantine"
               @export="exportIndicator"
+              @reload="loadData(processId)"
             />
           </div>
         </div>

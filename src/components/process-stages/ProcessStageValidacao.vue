@@ -2,13 +2,16 @@
 import { computed } from 'vue'
 import { FiCheckCircle, FiXCircle, FiClock, FiAlertTriangle } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
+import GateDecisaoGestor from '../GateDecisaoGestor.vue'
 
 const props = defineProps<{
   details: ProcessLogDetails
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
+  (e: 'reload'): void
 }>()
 
 /** Erro na validação ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
@@ -38,6 +41,16 @@ const overallStatus = computed(() => {
 
 <template>
   <div class="stage-container">
+    <!-- Gate de Decisão do Gestor na Validação -->
+    <GateDecisaoGestor
+      :processo-id="details.id"
+      etapa="VALIDACAO"
+      :read-only="readOnly"
+      :current-status="details.status"
+      :current-stage="details.stage"
+      @decisao-registrada="emit('reload')"
+    />
+
     <div class="card">
       <div class="card-header">
         <div class="header-left">

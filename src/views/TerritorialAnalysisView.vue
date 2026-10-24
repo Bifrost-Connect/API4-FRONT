@@ -469,6 +469,10 @@ watch(selectedCarId, () => {
 })
 
 onMounted(async () => {
+  const scrollContainer = document.querySelector('.content-scroll-container')
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0
+  }
   initializeMap()
   try {
     documents.value = await spatialAnalysisService.listDocuments()
@@ -535,6 +539,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="isLoadingDocuments" class="empty-state">Carregando documentos espaciais…</div>
+      <div v-else-if="documents.length === 0" class="empty-state" style="text-align: center; padding: 2rem;">
+        <strong style="color: var(--color-heading); font-size: 1rem;">Nenhuma base homologada disponível</strong>
+        <p style="margin-top: 0.5rem; color: var(--vis-c-text-dark-2); font-size: 0.85rem;">
+          Para realizar cálculos de sobreposição territorial, cadastre e homologue as bases oficiais no sistema ou importe uma prévia GeoJSON acima.
+        </p>
+      </div>
       <div v-else class="document-grid">
         <div class="form-field car-field">
           <label for="car-document">Imóveis rurais (CAR)</label>

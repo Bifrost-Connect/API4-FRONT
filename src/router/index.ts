@@ -38,6 +38,7 @@ const router = createRouter({
     },
     {
       path: '/processo/:id',
+      alias: ['/processos/:id'],
       name: 'process-log',
       component: ProcessLogView,
       meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },

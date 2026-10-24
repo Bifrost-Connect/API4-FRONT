@@ -112,7 +112,10 @@ export const spatialAnalysisService = {
     if (/^\d+$/.test(documentId)) {
       try {
         const response = await api.get('/mapa/camadas', {
-          params: bbox ? { bbox } : undefined,
+          params: {
+            processoId: Number(documentId),
+            bbox: bbox || undefined,
+          },
         })
         if (response.data && response.data.type === 'FeatureCollection' && response.data.features?.length > 0) {
           return response.data

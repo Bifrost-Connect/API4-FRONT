@@ -9,6 +9,7 @@ import {
   type DashboardSummary,
   type ProcessLog,
 } from '../services/dashboard'
+import { processService } from '../services/process'
 import { userService } from '../services/user'
 import Stepper from '../components/Stepper.vue'
 import {
@@ -341,6 +342,19 @@ const confirmAssignEditor = async () => {
       Number(selectedEditorId.value),
       editorName,
     )
+
+    if (/^\d+$/.test(String(selectedProcessForEditor.value.id))) {
+      try {
+        await processService.alocarAuditor(
+          selectedProcessForEditor.value.id,
+          Number(selectedEditorId.value),
+          currentUser.value.id || 1,
+        )
+      } catch (err) {
+        console.warn('Erro ao chamar /carga/alocar-auditor no backend:', err)
+      }
+    }
+
     if (updated) {
       selectedProcessForEditor.value.assignedEditor = editorName
       selectedProcessForEditor.value.status = 'Em andamento'
