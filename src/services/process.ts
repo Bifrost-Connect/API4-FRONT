@@ -58,20 +58,71 @@ export const processService = {
           res.data.logs = normalizedLogs
         }
 
-        // Fake data since backend doesn't populate these yet
+        // Preenche com checklists padrão apenas se mockactive for true
         if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
-          res.data.validationChecks = validationChecksOk
+          res.data.validationChecks = mockactive ? validationChecksOk : []
         }
         if (!res.data.treatmentChecks || res.data.treatmentChecks.length === 0) {
-          res.data.treatmentChecks = treatmentChecksOk(res.data.epsg || 'EPSG:4674')
+          res.data.treatmentChecks = mockactive ? treatmentChecksOk(res.data.epsg || 'EPSG:4674') : []
         }
+        // Integração com cálculo analítico real do backend (/carga/{id}/calculos - US06)
         if (!res.data.analyticsData || res.data.analyticsData.length === 0) {
-          res.data.analyticsData = analyticsDataOk
+          if (/^\d+$/.test(id)) {
+            try {
+              const calculosRes = await api.get(`/carga/${id}/calculos`)
+              const calculos = calculosRes.data
+              if (calculos && calculos.areaTotalHectares !== undefined) {
+                const totalAppHa = calculos.totaisPorCategoria?.APP?.hectares ?? 0
+                const qtdApp = calculos.totaisPorCategoria?.APP?.quantidade ?? 0
+                const totalRlHa = calculos.totaisPorCategoria?.RESERVA_LEGAL?.hectares ?? 0
+                const qtdRl = calculos.totaisPorCategoria?.RESERVA_LEGAL?.quantidade ?? 0
+                const totalAlertaHa = calculos.totaisPorCategoria?.ALERTA?.hectares ?? 0
+                const qtdAlerta = calculos.totaisPorCategoria?.ALERTA?.quantidade ?? 0
+
+                res.data.analyticsData = [
+                  {
+                    param: 'Cálculo de Área Total Contínua',
+                    result: `${Number(calculos.areaTotalHectares).toLocaleString('pt-BR')} ha`,
+                    reference: `${calculos.poligonosCalculados || 0} feição(ões)`,
+                    status: 'success',
+                    statusLabel: 'Calculado',
+                  },
+                  {
+                    param: 'Proporção de Reserva Legal',
+                    result: `${totalRlHa} ha (${qtdRl} cruzamento(s))`,
+                    reference: 'Camada de Referência INCRA/INCAR',
+                    status: qtdRl > 0 ? 'success' : 'warning',
+                    statusLabel: qtdRl > 0 ? 'Regular' : 'Não identificada',
+                  },
+                  {
+                    param: 'Área de APP Hídrica',
+                    result: `${totalAppHa} ha (${qtdApp} interseção(ões))`,
+                    reference: 'Art. 4º — Lei 12.651/2012',
+                    status: 'success',
+                    statusLabel: qtdApp > 0 ? 'Conforme' : 'Sem sobreposição',
+                  },
+                  {
+                    param: 'Sobreposição com Áreas Embargadas / Alertas',
+                    result: `${totalAlertaHa} ha (${qtdAlerta} alerta(s))`,
+                    reference: 'Cadastro IBAMA / INPE',
+                    status: qtdAlerta > 0 ? 'danger' : 'success',
+                    statusLabel: qtdAlerta > 0 ? 'Alerta Crítico' : 'Sem alertas',
+                  },
+                ]
+              } else {
+                res.data.analyticsData = mockactive ? analyticsDataOk : []
+              }
+            } catch {
+              res.data.analyticsData = mockactive ? analyticsDataOk : []
+            }
+          } else {
+            res.data.analyticsData = mockactive ? analyticsDataOk : []
+          }
         }
       }
       return res.data
     } catch (err) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('API indisponível, usando mock para detalhes do processo')
       await delay(600)
       const details = mockProcessDetails[id]
@@ -124,10 +175,7 @@ export const processService = {
       const res = await api.post(`/processos/${id}/processar`, null, { params })
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
+      if (!mockactive) throw err.response?.data || err
       console.warn('API indisponível, mockando sucesso do início de processamento')
       await delay(500)
       return { success: true }
@@ -139,10 +187,7 @@ export const processService = {
       const res = await api.get(`/processos/${id}/log-espacial`)
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
+      if (!mockactive) throw err.response?.data || err
       console.warn('API indisponível, mockando log espacial')
       await delay(300)
       return { type: 'FeatureCollection', features: [] }

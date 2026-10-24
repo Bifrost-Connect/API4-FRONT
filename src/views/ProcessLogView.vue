@@ -16,6 +16,7 @@ import ProcessStageValidacao from '../components/process-stages/ProcessStageVali
 import ProcessStageTratamento from '../components/process-stages/ProcessStageTratamento.vue'
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
+import { mockactive } from '@/services/api'
 import {
   auditoriaService,
   type ProcessVersion,
@@ -167,28 +168,30 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Verifica se o ID corresponde diretamente a uma carga do mock de auditoria
-    const foundMockCarga = mockAuditCargas.find(
-      (c) =>
-        c.id.toLowerCase() === idToLoad.toLowerCase() ||
-        c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
-    )
+    // 1. Só verifica mock se mockactive for true
+    if (mockactive) {
+      const foundMockCarga = mockAuditCargas.find(
+        (c) =>
+          c.id.toLowerCase() === idToLoad.toLowerCase() ||
+          c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
+      )
 
-    if (foundMockCarga) {
-      currentCarga.value = foundMockCarga
-      auditVersions.value = foundMockCarga.versions
+      if (foundMockCarga) {
+        currentCarga.value = foundMockCarga
+        auditVersions.value = foundMockCarga.versions
 
-      const targetVersion =
-        foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-        foundMockCarga.versions[0]
+        const targetVersion =
+          foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
+          foundMockCarga.versions[0]
 
-      if (targetVersion) {
-        details.value = targetVersion
-        activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-        selectedQuarantineStage.value = targetVersion.stage
+        if (targetVersion) {
+          details.value = targetVersion
+          activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+          selectedQuarantineStage.value = targetVersion.stage
+        }
+        await loadTraceability(idToLoad, false)
+        return
       }
-      await loadTraceability(idToLoad, false)
-      return
     }
 
     // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
@@ -274,9 +277,9 @@ const openQuarantine = () => {
 }
 
 const handleVersionChange = async (newVersion: ProcessVersion) => {
-  const isMockVersion = mockAuditCargas.some((c) =>
-    c.versions.some((v) => v.id === newVersion.id),
-  )
+  const isMockVersion =
+    mockactive &&
+    mockAuditCargas.some((c) => c.versions.some((v) => v.id === newVersion.id))
 
   if (!isMockVersion) {
     try {

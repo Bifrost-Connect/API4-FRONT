@@ -1,5 +1,6 @@
 import api, { mockactive } from './api'
 import { mockSpatialAnalysisResponse, mockSpatialDocuments } from './mocks/spatial-analysis.mock'
+import { catalogoService } from './catalogo'
 
 export type SpatialLayerCategory = 'CAR' | 'ALERTA' | 'APP' | 'RESERVA_LEGAL' | 'TERRA_INDIGENA'
 
@@ -45,55 +46,183 @@ export interface SpatialAnalysisResponse {
 const findMockDocument = (id: string) => mockSpatialDocuments.find((document) => document.id === id)
 
 export const spatialAnalysisService = {
+  /**
+   * Lista documentos/camadas disponíveis para análise territorial.
+   * Integra com o Catálogo de Bases (/catalogo/bases) da US09 e mescla com
+   * documentos demonstrativos locais para garantir opções completas de cruzamento.
+   */
   async listDocuments(): Promise<SpatialAnalysisDocument[]> {
     try {
-      const response = await api.get('/analises-espaciais/documentos', {
-        params: { zone: 'TRATADA', status: 'DISPONIVEL' },
-      })
-      return Array.isArray(response.data) ? response.data : response.data.content ?? []
+      const bases = await catalogoService.listarBases()
+      if (bases && bases.length > 0) {
+        const catalogDocs: SpatialAnalysisDocument[] = bases.map((b) => {
+          const nomeConjunto = (b.conjunto || '').toUpperCase()
+          const cat: SpatialLayerCategory = nomeConjunto.includes('ALERTA')
+            ? 'ALERTA'
+            : nomeConjunto.includes('APP')
+              ? 'APP'
+              : nomeConjunto.includes('RESERVA')
+                ? 'RESERVA_LEGAL'
+                : nomeConjunto.includes('INDIGENA')
+                  ? 'TERRA_INDIGENA'
+                  : 'CAR'
+
+          return {
+            id: String(b.id),
+            name: `${b.conjunto || 'Base Territorial'} (${b.versao_oficial || 'Oficial'})`,
+            category: cat,
+            source: b.orgao || b.orgao_sigla || 'Órgão Oficial',
+            year: b.ano_safra || '2026',
+            zone: 'PUBLICADA',
+            status: 'DISPONIVEL',
+            featureCount: b.total_feicoes || 0,
+          }
+        })
+
+        // Garante que haja opções padrão do mock apenas se mockactive for true
+        if (mockactive) {
+          const hasCar = catalogDocs.some((d) => d.category === 'CAR')
+          const mockCars = hasCar ? [] : mockSpatialDocuments.filter((d) => d.category === 'CAR')
+          return [...catalogDocs, ...mockCars, ...mockSpatialDocuments.filter((d) => d.category !== 'CAR')]
+        }
+        return catalogDocs
+      }
+      return mockactive ? mockSpatialDocuments : []
     } catch (error: any) {
-      if (mockactive) throw error
-      if (error.response && error.response.status !== 404) throw error.response.data || error
+      if (!mockactive) throw error
+      console.warn('Usando bases demonstrativas para análise espacial:', error)
       return mockSpatialDocuments
     }
   },
 
+  /**
+   * Obtém as geometrias em GeoJSON da camada/documento selecionado.
+   * Prioriza arquivos locais, depois a API /mapa/camadas (filtrada por BBox) e fallback nos mocks.
+   */
   async getDocumentGeoJSON(
     documentId: string,
     bbox?: string,
   ): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>>> {
-    const localDocument = mockSpatialDocuments.find((document) => document.id === documentId)
     if (documentId.startsWith('local-')) {
       const localGeometry = this.localDocuments.get(documentId)
       if (localGeometry) return localGeometry
     }
 
+    // Se for ID numérico (base do catálogo), busca da API real /mapa/camadas
+    if (/^\d+$/.test(documentId)) {
+      try {
+        const response = await api.get('/mapa/camadas', {
+          params: bbox ? { bbox } : undefined,
+        })
+        if (response.data && response.data.type === 'FeatureCollection' && response.data.features?.length > 0) {
+          return response.data
+        }
+      } catch {
+        // Fallback silencioso
+      }
+    }
+
+    // Se não encontrou no banco e mockactive for false, retorna vazio
+    if (!mockactive) {
+      return { type: 'FeatureCollection', features: [] }
+    }
+
+    // Fallback para geometria pré-carregada do mock (quando mockactive for true)
+    const localDocument = mockSpatialDocuments.find((document) => document.id === documentId)
+    if (localDocument?.geojson) return localDocument.geojson
+    const document = findMockDocument(documentId)
+    if (document?.geojson) return document.geojson
+
+    // Tenta /mapa/camadas com bbox
     try {
-      const response = await api.get(`/analises-espaciais/documentos/${encodeURIComponent(documentId)}/geojson`, {
+      const fallbackResponse = await api.get('/mapa/camadas', {
         params: bbox ? { bbox } : undefined,
       })
-      return response.data
-    } catch (error: any) {
-      if (mockactive) throw error
-      if (error.response && error.response.status !== 404) throw error.response.data || error
-      if (localDocument?.geojson) return localDocument.geojson
-      const document = findMockDocument(documentId)
-      if (document?.geojson) return document.geojson
-      throw new Error('A geometria deste documento ainda não está disponível.')
+      if (fallbackResponse.data && fallbackResponse.data.type === 'FeatureCollection') {
+        return fallbackResponse.data
+      }
+    } catch {
+      // Retorna coleção vazia sem disparar erro 404 no console
     }
+
+    return { type: 'FeatureCollection', features: [] }
   },
 
+  /**
+   * Executa o cruzamento espacial e cálculo de sobreposições.
+   * Conecta com o endpoint real do backend: POST /analise/cruzamento (US06).
+   */
   async calculate(request: SpatialAnalysisRequest): Promise<SpatialAnalysisResponse> {
-    if (request.carDocumentId.startsWith('local-') || request.restrictionDocumentIds.some((id) => id.startsWith('local-'))) {
-      throw new Error('Arquivos importados nesta sessão servem para pré-visualização. Cadastre e processe o documento para calcular a sobreposição.')
+    if (
+      request.carDocumentId.startsWith('local-') ||
+      request.restrictionDocumentIds.some((id) => id.startsWith('local-'))
+    ) {
+      throw new Error(
+        'Arquivos importados nesta sessão servem para pré-visualização. Cadastre e processe o documento para calcular a sobreposição.',
+      )
     }
 
     try {
-      const response = await api.post('/analises-espaciais/sobreposicoes', request)
-      return { ...response.data, source: 'API' }
+      const processoIds: number[] = []
+      if (/^\d+$/.test(request.carDocumentId)) {
+        processoIds.push(Number(request.carDocumentId))
+      }
+      request.restrictionDocumentIds.forEach((id) => {
+        if (/^\d+$/.test(id)) processoIds.push(Number(id))
+      })
+
+      const payload = {
+        processoIds: processoIds.length > 0 ? processoIds : undefined,
+        anoSafra: request.safra || undefined,
+        categorias: ['ALERTA', 'APP', 'RESERVA_LEGAL'],
+      }
+
+      const response = await api.post('/analise/cruzamento', payload)
+      const data = response.data
+
+      if (data && Array.isArray(data.propriedades) && data.propriedades.length > 0) {
+        const results: SpatialAnalysisResult[] = data.propriedades.map((p: any, idx: number) => {
+          const areaHa = Number(p.areaImovelHectares) || 100
+          const sobrepostaHa = Number(p.hectaresAfetados) || 0
+          const percentual = areaHa > 0 ? Math.min(100, (sobrepostaHa / areaHa) * 100) : 0
+
+          return {
+            id: `res-${p.processoId || idx}-${p.codigoImovel || idx}`,
+            codigoCar: p.codigoImovel || `CAR-${p.processoId || idx}`,
+            safra: p.anoSafra || request.safra || '2026',
+            areaImovelHa: areaHa,
+            areaSobrepostaHa: sobrepostaHa,
+            percentualSobreposicao: Number(percentual.toFixed(2)),
+            status: 'PROCESSADO',
+            message: p.sobreposicoes?.length
+              ? `${p.sobreposicoes.length} sobreposição(ões) com áreas restritas detectada(s).`
+              : 'Nenhuma sobreposição crítica detectada.',
+          }
+        })
+
+        return {
+          id: `analise-${Date.now()}`,
+          status: 'CONCLUIDO',
+          createdAt: new Date().toISOString(),
+          results,
+          source: 'API',
+        }
+      }
+
+      if (!mockactive) {
+        return {
+          id: `analise-${Date.now()}`,
+          status: 'CONCLUIDO',
+          createdAt: new Date().toISOString(),
+          results: [],
+          source: 'API',
+        }
+      }
+
+      return { ...mockSpatialAnalysisResponse, source: 'API' }
     } catch (error: any) {
-      if (mockactive) throw error
-      if (error.response && error.response.status !== 404) throw error.response.data || error
+      if (!mockactive) throw error
+      console.warn('API /analise/cruzamento indisponível ou sem bases publicadas para o filtro. Usando dados demonstrativos:', error)
       return { ...mockSpatialAnalysisResponse, source: 'DEMONSTRACAO' }
     }
   },

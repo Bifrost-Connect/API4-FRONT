@@ -31,7 +31,7 @@ export const catalogoService = {
       }
       return Array.isArray(response.data) ? response.data : []
     } catch (error: any) {
-      if (mockactive) throw error
+      if (!mockactive) throw error
       console.warn('Falha ao buscar catálogo de bases da API.', error)
       return []
     }
@@ -45,7 +45,7 @@ export const catalogoService = {
       const response = await api.get(`/catalogo/bases/${idBase}`)
       return response.data
     } catch (error: any) {
-      if (mockactive) throw error
+      if (!mockactive) throw error
       console.warn(`Falha ao buscar detalhes da base ${idBase}.`, error)
       return null
     }

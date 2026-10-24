@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { userService } from './user'
 
-export const mockactive = false // Quando ativada (true), cancela todos os mocks e exibe o erro real da API
+export const mockactive = false // Quando false, desativa todos os mocks, exibe o erro real da API e deixa vazio se o banco não retornar dados. Só usa mock se mockactive === true.
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080') + '/api',

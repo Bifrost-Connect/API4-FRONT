@@ -1,5 +1,6 @@
+import { mockactive } from './api'
 import { dashboardService, type ProcessLog } from './dashboard'
-import type { ProcessLogDetails } from './process'
+import { processService, type ProcessLogDetails } from './process'
 import {
   mockAuditCargas,
   type AuditProcessCarga,
@@ -107,9 +108,9 @@ function mapProcessLogToVersion(
         logs: {
           Ingestão: [`[${item.dateTime || '—'}] Registro da carga ${item.id}.`],
         },
-        validationChecks: validationChecksOk,
-        treatmentChecks: treatmentChecksOk(item.epsg || 'EPSG:4674'),
-        analyticsData: analyticsDataOk,
+        validationChecks: mockactive ? validationChecksOk : [],
+        treatmentChecks: mockactive ? treatmentChecksOk(item.epsg || 'EPSG:4674') : [],
+        analyticsData: mockactive ? analyticsDataOk : [],
       }
 
   return {
@@ -136,21 +137,85 @@ export const auditoriaService = {
     processId: string,
     currentDetails?: ProcessLogDetails | null,
   ): Promise<{ carga: AuditProcessCarga; versions: ProcessVersion[] }> {
-    // 1. Verifica primeiro se pertence a uma carga explícita do mock de auditoria
-    const foundMockCarga = mockAuditCargas.find(
-      (c) =>
-        c.id.toLowerCase() === processId.toLowerCase() ||
-        c.versions.some((v) => v.id.toLowerCase() === processId.toLowerCase()),
-    )
+    // 1. Só verifica mock se mockactive for true
+    if (mockactive) {
+      const foundMockCarga = mockAuditCargas.find(
+        (c) =>
+          c.id.toLowerCase() === processId.toLowerCase() ||
+          c.versions.some((v) => v.id.toLowerCase() === processId.toLowerCase()),
+      )
 
-    if (foundMockCarga) {
-      return {
-        carga: foundMockCarga,
-        versions: foundMockCarga.versions,
+      if (foundMockCarga) {
+        return {
+          carga: foundMockCarga,
+          versions: foundMockCarga.versions,
+        }
       }
     }
 
-    // 2. Busca todos os processos na esteira para agrupar por dataset ("gambiarra")
+    // 2. Busca linhagem real do backend se for processo com ID numérico
+    if (/^\d+$/.test(processId)) {
+      try {
+        const trace = await processService.getTraceability(processId)
+        if (trace && trace.historicoEtapas && trace.historicoEtapas.length > 0) {
+          const etapas = trace.historicoEtapas
+          const realVersions: ProcessVersion[] = etapas.map((h: any, idx: number) => {
+            const verNum = idx + 1
+            const isLatest = idx === etapas.length - 1
+            const isInitial = idx === 0 && etapas.length > 1
+            const dateStr = h.dataFim || h.dataInicio || trace.dataCarga || ''
+            const mappedStage = (h.etapa || currentDetails?.stage || 'Ingestão') as ProcessVersion['stage']
+            const mappedStatus = (h.situacao === 'CONCLUIDA' ? 'Concluída' : h.situacao === 'FALHOU' ? 'Falhou' : 'Em andamento') as ProcessVersion['status']
+
+            return {
+              id: String(trace.processoId || processId),
+              dataset: currentDetails?.dataset || trace.nomeArquivoOriginal || 'Conjunto Territorial',
+              layerName: currentDetails?.layerName || trace.nomeArquivoOriginal || `Carga ${processId}`,
+              stage: mappedStage,
+              status: mappedStatus,
+              dateTime: dateStr ? new Date(dateStr).toLocaleString('pt-BR') : '',
+              source: currentDetails?.source || 'Órgão Oficial',
+              year: currentDetails?.year || '2026',
+              epsg: currentDetails?.epsg || 'EPSG:4674',
+              originalFileUrl: `/api/carga/download/${processId}`,
+              integrityHash: trace.hashSha256 || '',
+              description: h.mensagem || '',
+              pauseReason: h.mensagem || undefined,
+              versionNumber: verNum,
+              versionTag: isLatest ? `v${verNum}.0 (Mais recente)` : isInitial ? `v1.0 (Inicial)` : `v${verNum}.0`,
+              isLatest,
+              changeNote: h.mensagem || `Etapa de ${h.etapa}: ${h.situacao}`,
+              logs: {
+                [mappedStage]: [
+                  `[${dateStr ? new Date(dateStr).toLocaleTimeString('pt-BR') : '—'}] ${h.etapa} - ${h.situacao}: ${h.mensagem || h.resultado || 'Processado com sucesso'}`,
+                ],
+              },
+            }
+          })
+
+          const reversed = [...realVersions].reverse()
+          const latest = reversed[0]
+          return {
+            carga: {
+              id: String(processId),
+              dataset: currentDetails?.dataset || trace.nomeArquivoOriginal || 'Conjunto Territorial',
+              layerName: currentDetails?.layerName || trace.nomeArquivoOriginal || `Carga ${processId}`,
+              source: currentDetails?.source || 'Órgão Oficial',
+              lastUpdate: latest?.dateTime || '',
+              totalVersions: reversed.length,
+              currentStatus: (latest?.status || 'Em andamento') as AuditProcessCarga['currentStatus'],
+              currentStage: latest?.stage || 'Ingestão',
+              versions: reversed,
+            },
+            versions: reversed,
+          }
+        }
+      } catch {
+        // Fallback para agrupamento ou processo atual se a chamada falhar
+      }
+    }
+
+    // 3. Busca todos os processos na esteira para agrupar por dataset
     let allProcesses: ProcessLog[] = []
     try {
       const page = await dashboardService.getDashboardProcesses()
@@ -208,6 +273,22 @@ export const auditoriaService = {
 
     // Inverte para exibir a versão mais recente no topo do painel lateral
     const versions = versionsOldestFirst.reverse()
+    if (versions.length === 0) {
+      return {
+        carga: {
+          id: String(processId),
+          dataset: '',
+          layerName: '',
+          source: '',
+          lastUpdate: '',
+          totalVersions: 0,
+          currentStatus: 'Em andamento',
+          currentStage: 'Ingestão',
+          versions: [],
+        },
+        versions: [],
+      }
+    }
     const latestVersion = versions[0]
 
     const carga: AuditProcessCarga = {

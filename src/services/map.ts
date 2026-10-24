@@ -23,12 +23,14 @@ export const mapService = {
   async getPublishedLocations() {
     try {
       const response = await api.get('/mapa/camadas-legado')
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        return response.data
+      if (Array.isArray(response.data)) {
+        if (response.data.length > 0 || !mockactive) {
+          return response.data
+        }
       }
-      return mockLocations
+      return mockactive ? mockLocations : []
     } catch (error: any) {
-      if (mockactive) throw error
+      if (!mockactive) throw error
       console.warn('Falha ao buscar locais do mapa. Usando dados simulados.', error)
       return mockLocations
     }
@@ -38,11 +40,15 @@ export const mapService = {
     try {
       const response = await api.get('/mapa/camadas', { params: filters })
       if (response.data && response.data.type === 'FeatureCollection') {
-        return response.data
+        if (response.data.features?.length > 0 || !mockactive) {
+          return response.data
+        }
       }
-      return mockTerritories as PaginatedGeoJson
+      return mockactive
+        ? (mockTerritories as PaginatedGeoJson)
+        : { type: 'FeatureCollection', features: [] }
     } catch (error: any) {
-      if (mockactive) throw error
+      if (!mockactive) throw error
       console.warn('Falha ao buscar camadas territoriais. Usando dados simulados.', error)
       return mockTerritories as PaginatedGeoJson
     }

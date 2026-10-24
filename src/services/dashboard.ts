@@ -148,7 +148,7 @@ export const dashboardService = {
       const res = await api.get('/processos/metricas')
       return mapMetricasToSummary(res.data)
     } catch (err: any) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('API indisponível ou não autorizada, usando mock para métricas do dashboard')
       await delay(400)
       return mapMetricasToSummary(mockMetricasResponse)
@@ -178,7 +178,7 @@ export const dashboardService = {
 
       return { ...res.data, source: 'API' }
     } catch (err: any) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('API indisponível ou não autorizada, usando mock para processos do dashboard')
       await delay(600)
 
@@ -230,6 +230,9 @@ export const dashboardService = {
       const res = await api.get('/dominios/filtros')
       return res.data
     } catch (err) {
+      if (!mockactive) {
+        return { conjuntos: [], etapas: [], situacoes: [] }
+      }
       console.warn('Endpoint /dominios/filtros não encontrado, usando mockFilterOptions')
       await delay(400)
       return mockFilterOptions
@@ -245,10 +248,12 @@ export const dashboardService = {
           name: u.nome || u.name || 'Auditor Sem Nome',
         }))
       }
-      // Fallback pois o backend pode estar retornando List.of() vazio
+      if (!mockactive) {
+        return []
+      }
       return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
     } catch (err: any) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('API indisponível, usando mock para auditores')
       await delay(400)
       return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
@@ -264,7 +269,7 @@ export const dashboardService = {
       const res = await api.put(`/processos/${processId}/editor`, { editorId })
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('API indisponível ou não autorizada, usando mock para alocação de editor')
       await delay(400)
       const process = mockProcessosPage.content.find((p) => p.id === processId)
@@ -302,6 +307,7 @@ export const dashboardService = {
         })
       }
     } catch (e) {
+      if (!mockactive) throw e
       console.warn('Backend /fechar indisponível, simulando fechamento local:', e)
     }
 
@@ -370,8 +376,13 @@ export const dashboardService = {
       if (/^\d+$/.test(id)) {
         return await processService.exportIndicator(id, formato)
       }
-    } catch {
+    } catch (err) {
+      if (!mockactive) throw err
       // Fallback para download local
+    }
+
+    if (!mockactive) {
+      throw new Error(`Exportação oficial indisponível no backend para o processo ${id}`)
     }
 
     const dataset = item?.dataset || 'Conjunto Territorial'

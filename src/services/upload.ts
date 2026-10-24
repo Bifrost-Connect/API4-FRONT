@@ -28,10 +28,7 @@ export const uploadService = {
       const res = await api.post('/carga/metadados', backendPayload)
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
+      if (!mockactive) throw err.response?.data || err
       console.warn('API indisponível (ou rota 404), usando mock para cadastrar metadados')
       await delay(1000)
       if (payload.nomeCamada && payload.nomeCamada.toLowerCase().includes('erro')) {
@@ -61,10 +58,7 @@ export const uploadService = {
       })
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
+      if (!mockactive) throw err.response?.data || err
       console.warn('API indisponível (ou rota 404), usando mock para upload de arquivo')
       await delay(1500)
       return mockArquivoOriginalSuccess(file)
@@ -80,9 +74,9 @@ export const uploadService = {
       if (res.data) {
         return res.data
       }
-      return mockUploadOptions
+      return mockactive ? mockUploadOptions : { anos: [], epsgs: [], conjuntos: [], orgaos: [] }
     } catch (err: any) {
-      if (mockactive) throw err
+      if (!mockactive) throw err
       console.warn('Endpoint /dominios/carga indisponível, usando mockUploadOptions')
       await delay(300)
       return mockUploadOptions
@@ -96,12 +90,7 @@ export const uploadService = {
       })
       return res.data
     } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
-      console.warn('API indisponível (ou rota 404), mock indisponível para download.')
-      throw err
+      throw err.response?.data || err
     }
   },
 
