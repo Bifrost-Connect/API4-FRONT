@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   processService,
@@ -9,6 +9,7 @@ import {
 } from '../services/process'
 import { userService } from '../services/user'
 import { dashboardService } from '../services/dashboard'
+import { uploadService } from '../services/upload'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -69,6 +70,9 @@ const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 // Controle do componente Auditoria
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
+const currentCargaLinhagem = computed(() => currentCarga.value?.linhagemCompleta || null)
+const quarentenaStageRef = ref<any>(null)
+const currentUser = computed(() => userService.getCurrentUser())
 
 // Rastreabilidade e Exportação (US05 e US07)
 const traceability = ref<ProcessTraceability | null>(null)
@@ -269,6 +273,32 @@ const handleVersionChange = async (newVersion: ProcessVersion) => {
   await loadTraceability(newVersion.id, details.value?.dataSource === 'API')
 }
 
+const handleNotificarOperadorAuditoria = async (cargaIdStr: string) => {
+  const numericId = Number(String(cargaIdStr || details.value?.id).replace(/\D/g, ''))
+  if (numericId) {
+    try {
+      await uploadService.notificarOperadorQuarentena(numericId)
+      await loadData(processId.value)
+    } catch (e) {
+      console.error('Erro ao notificar operador:', e)
+    }
+  }
+}
+
+const handleAbrirReprocessamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openReprocessModal?.()
+  })
+}
+
+const handleAbrirCancelamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openCancelModal?.()
+  })
+}
+
 const goBack = () => {
   if (window.history.length > 1) {
     router.back()
@@ -378,6 +408,7 @@ const currentComponent = computed(() => {
               <div class="quarantine-body">
                 <ProcessStageQuarentena
                   v-if="details"
+                  ref="quarentenaStageRef"
                   :details="details"
                   :read-only="isReadOnly"
                   @reload="loadData(processId)"
@@ -418,8 +449,13 @@ const currentComponent = computed(() => {
         :cargaDataset="details?.dataset"
         :layerName="details?.layerName"
         :canClose="true"
+        :linhagemCompleta="currentCargaLinhagem"
+        :userRole="currentUser.role"
         @select-version="handleVersionChange"
         @close="closeAuditPanel"
+        @notificar-operador="handleNotificarOperadorAuditoria"
+        @reprocessar="handleAbrirReprocessamentoAuditoria"
+        @cancelar="handleAbrirCancelamentoAuditoria"
       />
     </div>
   </div>

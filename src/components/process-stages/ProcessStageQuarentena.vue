@@ -107,13 +107,34 @@ const signalOperatorReprocess = async () => {
 }
 
 // Tarefa 6 e Tarefa 10: Exportar Motivos de Rejeição (CSV / JSON) com validação de vazio
-const exportQuarantine = (format: 'csv' | 'json') => {
+const exportQuarantine = async (format: 'csv' | 'json') => {
   const records = props.details.quarantineRecords ?? []
   if (records.length === 0) {
     showErrorToast(
       'Não foi possível exportar: o relatório de motivos de rejeição está vazio para esta carga.',
     )
     return
+  }
+
+  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
+  if (format === 'csv' && numericId) {
+    try {
+      const blob = await uploadService.exportarRejeicoesCsv(numericId)
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `rejeicoes_carga_${numericId}.csv`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+        showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
+        return
+      }
+    } catch {
+      // Fallback para os registros locais em memória
+    }
   }
 
   let content = ''
@@ -142,6 +163,17 @@ const exportQuarantine = (format: 'csv' | 'json') => {
     URL.revokeObjectURL(url)
   }
 }
+
+defineExpose({
+  openReprocessModal: () => {
+    showReprocessModal.value = true
+  },
+  openCancelModal: () => {
+    showCancelModal.value = true
+  },
+  signalOperatorReprocess,
+  exportQuarantine,
+})
 
 // Tarefa 7 e Tarefa 10: Modal de Reprocessar Carga com anexo obrigatório
 const showReprocessModal = ref(false)
