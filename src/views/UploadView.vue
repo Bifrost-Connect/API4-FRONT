@@ -661,7 +661,7 @@ const resetForm = () => {
 
         <div class="confirmation__actions">
           <router-link
-            :to="`/processo/${currentProcessoId || uploadResult.processo?.id || uploadResult.id}`"
+            :to="`/processo/${currentProcessoId || uploadResult?.processo?.id || uploadResult?.id || ''}`"
             class="btn"
           >
             Acompanhar Processamento na Esteira
