@@ -140,6 +140,8 @@ const overallStatus = computed(() => {
       <ProcessoMiniMapa
         v-if="details?.id"
         :processo-id="details.id"
+        :is-published="false"
+        :status="details.status"
         title="Prévia Cartográfica das Feições Tratadas (SIRGAS 2000)"
         height="300px"
       />

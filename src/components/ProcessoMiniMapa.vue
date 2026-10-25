@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../services/api'
@@ -10,12 +10,21 @@ const props = withDefaults(
     processoId: string | number
     height?: string
     title?: string
+    isPublished?: boolean
+    status?: string
   }>(),
   {
     height: '340px',
     title: 'Pré-visualização Geoespacial da Carga',
+    isPublished: false,
   },
 )
+
+const canOpenFullMap = computed(() => {
+  if (props.isPublished) return true
+  const st = (props.status || '').toLowerCase()
+  return st === 'concluída' || st === 'concluida' || st === 'publicado' || st === 'fechado'
+})
 
 const router = useRouter()
 const mapContainer = ref<HTMLElement | null>(null)
@@ -171,6 +180,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <button
+        v-if="canOpenFullMap"
         type="button"
         class="btn-ver-mapa"
         @click="abrirNoMapaCompleto"
@@ -183,6 +193,9 @@ onBeforeUnmount(() => {
           <line x1="10" y1="14" x2="21" y2="3"></line>
         </svg>
       </button>
+      <span v-else class="badge-preview-tag" title="Disponível no mapa completo após a publicação oficial">
+        Pré-visualização
+      </span>
     </div>
 
     <div v-if="isLoading" class="mini-mapa-loading" :style="{ height }">
@@ -245,6 +258,16 @@ onBeforeUnmount(() => {
   padding: 0.2rem 0.55rem;
   background: rgba(242, 101, 34, 0.12);
   color: var(--vis-brand-orange, #f26522);
+  border-radius: 999px;
+}
+
+.badge-preview-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  background: var(--color-surface-soft, rgba(0, 0, 0, 0.05));
+  color: var(--color-text, #64748b);
+  border: 1px dashed var(--color-border, #cbd5e1);
   border-radius: 999px;
 }
 

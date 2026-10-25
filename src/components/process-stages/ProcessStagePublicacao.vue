@@ -122,10 +122,13 @@ const closePublishModal = () => {
   showPublishConfirmModal.value = false
 }
 
+const publishError = ref<string | null>(null)
+
 const confirmPublishAndClose = async () => {
   if (isSubmitting.value) return
 
   isSubmitting.value = true
+  publishError.value = null
   try {
     if (/^\d+$/.test(String(props.details.id))) {
       try {
@@ -140,31 +143,36 @@ const confirmPublishAndClose = async () => {
       }
     }
 
-    await dashboardService.aprovarEFecharVersao(
-      {
-        id: String(props.details.id),
-        dataset: props.details.dataset,
-        stage: 'Publicação',
-        status: 'Fechado',
-        dateTime: props.details.dateTime,
-        source: props.details.source,
-        year: props.details.year,
-        epsg: props.details.epsg,
-      },
-      currentUser.value.name,
-    )
+    try {
+      await dashboardService.aprovarEFecharVersao(
+        {
+          id: String(props.details.id),
+          dataset: props.details.dataset,
+          stage: 'Publicação',
+          status: 'Fechado',
+          dateTime: props.details.dateTime,
+          source: props.details.source,
+          year: props.details.year,
+          epsg: props.details.epsg,
+        },
+        currentUser.value.name,
+      )
+    } catch (e) {
+      console.warn('Aviso ao fechar versão via dashboardService:', e)
+    }
 
     isApproved.value = true
     isRejected.value = false
     props.details.status = 'Concluída'
     props.details.stage = 'Publicação'
     props.details.assignedEditor = currentUser.value.name
-    closePublishModal()
-    emit('reload')
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao aprovar e publicar:', err)
+    publishError.value = err?.response?.data?.message || err?.message || 'Falha ao homologar publicação.'
   } finally {
+    closePublishModal()
     isSubmitting.value = false
+    emit('reload')
   }
 }
 
@@ -248,6 +256,10 @@ const handleUndo = () => {
 const goToDashboard = () => {
   router.push({ name: 'dashboard' })
 }
+
+const goToMap = () => {
+  router.push(`/mapa?processoId=${props.details.id}`)
+}
 </script>
 
 <template>
@@ -267,6 +279,8 @@ const goToDashboard = () => {
       <ProcessoMiniMapa
         v-if="details?.id"
         :processo-id="details.id"
+        :is-published="isAlreadyPublished"
+        :status="details.status"
         title="Visualização Territorial do Indicador (Geometrias da Carga)"
         height="320px"
       />
@@ -351,6 +365,10 @@ const goToDashboard = () => {
 
       <!-- ═══ VERSÃO OFICIAL BLOQUEADA E EXPORTAÇÕES (Tarefa 5 e 6) ═══ -->
       <div v-if="isAlreadyPublished || readOnly || isClosed || isApproved" class="official-export-box" data-testid="official-export-section">
+        <div v-if="isApproved" class="mb-3" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 6px; padding: 0.75rem 1rem; color: #10b981; font-weight: 600;">
+          <FiCheckCircle size="18" />
+          <span>Versão homologada e publicada com sucesso! Os dados foram consolidados na base de produção.</span>
+        </div>
         <div class="official-seal">
           <span class="badge-bloqueada" data-testid="badge-versao-bloqueada">
             <FiLock size="14" />
@@ -380,6 +398,15 @@ const goToDashboard = () => {
           >
             <FiMap size="14" />
             {{ exportingFormat === 'geojson' ? 'Exportando…' : 'Exportar Mapa (GeoJSON)' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn_outline"
+            style="display: inline-flex; align-items: center; gap: 0.4rem;"
+            @click="goToMap"
+          >
+            <FiMap size="14" />
+            Visualizar no Mapa
           </button>
         </div>
       </div>

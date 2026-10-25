@@ -41,6 +41,54 @@ const coberturaTemporalFim = ref('')
 const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
 const classificacaoOptions = ['Público', 'Restrito', 'Confidencial']
 
+interface FormatoConfig {
+  extensions: string[]
+  label: string
+  tag: string
+}
+
+const formatoConfigMap: Record<string, FormatoConfig> = {
+  GeoJSON: {
+    extensions: ['.geojson', '.json'],
+    label: 'GeoJSON (.geojson, .json)',
+    tag: '.geojson / .json',
+  },
+  'Shapefile (ZIP)': {
+    extensions: ['.zip'],
+    label: 'Shapefile compactado (.zip)',
+    tag: '.zip (Shapefile)',
+  },
+  CSV: {
+    extensions: ['.csv'],
+    label: 'Tabela delimitada (.csv)',
+    tag: '.csv',
+  },
+  GeoPackage: {
+    extensions: ['.gpkg'],
+    label: 'GeoPackage (.gpkg)',
+    tag: '.gpkg',
+  },
+  KML: {
+    extensions: ['.kml', '.kmz'],
+    label: 'Keyhole Markup Language (.kml, .kmz)',
+    tag: '.kml / .kmz',
+  },
+}
+
+const formatoConfigAtual = computed<FormatoConfig | null>(() => {
+  if (!formato.value) return null
+  return formatoConfigMap[formato.value] || null
+})
+
+const allowedExtensions = computed(() => {
+  if (formatoConfigAtual.value) {
+    return formatoConfigAtual.value.extensions
+  }
+  return ['.zip', '.geojson', '.json', '.csv', '.gpkg', '.kml', '.kmz']
+})
+
+const acceptAttribute = computed(() => allowedExtensions.value.join(','))
+
 const formOptions = ref({
   anos: [] as string[],
   epsgs: [] as { id: string; label: string }[],
@@ -126,18 +174,32 @@ const triggerFileInput = () => {
   }
 }
 
+const processSelectedFile = (file: File) => {
+  const isValid = allowedExtensions.value.some((ext) => file.name.toLowerCase().endsWith(ext))
+  if (isValid) {
+    arquivoSelecionado.value = file
+    erroMensagem.value = null
+  } else {
+    const esperado = formatoConfigAtual.value
+      ? formatoConfigAtual.value.label
+      : allowedExtensions.value.join(', ')
+    erroMensagem.value = {
+      titulo: 'Formato de Arquivo Incompatível',
+      texto: `O arquivo selecionado deve estar no formato exigido: ${esperado}.`,
+    }
+    arquivoSelecionado.value = null
+  }
+}
+
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     const file = target.files[0]
     if (file) {
-      arquivoSelecionado.value = file
-      erroMensagem.value = null
+      processSelectedFile(file)
     }
   }
 }
-
-const allowedExtensions = ['.zip', '.geojson', '.json', '.csv', '.gpkg', '.kml', '.kmz']
 
 const extrairMensagemErro = (err: any): { titulo: string; texto: string } => {
   const errorData = err?.response?.data || err
@@ -171,16 +233,7 @@ const handleDrop = (event: DragEvent) => {
   if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
     const file = event.dataTransfer.files[0]
     if (file) {
-      const isValid = allowedExtensions.some((ext) => file.name.toLowerCase().endsWith(ext))
-      if (isValid) {
-        arquivoSelecionado.value = file
-        erroMensagem.value = null
-      } else {
-        erroMensagem.value = {
-          titulo: 'Arquivo Inválido',
-          texto: 'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson, .json, .csv, .gpkg, .kml, .kmz).',
-        }
-      }
+      processSelectedFile(file)
     }
   }
 }
@@ -443,7 +496,12 @@ const resetForm = () => {
         <h2>Upload do Arquivo</h2>
       </div>
       <p class="card-description">
-        Arraste ou selecione o arquivo geoespacial (formatos suportados: .zip, .geojson, .csv, .gpkg, .kml, .kmz).
+        <template v-if="formatoConfigAtual">
+          Envie o arquivo no formato selecionado na etapa anterior: <strong>{{ formatoConfigAtual.label }}</strong>.
+        </template>
+        <template v-else>
+          Arraste ou selecione o arquivo geoespacial (formatos suportados: .zip, .geojson, .csv, .gpkg, .kml, .kmz).
+        </template>
       </p>
 
       <!-- Mensagem de Erro -->
@@ -471,7 +529,7 @@ const resetForm = () => {
           id="file-upload"
           ref="fileInputRef"
           type="file"
-          accept=".zip,.geojson,.json,.csv,.gpkg,.kml,.kmz"
+          :accept="acceptAttribute"
           @change="handleFileSelect"
           :disabled="isUploading"
           style="display: none"
@@ -485,11 +543,16 @@ const resetForm = () => {
             <p class="dropzone__title">Arraste o arquivo aqui</p>
             <p class="dropzone__subtitle">ou clique para selecionar</p>
             <div class="dropzone__formats">
-              <span class="format-tag">.geojson / .json</span>
-              <span class="format-tag">.zip (Shapefile / CSV)</span>
-              <span class="format-tag">.csv</span>
-              <span class="format-tag">.gpkg (GeoPackage)</span>
-              <span class="format-tag">.kml / .kmz</span>
+              <span v-if="formatoConfigAtual" class="format-tag format-tag-active">
+                {{ formatoConfigAtual.tag }}
+              </span>
+              <template v-else>
+                <span class="format-tag">.geojson / .json</span>
+                <span class="format-tag">.zip (Shapefile / CSV)</span>
+                <span class="format-tag">.csv</span>
+                <span class="format-tag">.gpkg (GeoPackage)</span>
+                <span class="format-tag">.kml / .kmz</span>
+              </template>
             </div>
           </template>
           <template v-else>
@@ -810,6 +873,14 @@ const resetForm = () => {
   background-color: rgba(242, 101, 34, 0.08);
   color: var(--vis-brand-orange);
   letter-spacing: 0.03em;
+}
+
+.format-tag-active {
+  background-color: rgba(242, 101, 34, 0.16);
+  border: 1px solid var(--vis-brand-orange);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
 }
 
 /* Ações do Passo */
