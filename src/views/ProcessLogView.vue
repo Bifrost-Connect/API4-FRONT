@@ -412,7 +412,12 @@ const currentComponent = computed(() => {
               </div>
 
               <div class="quarantine-body">
-                <ProcessStageQuarentena v-if="details" :details="details" :read-only="isReadOnly" />
+                <ProcessStageQuarentena
+                  v-if="details"
+                  :details="details"
+                  :read-only="isReadOnly"
+                  @reload="loadData(processId)"
+                />
               </div>
             </div>
           </div>

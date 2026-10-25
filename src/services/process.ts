@@ -289,8 +289,9 @@ export const processService = {
     try {
       const cleanId = encodeURIComponent(String(id))
       const res = await api.get(`/carga/${cleanId}/decisoes-gestor`)
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-        return res.data
+      if (res.data && Array.isArray(res.data)) {
+        if (res.data.length > 0) return res.data
+        return localList.length > 0 ? localList : res.data
       }
       return localList
     } catch (err: any) {

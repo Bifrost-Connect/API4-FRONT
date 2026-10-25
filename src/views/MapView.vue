@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { mapService } from '../services/map'
@@ -26,6 +26,7 @@ interface TerritoryProperties {
 }
 
 const route = useRoute()
+const router = useRouter()
 const mapElement = ref<HTMLElement | null>(null)
 const searchTerm = ref('')
 const selectedLocation = ref<MapLocation | null>(null)

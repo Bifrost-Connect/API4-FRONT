@@ -22,6 +22,7 @@ const isGestorOrAdmin = computed(
 )
 
 const isSubmitting = ref(false)
+const isLoadingHistorico = ref(true)
 const showRejectModal = ref(false)
 const parecerRejeicao = ref('')
 const erroMsg = ref<string | null>(null)
@@ -35,7 +36,11 @@ const decisaoHistorico = ref<{
 } | null>(null)
 
 const carregarDecisaoPrevia = async () => {
-  if (!props.processoId) return
+  if (!props.processoId) {
+    isLoadingHistorico.value = false
+    return
+  }
+  isLoadingHistorico.value = true
   try {
     const historico = await processService.getDecisoesGestor(props.processoId)
     const ultimaDaEtapa = historico.find(
@@ -55,6 +60,8 @@ const carregarDecisaoPrevia = async () => {
     }
   } catch (err) {
     // Ignora erro silencioso de carregar histórico prévio
+  } finally {
+    isLoadingHistorico.value = false
   }
 }
 
@@ -99,6 +106,29 @@ const isEtapaConcluida = computed(() => {
   const st = (props.currentStatus || '').toUpperCase()
   return st === 'CONCLUÍDA' || st === 'CONCLUIDA' || st === 'FECHADO'
 })
+
+const isStageMatching = computed(() => {
+  if (!props.currentStage) return true
+  const current = props.currentStage
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  const target = props.etapa
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  return current === target
+})
+
+const formatarData = (dataStr?: string) => {
+  if (!dataStr) return ''
+  try {
+    const d = new Date(dataStr)
+    return isNaN(d.getTime()) ? dataStr : d.toLocaleString('pt-BR')
+  } catch {
+    return dataStr
+  }
+}
 
 const handleAprovar = async () => {
   if (isSubmitting.value) return
@@ -176,44 +206,73 @@ const handleConfirmarRejeicao = async () => {
 </script>
 
 <template>
-  <div v-if="isGestorOrAdmin && !readOnly && !decisaoTomada && !isEtapaConcluida" class="gate-card card mb-4">
-    <div class="gate-header">
-      <div class="gate-title">
-        <FiShield size="20" class="gate-icon" />
-        <div>
-          <h4>Gate de Decisão do Gestor — {{ etapaTitulo }}</h4>
-          <p class="gate-desc">
-            Como Gestor, avalie a conformidade da etapa antes de liberar para {{ proximaEtapaNome }}.
-          </p>
+  <div class="gate-decisao-container">
+    <div
+      v-if="isGestorOrAdmin && !readOnly && !isLoadingHistorico && !decisaoTomada && !isEtapaConcluida && isStageMatching"
+      class="gate-card card mb-4"
+    >
+      <div class="gate-header">
+        <div class="gate-title">
+          <FiShield size="20" class="gate-icon" />
+          <div>
+            <h4>Gate de Decisão do Gestor — {{ etapaTitulo }}</h4>
+            <p class="gate-desc">
+              Como Gestor, avalie a conformidade da etapa antes de liberar para {{ proximaEtapaNome }}.
+            </p>
+          </div>
+        </div>
+
+        <div class="gate-actions" v-if="!decisaoTomada">
+          <button
+            class="btn btn-outline-danger btn-sm"
+            :disabled="isSubmitting"
+            @click="openRejectModal"
+          >
+            <FiXCircle size="14" />
+            Rejeitar (Quarentena)
+          </button>
+          <button
+            class="btn btn-success btn-sm"
+            :disabled="isSubmitting"
+            @click="handleAprovar"
+          >
+            <FiCheckCircle size="14" />
+            Aprovar {{ etapaTitulo }}
+          </button>
         </div>
       </div>
+    </div>
 
-      <div class="gate-actions" v-if="!decisaoTomada">
-        <button
-          class="btn btn-outline-danger btn-sm"
-          :disabled="isSubmitting"
-          @click="openRejectModal"
-        >
-          <FiXCircle size="14" />
-          Rejeitar (Quarentena)
-        </button>
-        <button
-          class="btn btn-success btn-sm"
-          :disabled="isSubmitting"
-          @click="handleAprovar"
-        >
-          <FiCheckCircle size="14" />
-          Aprovar {{ etapaTitulo }}
-        </button>
+    <!-- Badge / Aviso informativo amigável de decisão prévia -->
+    <div
+      v-else-if="decisaoHistorico && !isLoadingHistorico"
+      class="gate-card card mb-4"
+      :class="decisaoHistorico.decisao === 'APROVADO' ? 'historico-aprovado' : 'historico-reprovado'"
+    >
+      <div class="gate-header">
+        <div class="gate-title">
+          <FiCheckCircle v-if="decisaoHistorico.decisao === 'APROVADO'" size="20" class="gate-icon-success" />
+          <FiXCircle v-else size="20" class="gate-icon-danger" />
+          <div>
+            <h4>
+              Etapa de {{ etapaTitulo }} {{ decisaoHistorico.decisao === 'APROVADO' ? 'aprovada' : 'rejeitada' }}
+              <template v-if="decisaoHistorico.gestorNome"> pelo Gestor {{ decisaoHistorico.gestorNome }}</template>
+              <template v-if="decisaoHistorico.dataDecisao"> em {{ formatarData(decisaoHistorico.dataDecisao) }}</template>.
+            </h4>
+            <p v-if="decisaoHistorico.parecer" class="gate-desc">
+              Parecer: <em>"{{ decisaoHistorico.parecer }}"</em>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Feedback Alerts -->
-    <div v-if="sucessoMsg" class="alert alert-success mt-3">
+    <div v-if="sucessoMsg" class="alert alert-success mt-3 mb-4">
       <FiCheckCircle size="16" />
       <span>{{ sucessoMsg }}</span>
     </div>
-    <div v-if="erroMsg" class="alert alert-danger mt-3">
+    <div v-if="erroMsg" class="alert alert-danger mt-3 mb-4">
       <FiAlertTriangle size="16" />
       <span>{{ erroMsg }}</span>
     </div>
@@ -268,6 +327,26 @@ const handleConfirmarRejeicao = async () => {
   border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 10px;
   padding: 1.25rem 1.5rem;
+}
+
+.historico-aprovado {
+  background: linear-gradient(to right, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.historico-reprovado {
+  background: linear-gradient(to right, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.gate-icon-success {
+  color: var(--vis-c-success, #10b981);
+  flex-shrink: 0;
+}
+
+.gate-icon-danger {
+  color: #ef4444;
+  flex-shrink: 0;
 }
 
 .gate-header {

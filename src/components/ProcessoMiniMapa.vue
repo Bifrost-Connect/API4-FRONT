@@ -38,6 +38,7 @@ const carregarGeometrias = async () => {
       const res = await api.get(`/publicacao/${props.processoId}/revisao`)
       const geojson = res.data?.feicoesGeoJson
       if (geojson && geojson.features && geojson.features.length > 0) {
+        isLoading.value = false
         renderizarMapa(geojson)
         totalFeicoes.value = geojson.features.length
         return
@@ -51,6 +52,7 @@ const carregarGeometrias = async () => {
       const res = await api.get(`/carga/${props.processoId}/revisao-publicacao`)
       const geojson = res.data?.feicoesGeoJson
       if (geojson && geojson.features && geojson.features.length > 0) {
+        isLoading.value = false
         renderizarMapa(geojson)
         totalFeicoes.value = geojson.features.length
         return
@@ -64,6 +66,7 @@ const carregarGeometrias = async () => {
       params: { processoId: props.processoId },
     })
     if (fallbackRes.data && fallbackRes.data.features && fallbackRes.data.features.length > 0) {
+      isLoading.value = false
       renderizarMapa(fallbackRes.data)
       totalFeicoes.value = fallbackRes.data.features.length
       return
@@ -91,6 +94,8 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
       maxZoom: 19,
     }).addTo(map)
   }
+
+  map.invalidateSize()
 
   if (geoJsonLayer) {
     map.removeLayer(geoJsonLayer)

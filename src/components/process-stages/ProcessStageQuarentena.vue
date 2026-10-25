@@ -23,6 +23,8 @@ const props = withDefaults(
   { readOnly: false },
 )
 
+const emit = defineEmits<{ (e: 'reload'): void }>()
+
 const currentUser = computed(() => userService.getCurrentUser())
 const isAuditor = computed(() => currentUser.value.role === 'Auditor')
 const isAdmin = computed(() => userService.isAdmin())
@@ -54,7 +56,7 @@ const openAlocarAuditorModal = async () => {
   try {
     auditores.value = await processService.getAuditores()
     if (auditores.value.length > 0) {
-      selectedAuditorId.value = auditores.value[0].id
+      selectedAuditorId.value = auditores.value[0]?.id ?? null
     }
   } catch (err) {
     console.error('Falha ao obter lista de auditores:', err)
@@ -172,6 +174,8 @@ const confirmReprocess = async () => {
   if (numericId) {
     try {
       await uploadService.reprocessarCarga(numericId, fileToUpload)
+      await processService.iniciarProcessamento(numericId)
+      emit('reload')
     } catch (e: any) {
       console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
     }
@@ -306,7 +310,7 @@ const confirmCancelLoad = async () => {
       <div class="mt-4 border-top pt-4 action-footer">
         <!-- Alocar Auditor pelo Gestor / Administrador -->
         <button
-          v-if="isAdmin || currentUser.role === 'Gestor'"
+          v-if="isAdmin || (currentUser.role as string) === 'Gestor'"
           type="button"
           class="btn btn_outline"
           style="color: #3b82f6; border-color: #3b82f6; display: flex; align-items: center; gap: 0.4rem"

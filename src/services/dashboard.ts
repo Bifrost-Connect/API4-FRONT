@@ -89,13 +89,13 @@ export function mapStatus(backendStatus: string): string {
   if (!backendStatus) return 'Em andamento'
   switch (backendStatus) {
     case 'CONCLUIDA':
-    case 'COM_RESSALVA':
       return 'Concluída'
-    case 'EM_ANDAMENTO':
-      return 'Em andamento'
+    case 'COM_RESSALVA':
     case 'EM_VALIDACAO':
     case 'VALIDACAO':
       return 'Aguardando validação'
+    case 'EM_ANDAMENTO':
+      return 'Em andamento'
     case 'FALHOU':
       return 'Falhou'
     case 'FECHADO':

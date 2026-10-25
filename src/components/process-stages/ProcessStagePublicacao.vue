@@ -255,7 +255,14 @@ const goToDashboard = () => {
     <div v-if="readOnly" class="closed-version-banner" role="status">
       Esta versão foi fechada e está disponível somente para consulta.
     </div>
-    <template v-if="!showSuccess">
+
+    <div v-if="!isStageReached" class="card p-4 text-center my-4" data-testid="locked-stage-card">
+      <FiLock size="32" class="text-muted mb-2" style="margin: 0 auto; display: block;" />
+      <h4>Etapa de Publicação ainda não liberada</h4>
+      <p class="text-muted">Esta etapa será liberada após a aprovação das etapas anteriores pelo Gestor.</p>
+    </div>
+
+    <template v-else-if="!showSuccess">
       <!-- ═══ MAPA INTERATIVO: POLÍGONOS DA CARGA ═════════════════════════════════ -->
       <ProcessoMiniMapa
         v-if="details?.id"
