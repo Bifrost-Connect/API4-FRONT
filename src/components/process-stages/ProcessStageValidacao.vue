@@ -14,11 +14,18 @@ const emit = defineEmits<{
   (e: 'reload'): void
 }>()
 
-/** Erro na validação ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
+/** Erro ou quarentena na validação */
+const isQuarantine = computed(
+  () =>
+    props.details.status === 'Em quarentena' ||
+    props.details.status === 'Aguardando validação' ||
+    (props.details.quarantineRecords?.length ?? 0) > 0,
+)
+
 const isError = computed(
   () =>
     props.details.status === 'Falhou' ||
-    props.details.status === 'Aguardando validação' ||
+    isQuarantine.value ||
     checks.value.some((c) => c.status === 'error'),
 )
 
@@ -31,11 +38,14 @@ const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {
   if (isUnderCorrection.value) return { label: 'Em Correção (Editor Alocado)', cls: 'warning' }
+  if (isQuarantine.value) return { label: 'Em Quarentena', cls: 'error' }
+  if (props.details.status === 'Falhou') return { label: 'Falhou', cls: 'error' }
   const errorCount = checks.value.filter((c) => c.status === 'error').length
-  if (errorCount === 0) return { label: 'Concluído (Sem Erros)', cls: 'success' }
-  if (errorCount < checks.value.length)
-    return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
-  return { label: 'Falhou', cls: 'error' }
+  if (errorCount > 0) return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
+  if (props.details.stage === 'Validação' && props.details.status === 'Em andamento') {
+    return { label: 'Em Validação', cls: 'warning' }
+  }
+  return { label: 'Concluído (Sem Erros)', cls: 'success' }
 })
 </script>
 
@@ -61,7 +71,7 @@ const overallStatus = computed(() => {
         </div>
         <div class="header-right">
           <span class="badge" :class="overallStatus.cls">{{ overallStatus.label }}</span>
-          <button v-if="isError || (details.quarantineRecords?.length ?? 0) > 0" class="btn btn-warning" @click="emit('open-quarantine')">
+          <button v-if="isQuarantine" class="btn btn-warning" @click="emit('open-quarantine')">
             <FiAlertTriangle size="14" />
             Ver Quarentena
           </button>
@@ -89,7 +99,7 @@ const overallStatus = computed(() => {
           </li>
         </ul>
 
-        <div v-if="(isError || (details.quarantineRecords?.length ?? 0) > 0) && details.pauseReason" class="error-alert">
+        <div v-if="isQuarantine && details.pauseReason" class="error-alert">
           <div class="alert-icon">
             <FiAlertTriangle size="22" />
           </div>

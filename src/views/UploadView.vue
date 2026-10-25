@@ -254,16 +254,6 @@ const handleUpload = async () => {
         const response = await uploadService.reprocessarCarga(pId, arquivoSelecionado.value)
         uploadResult.value = response
         currentProcessoId.value = pId
-
-        try {
-          const procRes = await processService.iniciarProcessamento(pId, arquivoSelecionado.value.name)
-          processamentoStatus.value = procRes
-        } catch (procErr: any) {
-          const errParsed = extrairMensagemErro(procErr)
-          processamentoErro.value = errParsed.texto
-          processamentoStatus.value = { quarentena: true, erro: errParsed.texto }
-        }
-
         currentStep.value = 3
       }
       return
@@ -295,17 +285,6 @@ const handleUpload = async () => {
     if (arquivoSelecionado.value && processoId) {
       const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
       uploadResult.value = response
-
-      // Aciona o gatilho de processamento no back-end
-      try {
-        const procRes = await processService.iniciarProcessamento(processoId, arquivoSelecionado.value.name)
-        processamentoStatus.value = procRes
-      } catch (procErr: any) {
-        const errParsed = extrairMensagemErro(procErr)
-        processamentoErro.value = errParsed.texto
-        processamentoStatus.value = { quarentena: true, erro: errParsed.texto }
-      }
-
       currentStep.value = 3
     }
   } catch (err: any) {
@@ -681,7 +660,13 @@ const resetForm = () => {
         </div>
 
         <div class="confirmation__actions">
-          <button class="btn" @click="resetForm">+ Nova Carga</button>
+          <router-link
+            :to="`/processo/${currentProcessoId || uploadResult.processo?.id || uploadResult.id}`"
+            class="btn"
+          >
+            Acompanhar Processamento na Esteira
+          </router-link>
+          <button class="btn btn_outline" @click="resetForm">+ Nova Carga</button>
           <router-link to="/" class="btn btn_outline">Voltar ao Dashboard</router-link>
         </div>
       </div>

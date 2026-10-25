@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   processService,
@@ -186,12 +186,49 @@ const loadData = async (idToLoad: string) => {
     auditVersions.value = versions
 
     await loadTraceability(idToLoad, details.value?.dataSource === 'API')
+    startPollingIfNeeded()
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
   } finally {
     isLoading.value = false
   }
 }
+
+let pollingTimer: any = null
+
+const startPollingIfNeeded = () => {
+  stopPolling()
+  if (details.value?.status === 'Em andamento') {
+    pollingTimer = setInterval(async () => {
+      if (processId.value) {
+        try {
+          const updated = await processService.getProcessDetails(processId.value)
+          if (updated) {
+            details.value = updated
+            activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+            if (updated.status !== 'Em andamento') {
+              stopPolling()
+              loadData(processId.value)
+            }
+          }
+        } catch {
+          // Ignore transient poll errors
+        }
+      }
+    }, 2500)
+  }
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 
 watch(
   () => props.detailsData,

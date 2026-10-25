@@ -1,11 +1,3 @@
-/**
- * Serviço de Gestão do Dashboard e Processos.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
- * Todas as requisições utilizam exclusivamente a API real do backend.
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
- */
 import api from './api'
 import { userService } from './user'
 import { processService } from './process'
@@ -97,17 +89,16 @@ export function mapStatus(backendStatus: string): string {
     case 'CONCLUIDA':
       return 'Concluída'
     case 'COM_RESSALVA':
+      return 'Com ressalva'
     case 'EM_VALIDACAO':
-    case 'VALIDACAO':
-      return 'Aguardando validação'
+    case 'EM_QUARENTENA':
+      return 'Em quarentena'
     case 'EM_ANDAMENTO':
       return 'Em andamento'
     case 'FALHOU':
       return 'Falhou'
     case 'FECHADO':
       return 'Fechado'
-    case 'EM_QUARENTENA':
-      return 'Em quarentena'
     default:
       return backendStatus
   }
@@ -283,10 +274,7 @@ export const dashboardService = {
   /**
    * Exporta a versão consolidada em formato CSV ou GeoJSON.
    */
-  async exportarVersao(
-    itemOrId: any,
-    formato: 'csv' | 'geojson',
-  ): Promise<Blob> {
+  async exportarVersao(itemOrId: any, formato: 'csv' | 'geojson'): Promise<Blob> {
     const id = typeof itemOrId === 'object' ? itemOrId.id : String(itemOrId)
     return await processService.exportIndicator(id, formato)
   },
