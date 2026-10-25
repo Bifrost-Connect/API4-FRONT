@@ -8,6 +8,7 @@ export interface MapFilters {
   page?: number
   size?: number
   busca?: string
+  processoId?: number | string
 }
 
 export interface PaginatedGeoJson {
@@ -40,14 +41,41 @@ export const mapService = {
     try {
       const response = await api.get('/mapa/camadas', { params: filters })
       if (response.data && response.data.type === 'FeatureCollection') {
-        if (response.data.features?.length > 0 || !mockactive) {
+        if (response.data.features && response.data.features.length > 0) {
           return response.data
         }
       }
+
+      // Se filtrou por processoId específico e a carga ainda não foi publicada, busca da revisão da carga
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/carga/${filters.processoId}/revisao-publicacao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Segue
+        }
+      }
+
+      if (response.data && response.data.type === 'FeatureCollection' && !mockactive) {
+        return response.data
+      }
+
       return mockactive
         ? (mockTerritories as PaginatedGeoJson)
         : { type: 'FeatureCollection', features: [] }
     } catch (error: any) {
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/carga/${filters.processoId}/revisao-publicacao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Segue
+        }
+      }
       if (!mockactive) throw error
       console.warn('Falha ao buscar camadas territoriais. Usando dados simulados.', error)
       return mockTerritories as PaginatedGeoJson

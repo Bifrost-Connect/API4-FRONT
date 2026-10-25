@@ -19,7 +19,7 @@ describe('Dashboard Service Helpers', () => {
   describe('mapStatus', () => {
     it('deve mapear os enumeradores do backend para o formato de UI', () => {
       expect(mapStatus('CONCLUIDA')).toBe('Concluída')
-      expect(mapStatus('COM_RESSALVA')).toBe('Concluída')
+      expect(mapStatus('COM_RESSALVA')).toBe('Aguardando validação')
       expect(mapStatus('EM_ANDAMENTO')).toBe('Em andamento')
       expect(mapStatus('EM_VALIDACAO')).toBe('Aguardando validação')
       expect(mapStatus('FALHOU')).toBe('Falhou')

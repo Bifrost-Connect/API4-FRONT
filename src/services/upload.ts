@@ -99,17 +99,21 @@ export const uploadService = {
     file: File,
     usuarioId: number = userService.getCurrentUser().id,
   ): Promise<any> {
-    const formData = new FormData()
-    formData.append('file', file)
-    if (usuarioId) {
-      formData.append('usuarioId', usuarioId.toString())
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (usuarioId) {
+        formData.append('usuarioId', usuarioId.toString())
+      }
+      const res = await api.post(`/carga/${processoId}/reprocessar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      return res.data
+    } catch (err: any) {
+      throw err.response?.data || err
     }
-    const res = await api.post(`/carga/${processoId}/reprocessar`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    return res.data
   },
 
   async cancelarCarga(
@@ -138,6 +142,16 @@ export const uploadService = {
   async exportarRejeicoesCsv(processoId: number): Promise<Blob> {
     const res = await api.get(`/carga/${processoId}/rejeicoes/exportar`, {
       responseType: 'blob',
+    })
+    return res.data
+  },
+
+  async importarReferenciasGeoespaciais(
+    fonte?: string,
+    limitePorFonte: number = 5000,
+  ): Promise<any> {
+    const res = await api.post('/carga/referencias/importar', null, {
+      params: { fonte, limitePorFonte },
     })
     return res.data
   },

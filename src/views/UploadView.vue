@@ -38,7 +38,7 @@ const coberturaEspacial = ref('')
 const coberturaTemporalInicio = ref('')
 const coberturaTemporalFim = ref('')
 
-const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'GeoPackage', 'KML']
+const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
 const classificacaoOptions = ['Público', 'Restrito', 'Confidencial']
 
 const formOptions = ref({
@@ -57,17 +57,30 @@ onMounted(async () => {
 
   if (route.query.reprocessId) {
     reprocessId.value = route.query.reprocessId as string
+    currentProcessoId.value = Number(reprocessId.value)
     try {
       const details = await processService.getProcessDetails(reprocessId.value)
-      nomeCamada.value = details.layerName || ''
-      orgaoEmissor.value = details.source || ''
-      anoReferencia.value = details.year || ''
-      epsg.value = details.epsg || ''
-      conjuntoDados.value = details.dataset || ''
+      nomeCamada.value = details.layerName || 'Camada_' + reprocessId.value
+      orgaoEmissor.value = details.source || '1'
+      anoReferencia.value = details.year || '2026'
+      epsg.value = details.epsg || '4674'
+      conjuntoDados.value = details.dataset || '1'
       descricao.value = details.description || ''
+      competencia.value = '2026-10'
+      formato.value = 'GeoJSON'
+      classificacaoAcesso.value = 'Público'
+      coberturaEspacial.value = 'Estado de Goiás'
     } catch (err) {
       console.error('Falha ao obter detalhes do processo para reprocessamento', err)
       nomeCamada.value = 'Camada_Corrigida_' + reprocessId.value
+      orgaoEmissor.value = '1'
+      anoReferencia.value = '2026'
+      epsg.value = '4674'
+      conjuntoDados.value = '1'
+      competencia.value = '2026-10'
+      formato.value = 'GeoJSON'
+      classificacaoAcesso.value = 'Público'
+      coberturaEspacial.value = 'Estado de Goiás'
     }
   }
 })
@@ -78,21 +91,24 @@ const erroMensagem = ref<{ titulo: string; texto: string } | null>(null)
 const isDragover = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadResult = ref<any>(null)
+const processamentoStatus = ref<any>(null)
+const processamentoErro = ref<string | null>(null)
 
 const isStep1Valid = computed(
   () =>
-    nomeCamada.value.trim().length > 0 &&
-    orgaoEmissor.value !== '' &&
-    anoReferencia.value !== '' &&
-    epsg.value !== '' &&
-    conjuntoDados.value !== '' &&
-    competencia.value !== '' &&
-    formato.value !== '' &&
-    classificacaoAcesso.value !== '' &&
-    coberturaEspacial.value.trim().length > 0 &&
-    (!coberturaTemporalInicio.value ||
-      !coberturaTemporalFim.value ||
-      coberturaTemporalInicio.value <= coberturaTemporalFim.value),
+    Boolean(reprocessId.value) ||
+    (nomeCamada.value.trim().length > 0 &&
+      orgaoEmissor.value !== '' &&
+      anoReferencia.value !== '' &&
+      epsg.value !== '' &&
+      conjuntoDados.value !== '' &&
+      competencia.value !== '' &&
+      formato.value !== '' &&
+      classificacaoAcesso.value !== '' &&
+      coberturaEspacial.value.trim().length > 0 &&
+      (!coberturaTemporalInicio.value ||
+        !coberturaTemporalFim.value ||
+        coberturaTemporalInicio.value <= coberturaTemporalFim.value)),
 )
 const isStep2Valid = computed(() => arquivoSelecionado.value !== null)
 
@@ -121,7 +137,32 @@ const handleFileSelect = (event: Event) => {
   }
 }
 
-const allowedExtensions = ['.zip', '.geojson']
+const allowedExtensions = ['.zip', '.geojson', '.json', '.csv', '.gpkg', '.kml', '.kmz']
+
+const extrairMensagemErro = (err: any): { titulo: string; texto: string } => {
+  const errorData = err?.response?.data || err
+  if (typeof errorData === 'string') {
+    return {
+      titulo: 'Falha na Operação',
+      texto: errorData,
+    }
+  }
+  if (typeof errorData === 'object' && errorData !== null) {
+    const titulo = errorData.titulo || errorData.erro || errorData.error || 'Falha na Operação'
+    const texto =
+      errorData.mensagem ||
+      errorData.message ||
+      errorData.detail ||
+      errorData.detalhes ||
+      (errorData.erro && errorData.erro !== titulo ? errorData.erro : null) ||
+      'Ocorreu um erro durante a operação.'
+    return { titulo, texto }
+  }
+  return {
+    titulo: 'Falha na Operação',
+    texto: 'Ocorreu um erro desconhecido.',
+  }
+}
 
 const handleDrop = (event: DragEvent) => {
   isDragover.value = false
@@ -137,7 +178,7 @@ const handleDrop = (event: DragEvent) => {
       } else {
         erroMensagem.value = {
           titulo: 'Arquivo Inválido',
-          texto: 'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson).',
+          texto: 'Por favor, selecione apenas arquivos com formato suportado (.zip, .geojson, .json, .csv, .gpkg, .kml, .kmz).',
         }
       }
     }
@@ -148,24 +189,49 @@ const handleUpload = async () => {
   if (!isStep1Valid.value || !isStep2Valid.value) return
 
   erroMensagem.value = null
+  processamentoErro.value = null
+  processamentoStatus.value = null
   isUploading.value = true
 
-  const metadataPayload = {
-    nomeCamada: nomeCamada.value,
-    orgaoEmissor: orgaoEmissor.value,
-    anoReferencia: anoReferencia.value,
-    epsg: epsg.value,
-    conjuntoDados: conjuntoDados.value,
-    descricao: descricao.value,
-    competencia: competencia.value,
-    formato: formato.value,
-    classificacaoAcesso: classificacaoAcesso.value,
-    coberturaEspacial: coberturaEspacial.value,
-    coberturaTemporalInicio: coberturaTemporalInicio.value,
-    coberturaTemporalFim: coberturaTemporalFim.value,
-  }
-
   try {
+    // 1. Reprocessamento de carga existente em quarentena
+    if (reprocessId.value) {
+      const pId = Number(reprocessId.value)
+      if (arquivoSelecionado.value) {
+        const response = await uploadService.reprocessarCarga(pId, arquivoSelecionado.value)
+        uploadResult.value = response
+        currentProcessoId.value = pId
+
+        try {
+          const procRes = await processService.iniciarProcessamento(pId, arquivoSelecionado.value.name)
+          processamentoStatus.value = procRes
+        } catch (procErr: any) {
+          const errParsed = extrairMensagemErro(procErr)
+          processamentoErro.value = errParsed.texto
+          processamentoStatus.value = { quarentena: true, erro: errParsed.texto }
+        }
+
+        currentStep.value = 3
+      }
+      return
+    }
+
+    // 2. Upload de nova carga
+    const metadataPayload = {
+      nomeCamada: nomeCamada.value,
+      orgaoEmissor: orgaoEmissor.value,
+      anoReferencia: anoReferencia.value,
+      epsg: epsg.value,
+      conjuntoDados: conjuntoDados.value,
+      descricao: descricao.value,
+      competencia: competencia.value,
+      formato: formato.value,
+      classificacaoAcesso: classificacaoAcesso.value,
+      coberturaEspacial: coberturaEspacial.value,
+      coberturaTemporalInicio: coberturaTemporalInicio.value,
+      coberturaTemporalFim: coberturaTemporalFim.value,
+    }
+
     let processoId = currentProcessoId.value
     if (!processoId) {
       const processo = await uploadService.cadastrarMetadados(metadataPayload)
@@ -177,22 +243,20 @@ const handleUpload = async () => {
       const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
       uploadResult.value = response
 
-      // Chama o gatilho para iniciar o processamento no back-end
+      // Aciona o gatilho de processamento no back-end
       try {
-        await processService.iniciarProcessamento(processoId, arquivoSelecionado.value.name)
-      } catch (procErr) {
-        console.warn('Falha ao acionar inicio de processamento:', procErr)
+        const procRes = await processService.iniciarProcessamento(processoId, arquivoSelecionado.value.name)
+        processamentoStatus.value = procRes
+      } catch (procErr: any) {
+        const errParsed = extrairMensagemErro(procErr)
+        processamentoErro.value = errParsed.texto
+        processamentoStatus.value = { quarentena: true, erro: errParsed.texto }
       }
 
-      console.log('Upload sucesso:', response)
       currentStep.value = 3
     }
   } catch (err: any) {
-    const errorData = err.response?.data || err
-    erroMensagem.value = {
-      titulo: errorData.erro || 'Falha no Upload',
-      texto: errorData.mensagem || 'Ocorreu um erro desconhecido durante o upload.',
-    }
+    erroMensagem.value = extrairMensagemErro(err)
   } finally {
     isUploading.value = false
   }
@@ -201,6 +265,9 @@ const handleUpload = async () => {
 const resetForm = () => {
   currentStep.value = 1
   currentProcessoId.value = null
+  reprocessId.value = null
+  processamentoStatus.value = null
+  processamentoErro.value = null
   arquivoSelecionado.value = null
   nomeCamada.value = ''
   orgaoEmissor.value = ''
@@ -376,7 +443,7 @@ const resetForm = () => {
         <h2>Upload do Arquivo</h2>
       </div>
       <p class="card-description">
-        Arraste ou selecione o arquivo geoespacial (formatos suportados: .zip, .geojson).
+        Arraste ou selecione o arquivo geoespacial (formatos suportados: .zip, .geojson, .csv, .gpkg, .kml, .kmz).
       </p>
 
       <!-- Mensagem de Erro -->
@@ -404,7 +471,7 @@ const resetForm = () => {
           id="file-upload"
           ref="fileInputRef"
           type="file"
-          accept=".zip,.geojson"
+          accept=".zip,.geojson,.json,.csv,.gpkg,.kml,.kmz"
           @change="handleFileSelect"
           :disabled="isUploading"
           style="display: none"
@@ -418,8 +485,11 @@ const resetForm = () => {
             <p class="dropzone__title">Arraste o arquivo aqui</p>
             <p class="dropzone__subtitle">ou clique para selecionar</p>
             <div class="dropzone__formats">
-              <span class="format-tag">.zip (Shapefile)</span>
-              <span class="format-tag">.geojson</span>
+              <span class="format-tag">.geojson / .json</span>
+              <span class="format-tag">.zip (Shapefile / CSV)</span>
+              <span class="format-tag">.csv</span>
+              <span class="format-tag">.gpkg (GeoPackage)</span>
+              <span class="format-tag">.kml / .kmz</span>
             </div>
           </template>
           <template v-else>
@@ -476,7 +546,7 @@ const resetForm = () => {
         <div v-if="uploadResult" class="upload-details">
           <div class="detail-row">
             <span>ID do Processo:</span>
-            <strong>#{{ uploadResult.id }}</strong>
+            <strong>#{{ currentProcessoId || uploadResult.processo?.id || uploadResult.id }}</strong>
           </div>
           <div class="detail-row">
             <span>Formato Detectado:</span>
@@ -508,10 +578,42 @@ const resetForm = () => {
             </div>
             <div class="epsg-box-item">
               <span class="epsg-label">Status da Carga</span>
-              <strong class="epsg-val" style="color: var(--vis-brand-orange)"
-                >Enviada para processamento</strong
+              <strong
+                class="epsg-val"
+                :style="{
+                  color: processamentoStatus?.quarentena
+                    ? 'var(--color-danger, #ef4444)'
+                    : processamentoStatus?.situacaoAtualId === 3
+                    ? '#f59e0b'
+                    : 'var(--vis-c-success, #10b981)'
+                }"
               >
+                {{
+                  processamentoStatus?.quarentena
+                    ? 'Em Quarentena / Análise'
+                    : processamentoStatus?.situacaoAtualId === 3
+                    ? 'Com Ressalva de EPSG'
+                    : processamentoStatus
+                    ? 'Processado com Sucesso'
+                    : 'Enviada para processamento'
+                }}
+              </strong>
             </div>
+          </div>
+
+          <div
+            v-if="processamentoErro"
+            class="alert-warning mt-3"
+            style="
+              background: rgba(239, 68, 68, 0.08);
+              border-left: 3px solid #ef4444;
+              padding: 0.75rem 1rem;
+              border-radius: 4px;
+              color: var(--color-heading);
+              font-size: 0.9rem;
+            "
+          >
+            <strong>Aviso da Esteira:</strong> {{ processamentoErro }}
           </div>
         </div>
 

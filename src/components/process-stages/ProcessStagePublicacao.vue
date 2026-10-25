@@ -17,8 +17,10 @@ import {
   FiXCircle,
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
+import { processService } from '../../services/process'
 import { userService } from '../../services/user'
 import { dashboardService } from '../../services/dashboard'
+import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -37,6 +39,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
   (e: 'export', format: IndicatorExportFormat): void
+  (e: 'reload'): void
 }>()
 
 const router = useRouter()
@@ -60,7 +63,10 @@ const rejectionDestination = ref<'reprocessar' | 'invalidar'>('reprocessar')
 const rejectionError = ref('')
 
 // ── Computeds de estado ────────────────────────────────────────────────────────
-const isClosed = computed(() => (props.details.status || '').toLowerCase().includes('fechad'))
+const isClosed = computed(() => {
+  const st = (props.details.status || '').toLowerCase()
+  return st.includes('fechad') || st === 'concluída' || st === 'concluida'
+})
 const isAlreadyPublished = computed(() => props.details.status === 'Concluída' || isClosed.value)
 /** Aprovado nesta sessão */
 const isJustApproved = computed(() => isApproved.value && !isClosed.value)
@@ -68,10 +74,27 @@ const isJustApproved = computed(() => isApproved.value && !isClosed.value)
 const showSuccess = computed(() => isJustApproved.value)
 
 /** Exibe painel de decisão: processo em andamento esperando homologação */
+const stageIndex = computed(() => {
+  const steps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
+  const s = (props.details.stage || '').trim().toUpperCase()
+  if (s.includes('INGEST')) return 0
+  if (s.includes('VALIDA')) return 1
+  if (s.includes('TRATA')) return 2
+  if (s.includes('PUBLICA') || s.includes('CALCULO')) return 3
+  const stage = props.details.stage === 'Cálculo analítico' ? 'Publicação' : props.details.stage
+  return steps.indexOf(stage)
+})
+
+const isStageReached = computed(() => {
+  if (props.details.status === 'Concluída' || isClosed.value) return true
+  return stageIndex.value >= 3
+})
+
 const isAwaiting = computed(
   () =>
     !props.readOnly &&
     !isClosed.value &&
+    isStageReached.value &&
     props.details.status === 'Em andamento' &&
     !isApproved.value &&
     !isRejected.value,
@@ -104,6 +127,19 @@ const confirmPublishAndClose = async () => {
 
   isSubmitting.value = true
   try {
+    if (/^\d+$/.test(String(props.details.id))) {
+      try {
+        await processService.registrarDecisaoGestor(props.details.id, {
+          gestorId: currentUser.value.id || 1,
+          etapa: 'PUBLICACAO',
+          decisao: 'APROVADO',
+          parecer: 'Publicação oficial homologada pelo gestor.',
+        })
+      } catch (errApi) {
+        console.warn('Aviso: endpoint de decisão do gestor offline ou simulado:', errApi)
+      }
+    }
+
     await dashboardService.aprovarEFecharVersao(
       {
         id: String(props.details.id),
@@ -120,10 +156,11 @@ const confirmPublishAndClose = async () => {
 
     isApproved.value = true
     isRejected.value = false
-    props.details.status = 'Fechado'
+    props.details.status = 'Concluída'
     props.details.stage = 'Publicação'
     props.details.assignedEditor = currentUser.value.name
     closePublishModal()
+    emit('reload')
   } catch (err) {
     console.error('Erro ao aprovar e publicar:', err)
   } finally {
@@ -155,6 +192,15 @@ const confirmReject = async () => {
 
   isSubmitting.value = true
   try {
+    if (/^\d+$/.test(String(props.details.id))) {
+      await processService.registrarDecisaoGestor(props.details.id, {
+        gestorId: currentUser.value.id || 1,
+        etapa: 'PUBLICACAO',
+        decisao: 'REPROVADO',
+        parecer: rejectionReason.value.trim(),
+      })
+    }
+
     await dashboardService.reprovarCarga(
       {
         id: String(props.details.id),
@@ -183,6 +229,7 @@ const confirmReject = async () => {
       props.details.pauseReason = `Carga invalidada na Publicação: ${rejectionReason.value.trim()}.`
     }
     closeRejectModal()
+    emit('reload')
   } catch (error: any) {
     rejectionError.value = error?.message || 'Falha ao reprovar.'
   } finally {
@@ -209,6 +256,14 @@ const goToDashboard = () => {
       Esta versão foi fechada e está disponível somente para consulta.
     </div>
     <template v-if="!showSuccess">
+      <!-- ═══ MAPA INTERATIVO: POLÍGONOS DA CARGA ═════════════════════════════════ -->
+      <ProcessoMiniMapa
+        v-if="details?.id"
+        :processo-id="details.id"
+        title="Visualização Territorial do Indicador (Geometrias da Carga)"
+        height="320px"
+      />
+
       <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
       <div class="card">
         <div class="card-header">
@@ -288,7 +343,7 @@ const goToDashboard = () => {
       </div>
 
       <!-- ═══ VERSÃO OFICIAL BLOQUEADA E EXPORTAÇÕES (Tarefa 5 e 6) ═══ -->
-      <div v-if="isAlreadyPublished || readOnly || isClosed" class="official-export-box" data-testid="official-export-section">
+      <div v-if="isAlreadyPublished || readOnly || isClosed || isApproved" class="official-export-box" data-testid="official-export-section">
         <div class="official-seal">
           <span class="badge-bloqueada" data-testid="badge-versao-bloqueada">
             <FiLock size="14" />
@@ -366,7 +421,7 @@ const goToDashboard = () => {
 
         <!-- Ações pós-publicação -->
         <div v-if="!readOnly" class="success-actions">
-          <button class="btn btn-outline-danger" @click="handleRejectRequest">
+          <button class="btn btn-outline-danger" @click="openRejectModal">
             <FiThumbsDown size="15" />
             Solicitar Revisão
           </button>
@@ -374,24 +429,6 @@ const goToDashboard = () => {
             <FiArrowLeft size="15" />
             Ver no Dashboard
           </button>
-        </div>
-
-        <!-- Input de revisão pós-publicação -->
-        <div v-if="!readOnly && showReviewInput" class="post-publish-review">
-          <h4>Motivo da Revisão</h4>
-          <textarea
-            v-model="reviewNote"
-            class="review-textarea"
-            placeholder="Descreva o que precisa ser revisado..."
-            rows="3"
-          />
-          <div class="review-actions">
-            <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
-            <button class="btn btn-outline-danger" @click="handleConfirmReject">
-              <FiThumbsDown size="15" />
-              Confirmar e Enviar ao Editor
-            </button>
-          </div>
         </div>
       </div>
     </div>

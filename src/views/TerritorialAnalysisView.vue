@@ -35,9 +35,15 @@ let renderedLayers: L.Layer[] = []
 let mapRequestSequence = 0
 let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
-const carDocuments = computed(() => documents.value.filter((item) => item.category === 'CAR'))
+const carDocuments = computed(() =>
+  documents.value.filter(
+    (item) => item.category === 'CAR' || item.zone === 'PUBLICADA' || /^\d+$/.test(item.id),
+  ),
+)
 const restrictionDocuments = computed(() =>
-  documents.value.filter((item) => item.category !== 'CAR'),
+  documents.value.filter(
+    (item) => item.zone !== 'PUBLICADA' && (!/^\d+$/.test(item.id) || item.category !== 'CAR'),
+  ),
 )
 const selectedCar = computed(() => carDocuments.value.find((item) => item.id === selectedCarId.value))
 const selectedRestrictions = computed(() =>
@@ -51,9 +57,9 @@ const criticalResults = computed(
 )
 const canCalculate = computed(
   () =>
-    !!selectedCar.value &&
-    selectedRestrictions.value.length > 0 &&
-    !selectedCar.value.localOnly &&
+    Boolean(selectedCarId.value || selectedCar.value) &&
+    selectedRestrictionIds.value.length > 0 &&
+    !selectedCar.value?.localOnly &&
     selectedRestrictions.value.every((item) => !item.localOnly) &&
     !isCalculating.value,
 )
@@ -456,7 +462,7 @@ watch(
 watch(baseMap, setBaseLayer)
 watch(selectedCarId, () => {
   const matchingRestrictions = restrictionDocuments.value.filter(
-    (document) => document.year === selectedCar.value?.year,
+    (document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year,
   )
   selectedRestrictionIds.value = selectedRestrictionIds.value.filter((id) =>
     matchingRestrictions.some((document) => document.id === id),
@@ -469,13 +475,17 @@ watch(selectedCarId, () => {
 })
 
 onMounted(async () => {
+  const scrollContainer = document.querySelector('.content-scroll-container')
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0
+  }
   initializeMap()
   try {
     documents.value = await spatialAnalysisService.listDocuments()
     selectedCarId.value = carDocuments.value[0]?.id ?? ''
     selectedRestrictionIds.value = restrictionDocuments.value
-      .filter((document) => document.year === selectedCar.value?.year)
-      .slice(0, 2)
+      .filter((document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year)
+      .slice(0, 3)
       .map((document) => document.id)
     await updateMapLayers()
     await nextTick()
@@ -535,6 +545,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="isLoadingDocuments" class="empty-state">Carregando documentos espaciais…</div>
+      <div v-else-if="documents.length === 0" class="empty-state" style="text-align: center; padding: 2rem;">
+        <strong style="color: var(--color-heading); font-size: 1rem;">Nenhuma base homologada disponível</strong>
+        <p style="margin-top: 0.5rem; color: var(--vis-c-text-dark-2); font-size: 0.85rem;">
+          Para realizar cálculos de sobreposição territorial, cadastre e homologue as bases oficiais no sistema ou importe uma prévia GeoJSON acima.
+        </p>
+      </div>
       <div v-else class="document-grid">
         <div class="form-field car-field">
           <label for="car-document">Imóveis rurais (CAR)</label>
@@ -553,7 +569,7 @@ onBeforeUnmount(() => {
             <input
               type="checkbox"
               :checked="selectedRestrictionIds.includes(document.id)"
-              :disabled="!!selectedCar && document.year !== selectedCar.year"
+              :disabled="!!selectedCar && !!document.year && document.year !== selectedCar.year"
               @change="toggleRestriction(document.id)"
             />
             <span class="document-option-copy">

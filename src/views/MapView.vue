@@ -126,12 +126,13 @@ const createTerritoryLayer = (data: GeoJSON.GeoJsonObject) =>
   L.geoJSON(data, {
     style: territoryStyle,
     onEachFeature: (feature, layer) => {
-      const properties = feature.properties as TerritoryProperties | null
+      const properties = feature.properties as any
       if (!properties) return
 
       const title =
         properties.codigoImovel || properties.name || `Feição #${properties.id || ''}`
       const details = [
+        properties.areaHectares ? `Área: ${properties.areaHectares} ha` : null,
         properties.category ? properties.category : null,
         properties.anoSafra ? `Safra: ${properties.anoSafra}` : null,
         properties.processoId ? `Processo: #${properties.processoId}` : null,
@@ -139,13 +140,42 @@ const createTerritoryLayer = (data: GeoJSON.GeoJsonObject) =>
         properties.source ? `<small>${properties.source}</small>` : null,
       ].filter(Boolean)
 
+      layer.bindTooltip(title)
       layer.bindPopup(
-        `<strong>${title}</strong>${details.length ? '<br />' + details.join('<br />') : ''}`,
+        `<div style="font-size: 0.85rem; line-height: 1.4;">
+          <strong style="color: #f26522; font-size: 0.95rem;">${title}</strong><br />
+          ${details.join('<br />')}
+          ${properties.processoId ? `<div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px;">
+            <a href="/processo/${properties.processoId}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
+          </div>` : ''}
+        </div>`,
       )
     },
   })
 
+const limparFiltroProcesso = async () => {
+  router.push({ path: '/mapa' })
+  searchTerm.value = ''
+  try {
+    const fetchedTerritories = await mapService.getTerritories()
+    if (territories && map) {
+      map.removeLayer(territories)
+      territories = createTerritoryLayer(fetchedTerritories).addTo(map)
+      if (territories.getLayers().length > 0 && territories.getBounds().isValid()) {
+        map.fitBounds(territories.getBounds().pad(0.12), { maxZoom: 14 })
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao restaurar territórios:', err)
+  }
+}
+
 onMounted(async () => {
+  const scrollContainer = document.querySelector('.content-scroll-container')
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0
+  }
+
   if (!mapElement.value) return
 
   map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
@@ -163,8 +193,22 @@ onMounted(async () => {
     maxZoom: 19,
   })
 
-  const fetchedTerritories = await mapService.getTerritories()
+  const requestedProcessoId = route.query?.processoId ? Number(route.query.processoId) : undefined
+  const requestedBase = String(route.query?.base || '').trim()
+  const requestedYear = String(route.query?.year || '').trim()
+
+  const initialFilters: any = {}
+  if (requestedProcessoId) initialFilters.processoId = requestedProcessoId
+  if (requestedBase) initialFilters.busca = requestedBase
+  if (requestedYear) initialFilters.anoSafra = requestedYear
+
+  const fetchedTerritories = await mapService.getTerritories(initialFilters)
   territories = createTerritoryLayer(fetchedTerritories).addTo(map)
+
+  if (territories.getLayers().length > 0 && territories.getBounds().isValid()) {
+    map.fitBounds(territories.getBounds().pad(0.12), { maxZoom: 14 })
+  }
+
   L.control
     .layers(
       {
@@ -178,18 +222,28 @@ onMounted(async () => {
     )
     .addTo(map)
 
-  locations.value = await mapService.getPublishedLocations()
+  const rawLocations = await mapService.getPublishedLocations()
+  locations.value = Array.isArray(rawLocations)
+    ? rawLocations.map((loc: any) => ({
+        id: String(loc.id ?? ''),
+        name: String(loc.name ?? loc.nome ?? `Base #${loc.id}`),
+        type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
+        latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
+        longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
+        status: (loc.status ?? 'Concluída') as any,
+      }))
+    : []
 
   markers = L.layerGroup().addTo(map)
   locations.value.forEach((location) => {
-    const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
-      .bindTooltip(location.name)
-      .on('click', () => selectLocation(location))
-    marker.addTo(markers as L.LayerGroup)
+    if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
+      const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
+        .bindTooltip(location.name)
+        .on('click', () => selectLocation(location))
+      marker.addTo(markers as L.LayerGroup)
+    }
   })
 
-  const requestedBase = String(route.query?.base || '').trim()
-  const requestedYear = String(route.query?.year || '').trim()
   if (requestedBase || requestedYear) {
     if (requestedBase) searchTerm.value = requestedBase
     const match = locations.value.find(
@@ -201,20 +255,6 @@ onMounted(async () => {
       selectLocation(match)
     } else if (locations.value[0]) {
       selectLocation(locations.value[0])
-    }
-
-    // US09: Atualiza camadas do mapa com os filtros vindos do catálogo de bases
-    try {
-      const filteredTerritories = await mapService.getTerritories({
-        busca: requestedBase || undefined,
-        anoSafra: requestedYear || undefined,
-      })
-      if (territories && map) {
-        map.removeLayer(territories)
-        territories = createTerritoryLayer(filteredTerritories as any).addTo(map)
-      }
-    } catch (err) {
-      console.warn('Erro ao carregar delimitações da base solicitada:', err)
     }
   }
 
@@ -247,6 +287,11 @@ onBeforeUnmount(() => {
         <span aria-hidden="true">⌖</span>
         Minha localização
       </button>
+    </div>
+
+    <div v-if="route.query?.processoId" class="filter-badge-banner" role="status">
+      <span>Exibindo delimitações da <strong>Carga #{{ route.query.processoId }}</strong></span>
+      <button type="button" class="btn-clear-filter" @click="limparFiltroProcesso">Ver todas as cargas</button>
     </div>
 
     <section class="map-toolbar" aria-label="Ferramentas do mapa">
@@ -282,6 +327,9 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="location-list">
+          <div v-if="locations.length === 0" class="empty-locations-state" style="padding: 1.5rem 0.5rem; text-align: center; color: var(--vis-c-text-dark-2); font-size: 0.82rem;">
+            Nenhuma base oficial cadastrada ainda.
+          </div>
           <button
             v-for="location in locations"
             :key="location.id"
@@ -353,6 +401,35 @@ h2 {
 .page-description {
   margin-top: 4px;
   color: var(--color-text);
+}
+
+.filter-badge-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  background: rgba(242, 101, 34, 0.12);
+  border: 1px solid rgba(242, 101, 34, 0.35);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: var(--color-heading);
+}
+
+.btn-clear-filter {
+  background: transparent;
+  border: 1px solid var(--vis-brand-orange, #f26522);
+  color: var(--vis-brand-orange, #f26522);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear-filter:hover {
+  background: var(--vis-brand-orange, #f26522);
+  color: #fff;
 }
 
 .locate-button {

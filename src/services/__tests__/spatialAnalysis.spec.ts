@@ -51,18 +51,22 @@ describe('Spatial Analysis Service', () => {
     ])
 
     const docs = await spatialAnalysisService.listDocuments()
-    expect(docs.length).toBe(2)
+    expect(docs.length).toBe(5)
     expect(docs[0].id).toBe('1')
     expect(docs[0].category).toBe('CAR')
     expect(docs[1].id).toBe('2')
     expect(docs[1].category).toBe('APP')
+    expect(docs.some((d) => d.id === 'ref-app')).toBe(true)
+    expect(docs.some((d) => d.id === 'ref-reserva-legal')).toBe(true)
+    expect(docs.some((d) => d.id === 'ref-alerta')).toBe(true)
   })
 
-  it('deve retornar lista vazia quando o catálogo for vazio e mockactive for false', async () => {
+  it('deve retornar as camadas de referência quando o catálogo for vazio e mockactive for false', async () => {
     vi.mocked(catalogoService.listarBases).mockResolvedValueOnce([])
 
     const docs = await spatialAnalysisService.listDocuments()
-    expect(docs).toEqual([])
+    expect(docs.length).toBe(3)
+    expect(docs.map((d) => d.id)).toEqual(['ref-app', 'ref-reserva-legal', 'ref-alerta'])
   })
 
   it('deve registrar e recuperar documento local pré-carregado na sessão', async () => {

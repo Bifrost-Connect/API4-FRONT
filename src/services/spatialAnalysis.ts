@@ -43,19 +43,54 @@ export interface SpatialAnalysisResponse {
   source?: 'API' | 'DEMONSTRACAO'
 }
 
+export const CAMADAS_REFERENCIA_OFICIAIS: SpatialAnalysisDocument[] = [
+  {
+    id: 'ref-app',
+    name: 'Área de Preservação Permanente (APP)',
+    category: 'APP',
+    source: 'PostGIS / Novo Código Florestal',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+  {
+    id: 'ref-reserva-legal',
+    name: 'Reserva Legal (RL)',
+    category: 'RESERVA_LEGAL',
+    source: 'PostGIS / SICAR',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+  {
+    id: 'ref-alerta',
+    name: 'Alertas de Desmatamento e Embargos',
+    category: 'ALERTA',
+    source: 'PostGIS / DETER & IBAMA',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+]
+
 const findMockDocument = (id: string) => mockSpatialDocuments.find((document) => document.id === id)
 
 export const spatialAnalysisService = {
   /**
    * Lista documentos/camadas disponíveis para análise territorial.
-   * Integra com o Catálogo de Bases (/catalogo/bases) da US09 e mescla com
-   * documentos demonstrativos locais para garantir opções completas de cruzamento.
+   * Integra com o Catálogo de Bases (/catalogo/bases) da US09 e inclui
+   * as camadas de referência oficiais do PostGIS (APP, Reserva Legal e Alertas).
    */
   async listDocuments(): Promise<SpatialAnalysisDocument[]> {
     try {
       const bases = await catalogoService.listarBases()
+      let catalogDocs: SpatialAnalysisDocument[] = []
+
       if (bases && bases.length > 0) {
-        const catalogDocs: SpatialAnalysisDocument[] = bases.map((b) => {
+        catalogDocs = bases.map((b) => {
           const nomeConjunto = (b.conjunto || '').toUpperCase()
           const cat: SpatialLayerCategory = nomeConjunto.includes('ALERTA')
             ? 'ALERTA'
@@ -78,16 +113,21 @@ export const spatialAnalysisService = {
             featureCount: b.total_feicoes || 0,
           }
         })
-
-        // Garante que haja opções padrão do mock apenas se mockactive for true
-        if (mockactive) {
-          const hasCar = catalogDocs.some((d) => d.category === 'CAR')
-          const mockCars = hasCar ? [] : mockSpatialDocuments.filter((d) => d.category === 'CAR')
-          return [...catalogDocs, ...mockCars, ...mockSpatialDocuments.filter((d) => d.category !== 'CAR')]
-        }
-        return catalogDocs
       }
-      return mockactive ? mockSpatialDocuments : []
+
+      // Garante que haja opções padrão do mock apenas se mockactive for true
+      if (mockactive) {
+        const hasCar = catalogDocs.some((d) => d.category === 'CAR')
+        const mockCars = hasCar ? [] : mockSpatialDocuments.filter((d) => d.category === 'CAR')
+        return [...catalogDocs, ...mockCars, ...mockSpatialDocuments.filter((d) => d.category !== 'CAR')]
+      }
+
+      // Inclui sempre as camadas de referência oficiais do PostGIS (APP, RESERVA_LEGAL, ALERTA)
+      const referenciasPostGIS = CAMADAS_REFERENCIA_OFICIAIS.filter(
+        (ref) => !catalogDocs.some((cd) => cd.id === ref.id),
+      )
+
+      return [...catalogDocs, ...referenciasPostGIS]
     } catch (error: any) {
       if (!mockactive) throw error
       console.warn('Usando bases demonstrativas para análise espacial:', error)
@@ -112,7 +152,10 @@ export const spatialAnalysisService = {
     if (/^\d+$/.test(documentId)) {
       try {
         const response = await api.get('/mapa/camadas', {
-          params: bbox ? { bbox } : undefined,
+          params: {
+            processoId: Number(documentId),
+            bbox: bbox || undefined,
+          },
         })
         if (response.data && response.data.type === 'FeatureCollection' && response.data.features?.length > 0) {
           return response.data
@@ -120,6 +163,16 @@ export const spatialAnalysisService = {
       } catch {
         // Fallback silencioso
       }
+    }
+
+    // Se for camada de referência oficial (APP, RESERVA_LEGAL, ALERTA)
+    if (documentId.startsWith('ref-')) {
+      const mockDoc = mockSpatialDocuments.find((d) => {
+        if (documentId.includes('app')) return d.category === 'APP'
+        if (documentId.includes('reserva') || documentId.includes('rl')) return d.category === 'RESERVA_LEGAL'
+        return d.category === 'ALERTA'
+      })
+      if (mockDoc?.geojson) return mockDoc.geojson
     }
 
     // Se não encontrou no banco e mockactive for false, retorna vazio
@@ -171,10 +224,33 @@ export const spatialAnalysisService = {
         if (/^\d+$/.test(id)) processoIds.push(Number(id))
       })
 
+      // Mapeia restrições selecionadas para categorias correspondentes ['APP', 'RESERVA_LEGAL', 'ALERTA']
+      const categoriasSet = new Set<string>()
+      request.restrictionDocumentIds.forEach((id) => {
+        const lower = id.toLowerCase()
+        if (lower.includes('app')) {
+          categoriasSet.add('APP')
+        } else if (lower.includes('reserva') || lower.includes('rl')) {
+          categoriasSet.add('RESERVA_LEGAL')
+        } else if (lower.includes('alerta') || lower.includes('alert')) {
+          categoriasSet.add('ALERTA')
+        } else {
+          const doc = mockSpatialDocuments.find((d) => d.id === id)
+          if (doc && (doc.category === 'APP' || doc.category === 'RESERVA_LEGAL' || doc.category === 'ALERTA')) {
+            categoriasSet.add(doc.category)
+          }
+        }
+      })
+
+      const categorias =
+        categoriasSet.size > 0
+          ? Array.from(categoriasSet).sort()
+          : ['ALERTA', 'APP', 'RESERVA_LEGAL']
+
       const payload = {
         processoIds: processoIds.length > 0 ? processoIds : undefined,
         anoSafra: request.safra || undefined,
-        categorias: ['ALERTA', 'APP', 'RESERVA_LEGAL'],
+        categorias,
       }
 
       const response = await api.post('/analise/cruzamento', payload)
