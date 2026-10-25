@@ -195,9 +195,10 @@ const confirmReprocess = async () => {
   const fileToUpload = selectedFile.value
   showReprocessModal.value = false
   props.details.status = 'Em andamento'
+  props.details.stage = 'Validação'
   props.details.pauseReason = `Reprocessamento iniciado com o arquivo ${fileToUpload.name}.`
   showSuccessToast(
-    `Arquivo "${fileToUpload.name}" vinculado à carga ${props.details.id} e enviado para reprocessamento.`,
+    `Arquivo "${fileToUpload.name}" enviado com sucesso! Recarregando esteira de processamento...`,
   )
   selectedFile.value = null
   reprocessNote.value = ''
@@ -211,10 +212,19 @@ const confirmReprocess = async () => {
     }
     try {
       await uploadService.reprocessarCarga(numericId, fileToUpload)
-      await processService.iniciarProcessamento(numericId)
       emit('reload')
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.reload()
+        }
+      }, 700)
     } catch (e: any) {
       console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.reload()
+        }
+      }, 700)
     }
   }
 }

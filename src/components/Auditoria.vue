@@ -384,12 +384,13 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   flex-direction: column;
   padding: 20px 16px;
-  border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   height: 100%;
   min-height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .panel-header {
@@ -448,23 +449,26 @@ const formatDateTime = (dt?: string) => {
 
 .carga-summary-card {
   margin-top: 14px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--color-surface-soft, #f8fafc);
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 6px;
-  display: grid;
-  gap: 6px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .summary-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  gap: 8px;
 }
 
 .summary-line .label {
   color: var(--color-text-muted, #64748b);
+  flex-shrink: 0;
 }
 
 .summary-line .value {
@@ -476,7 +480,7 @@ const formatDateTime = (dt?: string) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 170px;
+  max-width: 220px;
 }
 
 .audit-tabs {
@@ -494,9 +498,9 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 6px 2px;
-  font-size: 0.68rem;
+  gap: 4px;
+  padding: 8px 2px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-text-muted, #64748b);
   background: transparent;
@@ -504,6 +508,10 @@ const formatDateTime = (dt?: string) => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -523,10 +531,10 @@ const formatDateTime = (dt?: string) => {
 }
 
 .tab-intro {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   color: var(--color-text-muted, #64748b);
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .version-cards-list {
@@ -535,12 +543,14 @@ const formatDateTime = (dt?: string) => {
 }
 
 .version-card {
-  padding: 12px;
+  padding: 12px 14px;
   background: var(--color-surface-soft, #f8fafc);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .version-card:hover {
@@ -557,14 +567,17 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
 .attempt-badge {
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .badge-primary {
@@ -585,7 +598,8 @@ const formatDateTime = (dt?: string) => {
 .file-name-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .file-icon {
@@ -594,19 +608,23 @@ const formatDateTime = (dt?: string) => {
 }
 
 .file-name {
-  font-size: 0.84rem;
+  font-size: 0.85rem;
+  font-weight: 600;
   color: var(--color-heading);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .hash-box {
   background: var(--color-surface, #ffffff);
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 4px;
-  padding: 6px 8px;
-  display: grid;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
@@ -615,22 +633,25 @@ const formatDateTime = (dt?: string) => {
   text-transform: uppercase;
   font-weight: 700;
   color: var(--color-text-muted, #64748b);
+  letter-spacing: 0.05em;
 }
 
 .hash-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
 }
 
 .hash-code {
-  font-family: monospace;
-  font-size: 0.7rem;
-  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--color-text, #0f172a);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-icon {
@@ -638,13 +659,16 @@ const formatDateTime = (dt?: string) => {
   border: none;
   cursor: pointer;
   color: var(--color-text-muted, #64748b);
-  padding: 2px;
+  padding: 4px;
+  border-radius: 4px;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .btn-icon:hover {
   color: var(--color-heading);
+  background: var(--color-surface-soft, #f1f5f9);
 }
 
 .icon-success {
@@ -655,8 +679,12 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.72rem;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.74rem;
   color: var(--color-text-muted, #64748b);
+  padding-top: 6px;
+  border-top: 1px dashed var(--color-border, #e2e8f0);
 }
 
 .btn-download {

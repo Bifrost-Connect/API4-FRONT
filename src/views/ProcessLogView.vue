@@ -339,6 +339,11 @@ const handleAbrirCancelamentoAuditoria = () => {
   })
 }
 
+const handleQuarantineReload = () => {
+  isQuarantineMode.value = false
+  loadData(processId.value)
+}
+
 const goBack = () => {
   if (window.history.length > 1) {
     router.back()
@@ -451,7 +456,7 @@ const currentComponent = computed(() => {
                   ref="quarentenaStageRef"
                   :details="details"
                   :read-only="isReadOnly"
-                  @reload="loadData(processId)"
+                  @reload="handleQuarantineReload"
                 />
               </div>
             </div>
@@ -517,23 +522,29 @@ const currentComponent = computed(() => {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .audit-side-wrapper {
-  width: clamp(300px, 28vw, 380px);
+  width: clamp(380px, 32vw, 480px);
+  min-width: 350px;
   flex-shrink: 0;
   background: var(--color-surface);
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.04);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.05);
+  border-left: 1px solid var(--color-border);
   animation: slideIn 0.25s ease;
+  z-index: 10;
 }
 
-.audit-side-wrapper > :deep(.locations-panel) {
+.audit-side-wrapper > :deep(.audit-drawer-panel) {
   flex: 1;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @keyframes slideIn {

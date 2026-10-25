@@ -146,23 +146,27 @@ export const auditoriaService = {
         const isLatest = idx === totalArquivos - 1
         const isInitial = idx === 0
         const tag = isLatest
-          ? `v${tentativaNum}.0 (${isInitial ? 'Original' : 'Reprocessado - Atual'})`
-          : `v${tentativaNum}.0 (${isInitial ? 'Original Inicial' : 'Reprocessado'})`
+          ? `v${tentativaNum}.0 (Atual)`
+          : `v${tentativaNum}.0 (${isInitial ? 'Inicial' : 'Anterior'})`
 
         const note = isInitial
           ? `Arquivo bruto original submetido em ${arq.dataUpload ? new Date(arq.dataUpload).toLocaleString('pt-BR') : '—'}.`
           : `Novo arquivo submetido em reprocessamento pós-quarentena por ${arq.usuarioNome || 'Operador'}.`
+
+        const versionStatus = isLatest
+          ? (linhagem.statusAtual === 'CONCLUIDA'
+            ? 'Concluída'
+            : linhagem.statusAtual === 'FALHOU'
+              ? 'Falhou'
+              : 'Em andamento')
+          : 'Substituído'
 
         return {
           id: String(linhagem.processoId || processId),
           dataset: currentDetails?.dataset || linhagem.nomeArquivoOriginal || 'Conjunto Territorial',
           layerName: currentDetails?.layerName || arq.nomeArquivo || `Carga ${processId}`,
           stage: (linhagem.etapaAtual as any) || currentDetails?.stage || 'Ingestão',
-          status: (linhagem.statusAtual === 'CONCLUIDA'
-            ? 'Concluída'
-            : linhagem.statusAtual === 'FALHOU'
-              ? 'Falhou'
-              : 'Em andamento') as any,
+          status: versionStatus as any,
           dateTime: arq.dataUpload ? new Date(arq.dataUpload).toLocaleString('pt-BR') : currentDetails?.dateTime || '',
           source: currentDetails?.source || 'Órgão Oficial',
           year: currentDetails?.year || '2026',
