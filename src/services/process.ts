@@ -224,33 +224,37 @@ export const processService = {
       parecer?: string
     },
   ): Promise<any> {
-    const decisaoObj = {
-      id: Date.now(),
-      processoId: id,
-      gestorId: payload.gestorId,
-      gestorNome: 'Gestor API4',
-      etapa: payload.etapa,
-      decisao: payload.decisao,
-      parecer: payload.parecer,
-      dataDecisao: new Date().toISOString(),
-    }
-    try {
-      const raw = localStorage.getItem(`api4_decisoes_${id}`)
-      const list = raw ? JSON.parse(raw) : []
-      list.unshift(decisaoObj)
-      localStorage.setItem(`api4_decisoes_${id}`, JSON.stringify(list))
-    } catch {
-      // ignore storage error
+    const salvarLocal = () => {
+      const decisaoObj = {
+        id: Date.now(),
+        processoId: id,
+        gestorId: payload.gestorId,
+        gestorNome: 'Gestor API4',
+        etapa: payload.etapa,
+        decisao: payload.decisao,
+        parecer: payload.parecer,
+        dataDecisao: new Date().toISOString(),
+      }
+      try {
+        const raw = localStorage.getItem(`api4_decisoes_${id}`)
+        const list = raw ? JSON.parse(raw) : []
+        list.unshift(decisaoObj)
+        localStorage.setItem(`api4_decisoes_${id}`, JSON.stringify(list))
+      } catch {
+        // ignore storage error
+      }
     }
 
     try {
       const cleanId = encodeURIComponent(String(id))
       const res = await api.post(`/carga/${cleanId}/decisao-gestor`, payload)
+      salvarLocal()
       return res.data
     } catch (err: any) {
       if (!mockactive) throw err.response?.data || err
       console.warn('API indisponível, simulando decisão do gestor')
       await delay(400)
+      salvarLocal()
       return { sucesso: true, processoId: id, ...payload }
     }
   },

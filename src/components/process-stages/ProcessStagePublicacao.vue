@@ -104,7 +104,7 @@ const isError = computed(
   () =>
     !props.readOnly &&
     (props.details.status === 'Falhou' ||
-      props.details.status === 'Aguardando validação' ||
+      props.details.status === 'Em quarentena' ||
       !!props.details.pauseReason),
 )
 

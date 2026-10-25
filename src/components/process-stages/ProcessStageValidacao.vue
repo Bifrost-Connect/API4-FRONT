@@ -14,19 +14,18 @@ const emit = defineEmits<{
   (e: 'reload'): void
 }>()
 
-/** Erro ou quarentena na validação */
+/** Erro ou quarentena na validação ocorre quando o status é de erro/quarentena, há registros de quarentena ou checks falharam */
 const isQuarantine = computed(
   () =>
     props.details.status === 'Em quarentena' ||
-    props.details.status === 'Aguardando validação' ||
-    (props.details.quarantineRecords?.length ?? 0) > 0,
+    (props.details.quarantineRecords?.length ?? 0) > 0 ||
+    checks.value.some((c) => c.status === 'error'),
 )
 
 const isError = computed(
   () =>
     props.details.status === 'Falhou' ||
-    isQuarantine.value ||
-    checks.value.some((c) => c.status === 'error'),
+    isQuarantine.value,
 )
 
 const isUnderCorrection = computed(
@@ -38,10 +37,10 @@ const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {
   if (isUnderCorrection.value) return { label: 'Em Correção (Editor Alocado)', cls: 'warning' }
-  if (isQuarantine.value) return { label: 'Em Quarentena', cls: 'error' }
-  if (props.details.status === 'Falhou') return { label: 'Falhou', cls: 'error' }
   const errorCount = checks.value.filter((c) => c.status === 'error').length
   if (errorCount > 0) return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
+  if (props.details.status === 'Falhou') return { label: 'Falhou', cls: 'error' }
+  if (isQuarantine.value) return { label: 'Em Quarentena', cls: 'error' }
   if (props.details.stage === 'Validação' && props.details.status === 'Em andamento') {
     return { label: 'Em Validação', cls: 'warning' }
   }

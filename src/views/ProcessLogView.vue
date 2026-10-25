@@ -156,7 +156,10 @@ const warningStepIndex = computed(() => {
   if (!details.value) return undefined
   const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
   const isErrorStatus =
-    details.value.status === 'Falhou' || details.value.status === 'Aguardando validação'
+    details.value.status === 'Falhou' ||
+    details.value.status === 'Em quarentena' ||
+    (details.value.quarantineRecords?.length ?? 0) > 0 ||
+    (details.value.validationChecks?.some((c) => c.status === 'error') ?? false)
   if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
     return processSteps.indexOf(details.value.stage) + 1
   }

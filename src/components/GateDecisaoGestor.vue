@@ -130,24 +130,31 @@ const formatarData = (dataStr?: string) => {
   }
 }
 
+const formatarNomeGestor = (nome?: string) => {
+  if (!nome) return ''
+  const trimmed = nome.trim()
+  return trimmed.toLowerCase().startsWith('gestor') ? trimmed : `Gestor ${trimmed}`
+}
+
 const handleAprovar = async () => {
   if (isSubmitting.value) return
   isSubmitting.value = true
   erroMsg.value = null
 
   try {
+    const gestorLabel = formatarNomeGestor(currentUser.value.name)
     const res = await processService.registrarDecisaoGestor(props.processoId, {
       gestorId: currentUser.value.id || 1,
       etapa: props.etapa,
       decisao: 'APROVADO',
-      parecer: `Etapa de ${etapaTitulo.value} aprovada pelo Gestor ${currentUser.value.name}. Liberado para ${proximaEtapaNome.value}.`,
+      parecer: `Etapa de ${etapaTitulo.value} aprovada pelo ${gestorLabel}. Liberado para ${proximaEtapaNome.value}.`,
     })
 
     decisaoTomada.value = 'APROVADO'
     decisaoHistorico.value = {
       decisao: 'APROVADO',
       gestorNome: currentUser.value.name,
-      parecer: `Aprovado pelo Gestor`,
+      parecer: `Aprovado pelo ${gestorLabel}`,
       dataDecisao: new Date().toISOString(),
     }
     sucessoMsg.value = `Etapa ${etapaTitulo.value} aprovada com sucesso! O processo avançou para ${proximaEtapaNome.value}.`
@@ -256,7 +263,7 @@ const handleConfirmarRejeicao = async () => {
           <div>
             <h4>
               Etapa de {{ etapaTitulo }} {{ decisaoHistorico.decisao === 'APROVADO' ? 'aprovada' : 'rejeitada' }}
-              <template v-if="decisaoHistorico.gestorNome"> pelo Gestor {{ decisaoHistorico.gestorNome }}</template>
+              <template v-if="decisaoHistorico.gestorNome"> pelo {{ formatarNomeGestor(decisaoHistorico.gestorNome) }}</template>
               <template v-if="decisaoHistorico.dataDecisao"> em {{ formatarData(decisaoHistorico.dataDecisao) }}</template>.
             </h4>
             <p v-if="decisaoHistorico.parecer" class="gate-desc">

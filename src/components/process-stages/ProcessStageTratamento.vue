@@ -15,11 +15,12 @@ const emit = defineEmits<{
   (e: 'reload'): void
 }>()
 
-/** Erro no tratamento ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
+/** Erro no tratamento ocorre quando o status é Falhou/Em quarentena, há registros de quarentena ou algum check falhou */
 const isError = computed(
   () =>
     props.details.status === 'Falhou' ||
-    props.details.status === 'Aguardando validação' ||
+    props.details.status === 'Em quarentena' ||
+    (props.details.quarantineRecords?.length ?? 0) > 0 ||
     checks.value.some((c) => c.status === 'error'),
 )
 
