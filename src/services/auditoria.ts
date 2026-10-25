@@ -1,14 +1,32 @@
-import { mockactive } from './api'
+/**
+ * Serviço de Auditoria e Linhagem de Versões de Processos.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as informações de versões e histórico são obtidas via API REST (/indicadores/{id}/linhagem, /processos).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ */
 import { dashboardService, type ProcessLog } from './dashboard'
 import { processService, type ProcessLogDetails } from './process'
-import {
-  mockAuditCargas,
-  type AuditProcessCarga,
-  type ProcessVersion,
-} from './mocks/auditoria.mock'
-import { validationChecksOk, treatmentChecksOk, analyticsDataOk } from './mocks/process.mock'
 
-export type { AuditProcessCarga, ProcessVersion }
+export interface ProcessVersion extends ProcessLogDetails {
+  versionTag: string
+  versionNumber: number
+  changeNote: string
+  isLatest?: boolean
+}
+
+export interface AuditProcessCarga {
+  id: string
+  dataset: string
+  layerName: string
+  source: string
+  lastUpdate: string
+  totalVersions: number
+  currentStatus: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou'
+  currentStage: string
+  versions: ProcessVersion[]
+}
 
 /**
  * Converte data "DD/MM/YYYY HH:mm" ou "DD/MM/YYYY" ou ISO para timestamp numérico para ordenação
@@ -108,9 +126,9 @@ function mapProcessLogToVersion(
         logs: {
           Ingestão: [`[${item.dateTime || '—'}] Registro da carga ${item.id}.`],
         },
-        validationChecks: mockactive ? validationChecksOk : [],
-        treatmentChecks: mockactive ? treatmentChecksOk(item.epsg || 'EPSG:4674') : [],
-        analyticsData: mockactive ? analyticsDataOk : [],
+        validationChecks: [],
+        treatmentChecks: [],
+        analyticsData: [],
       }
 
   return {
@@ -131,29 +149,14 @@ function mapProcessLogToVersion(
 export const auditoriaService = {
   /**
    * Busca ou sintetiza as versões de auditoria para um processo específico.
-   * Adaptação no front-end: agrupa processos do mesmo dataset retornados por GET /processos.
+   * Agrupa processos do mesmo dataset retornados por GET /processos ou consulta
+   * a linhagem real do backend via /indicadores/{id}/linhagem.
    */
   async getVersionsForProcess(
     processId: string,
     currentDetails?: ProcessLogDetails | null,
   ): Promise<{ carga: AuditProcessCarga; versions: ProcessVersion[] }> {
-    // 1. Só verifica mock se mockactive for true
-    if (mockactive) {
-      const foundMockCarga = mockAuditCargas.find(
-        (c) =>
-          c.id.toLowerCase() === processId.toLowerCase() ||
-          c.versions.some((v) => v.id.toLowerCase() === processId.toLowerCase()),
-      )
-
-      if (foundMockCarga) {
-        return {
-          carga: foundMockCarga,
-          versions: foundMockCarga.versions,
-        }
-      }
-    }
-
-    // 2. Busca linhagem real do backend se for processo com ID numérico
+    // 1. Busca linhagem real do backend se for processo com ID numérico
     if (/^\d+$/.test(processId)) {
       try {
         const trace = await processService.getTraceability(processId)

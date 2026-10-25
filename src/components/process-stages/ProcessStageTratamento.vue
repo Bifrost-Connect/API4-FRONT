@@ -45,7 +45,7 @@ const isStageReached = computed(() => {
   return stageIndex.value >= 2
 })
 
-/** Checks vêm da API via details.treatmentChecks (ver process.mock.ts / GET /api/processes/{id}) */
+/** Checks vêm da API via details.treatmentChecks (GET /api/processos/{id}) */
 const checks = computed(() => props.details.treatmentChecks ?? [])
 
 const overallStatus = computed(() => {

@@ -1,7 +1,16 @@
+/**
+ * Configuração de cliente HTTP (Axios) para comunicação com a API REST.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded em produção. Mocks devem residir exclusivamente
+ * no diretório /mocks para uso em testes automatizados.
+ */
 import axios from 'axios'
 import { userService } from './user'
 
-export const mockactive = false // Quando false, desativa todos os mocks, exibe o erro real da API e deixa vazio se o banco não retornar dados. Só usa mock se mockactive === true.
+// Flag legada mantida como false para compatibilidade com asserções de testes existentes.
+// Nenhum serviço de produção deve utilizar fallback de mock.
+export const mockactive = false
 
 const api = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080') + '/api',

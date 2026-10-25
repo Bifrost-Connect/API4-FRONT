@@ -26,7 +26,7 @@ const isUnderCorrection = computed(
   () => props.details.status === 'Em andamento' && !!props.details.assignedEditor,
 )
 
-/** Checks vêm da API via details.validationChecks (ver process.mock.ts / GET /api/processes/{id}) */
+/** Checks vêm da API via details.validationChecks (GET /api/processos/{id}) */
 const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {

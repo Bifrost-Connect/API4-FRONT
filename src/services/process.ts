@@ -1,17 +1,72 @@
-import api, { mockactive } from './api'
-import {
-  mockProcessDetails,
-  validationChecksOk,
-  treatmentChecksOk,
-  analyticsDataOk,
-  type ProcessLogDetails as MockProcessLogDetails,
-  type ProcessStageCheck as MockProcessStageCheck,
-  type ProcessAnalyticsRow as MockProcessAnalyticsRow,
-} from './mocks/process.mock'
+/**
+ * Serviço de Gerenciamento e Detalhes de Processos de Carga.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as requisições utilizam exclusivamente a API real do backend (/processos/*, /calculos/*).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ */
+import api from './api'
+import { mapStage, mapStatus } from './dashboard'
 
-export type ProcessLogDetails = MockProcessLogDetails
-export type ProcessStageCheck = MockProcessStageCheck
-export type ProcessAnalyticsRow = MockProcessAnalyticsRow
+/** Item de checklist retornado pela API para as etapas de Validação e Tratamento */
+export interface ProcessStageCheck {
+  id: string
+  label: string
+  description: string
+  status: 'success' | 'error' | 'pending'
+  detail: string
+}
+
+/** Linha de resultado analítico retornada pela API para a etapa de Publicação */
+export interface ProcessAnalyticsRow {
+  param: string
+  result: string
+  reference: string
+  status: 'success' | 'error' | 'warning'
+  statusLabel: string
+}
+
+export interface QuarantineRecord {
+  recordId: string
+  motivo: string
+  etapaOrigem: string
+  execucaoId: string
+  dataRejeicao: string
+  campo: string
+  valorEncontrado: string
+  valorEsperado: string
+}
+
+export interface ProcessLogDetails {
+  id: string
+  dataSource?: 'API' | 'DEMONSTRACAO'
+  dataset: string
+  stage: string
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou' | 'Fechado'
+  dateTime: string
+  layerName: string
+  source: string
+  year: string
+  epsg: string
+  epsgDetected?: string
+  description: string
+  competencia?: string
+  formato?: string
+  classificacaoAcesso?: string
+  coberturaEspacial?: string
+  coberturaTemporalInicio?: string
+  coberturaTemporalFim?: string
+  integrityHash?: string
+  originalFileUrl: string
+  mapCoordinates: [number, number][]
+  logs: Record<string, string[]>
+  pauseReason?: string
+  assignedEditor?: string
+  validationChecks?: ProcessStageCheck[]
+  treatmentChecks?: ProcessStageCheck[]
+  analyticsData?: ProcessAnalyticsRow[]
+}
 
 export interface ProcessTraceability {
   indicadorId: number
@@ -24,10 +79,6 @@ export interface ProcessTraceability {
 }
 
 export type IndicatorExportFormat = 'geojson' | 'csv'
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-import { mapStage, mapStatus } from './dashboard'
 
 export const processService = {
   /**
@@ -110,49 +161,19 @@ export const processService = {
                   },
                 ]
               } else {
-                res.data.analyticsData = mockactive ? analyticsDataOk : []
+                res.data.analyticsData = []
               }
             } catch {
-              res.data.analyticsData = mockactive ? analyticsDataOk : []
+              res.data.analyticsData = []
             }
           } else {
-            res.data.analyticsData = mockactive ? analyticsDataOk : []
+            res.data.analyticsData = []
           }
         }
       }
       return res.data
     } catch (err) {
-      if (!mockactive) throw err
-      console.warn('API indisponível, usando mock para detalhes do processo')
-      await delay(600)
-      const details = mockProcessDetails[id]
-      if (!details) {
-        return {
-          id,
-          dataSource: 'DEMONSTRACAO',
-          dataset: 'Conjunto Desconhecido',
-          stage: 'Ingestão',
-          status: 'Em andamento',
-          dateTime: new Date().toLocaleDateString('pt-BR'),
-          layerName: `Camada ${id}`,
-          source: 'Fonte Desconhecida',
-          year: '2026',
-          epsg: 'EPSG:4674',
-          description: 'Processo não encontrado no mock. Exibindo dados padrão.',
-          originalFileUrl: '#',
-          mapCoordinates: [
-            [-15.793, -47.882],
-            [-15.793, -47.8],
-            [-15.85, -47.8],
-            [-15.85, -47.882],
-          ],
-          logs: {
-            Ingestão: [`[2026-09-07 10:00:00] Iniciando processo ${id}...`],
-          },
-        } as ProcessLogDetails
-      }
-
-      return { ...details, dataSource: 'DEMONSTRACAO' }
+      throw err
     }
   },
 

@@ -16,13 +16,11 @@ import ProcessStageValidacao from '../components/process-stages/ProcessStageVali
 import ProcessStageTratamento from '../components/process-stages/ProcessStageTratamento.vue'
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
-import { mockactive } from '@/services/api'
 import {
   auditoriaService,
   type ProcessVersion,
   type AuditProcessCarga,
 } from '@/services/auditoria'
-import { mockAuditCargas } from '@/services/mocks/auditoria.mock'
 
 interface Props {
   processId?: string
@@ -168,33 +166,7 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Só verifica mock se mockactive for true
-    if (mockactive) {
-      const foundMockCarga = mockAuditCargas.find(
-        (c) =>
-          c.id.toLowerCase() === idToLoad.toLowerCase() ||
-          c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
-      )
-
-      if (foundMockCarga) {
-        currentCarga.value = foundMockCarga
-        auditVersions.value = foundMockCarga.versions
-
-        const targetVersion =
-          foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-          foundMockCarga.versions[0]
-
-        if (targetVersion) {
-          details.value = targetVersion
-          activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-          selectedQuarantineStage.value = targetVersion.stage
-        }
-        await loadTraceability(idToLoad, false)
-        return
-      }
-    }
-
-    // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
+    // Carrega detalhes do processo via processService e sintetiza versões pela linhagem/dataset
     const loadedDetails = await processService.getProcessDetails(idToLoad)
     details.value = loadedDetails
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
@@ -277,24 +249,16 @@ const openQuarantine = () => {
 }
 
 const handleVersionChange = async (newVersion: ProcessVersion) => {
-  const isMockVersion =
-    mockactive &&
-    mockAuditCargas.some((c) => c.versions.some((v) => v.id === newVersion.id))
-
-  if (!isMockVersion) {
-    try {
-      const fullDetails = await processService.getProcessDetails(newVersion.id)
-      details.value = {
-        ...fullDetails,
-        id: newVersion.id,
-      }
-      if (!props.processId && route?.params?.id !== newVersion.id) {
-        router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
-      }
-    } catch {
-      details.value = newVersion
+  try {
+    const fullDetails = await processService.getProcessDetails(newVersion.id)
+    details.value = {
+      ...fullDetails,
+      id: newVersion.id,
     }
-  } else {
+    if (!props.processId && route?.params?.id !== newVersion.id) {
+      router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
+    }
+  } catch {
     details.value = newVersion
   }
 

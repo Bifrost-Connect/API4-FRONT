@@ -1,3 +1,11 @@
+/**
+ * @file /mocks para testes automatizados.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock deve ser hardcoded no código de produção (serviços, views ou componentes).
+ * Todos os mocks devem residir exclusivamente aqui (/mocks) para uso em testes automatizados.
+ */
+
 import type {
   ProcessLogDetails,
   ProcessStageCheck,

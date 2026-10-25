@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -302,6 +302,63 @@ const limparFiltroProcesso = async () => {
   }
 }
 
+const carregarCamadasElocais = async () => {
+  const rawLocations = await mapService.getPublishedLocations()
+  locations.value = Array.isArray(rawLocations)
+    ? rawLocations.map((loc: any) => ({
+        id: String(loc.id ?? ''),
+        name: String(loc.name ?? loc.nome ?? `Base #${loc.id}`),
+        type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
+        latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
+        longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
+        status: (loc.status ?? 'Concluída') as any,
+      }))
+    : []
+
+  const targetProcessoId = (route.query?.processoId || route.query?.id)
+    ? Number(route.query.processoId || route.query.id)
+    : undefined
+  const requestedBase = String(route.query?.base || '').trim()
+  const requestedYear = String(route.query?.year || '').trim()
+
+  const initialFilters: any = {}
+  if (targetProcessoId) {
+    initialFilters.processoId = targetProcessoId
+  } else {
+    if (requestedBase) initialFilters.busca = requestedBase
+    if (requestedYear) initialFilters.anoSafra = requestedYear
+  }
+
+  const fetchedTerritories = await mapService.getTerritories(initialFilters)
+  buildBaseLayersFromGeoJson(fetchedTerritories)
+
+  if (markers && map) {
+    markers.clearLayers()
+    locations.value.forEach((location) => {
+      if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
+        const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
+          .bindTooltip(location.name)
+          .on('click', () => selectLocation(location))
+        marker.addTo(markers as L.LayerGroup)
+      }
+    })
+  }
+
+  if (requestedBase || requestedYear) {
+    if (requestedBase) searchTerm.value = requestedBase
+    const match = locations.value.find(
+      (item) =>
+        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
+        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
+    )
+    if (match) {
+      selectLocation(match)
+    } else if (locations.value[0]) {
+      selectLocation(locations.value[0])
+    }
+  }
+}
+
 onMounted(async () => {
   const scrollContainer = document.querySelector('.content-scroll-container')
   if (scrollContainer) {
@@ -325,30 +382,6 @@ onMounted(async () => {
     maxZoom: 19,
   })
 
-  const rawLocations = await mapService.getPublishedLocations()
-  locations.value = Array.isArray(rawLocations)
-    ? rawLocations.map((loc: any) => ({
-        id: String(loc.id ?? ''),
-        name: String(loc.name ?? loc.nome ?? `Base #${loc.id}`),
-        type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
-        latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
-        longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
-        status: (loc.status ?? 'Concluída') as any,
-      }))
-    : []
-
-  const requestedProcessoId = route.query?.processoId ? Number(route.query.processoId) : undefined
-  const requestedBase = String(route.query?.base || '').trim()
-  const requestedYear = String(route.query?.year || '').trim()
-
-  const initialFilters: any = {}
-  if (requestedProcessoId) initialFilters.processoId = requestedProcessoId
-  if (requestedBase) initialFilters.busca = requestedBase
-  if (requestedYear) initialFilters.anoSafra = requestedYear
-
-  const fetchedTerritories = await mapService.getTerritories(initialFilters)
-  buildBaseLayersFromGeoJson(fetchedTerritories)
-
   L.control
     .layers(
       {
@@ -361,28 +394,8 @@ onMounted(async () => {
     .addTo(map)
 
   markers = L.layerGroup().addTo(map)
-  locations.value.forEach((location) => {
-    if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
-      const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
-        .bindTooltip(location.name)
-        .on('click', () => selectLocation(location))
-      marker.addTo(markers as L.LayerGroup)
-    }
-  })
 
-  if (requestedBase || requestedYear) {
-    if (requestedBase) searchTerm.value = requestedBase
-    const match = locations.value.find(
-      (item) =>
-        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
-        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
-    )
-    if (match) {
-      selectLocation(match)
-    } else if (locations.value[0]) {
-      selectLocation(locations.value[0])
-    }
-  }
+  await carregarCamadasElocais()
 
   map.on('click', ({ latlng }) => {
     selectedLocation.value = null
@@ -390,6 +403,15 @@ onMounted(async () => {
     mapError.value = ''
   })
 })
+
+watch(
+  () => [route.query?.processoId, route.query?.id, route.query?.base, route.query?.year],
+  async () => {
+    if (map) {
+      await carregarCamadasElocais()
+    }
+  },
+)
 
 onBeforeUnmount(() => {
   clearBaseLayers()
@@ -415,8 +437,8 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div v-if="route.query?.processoId" class="filter-badge-banner" role="status">
-      <span>Exibindo delimitações da <strong>Carga #{{ route.query.processoId }}</strong></span>
+    <div v-if="route.query?.processoId || route.query?.id" class="filter-badge-banner" role="status">
+      <span>Exibindo delimitações da <strong>Carga #{{ route.query?.processoId || route.query?.id }}</strong></span>
       <button type="button" class="btn-clear-filter" @click="limparFiltroProcesso">Ver todas as cargas</button>
     </div>
 
