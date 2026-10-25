@@ -53,7 +53,23 @@ const carregarDecisaoPrevia = async () => {
         parecer: ultimaDaEtapa.parecer,
         dataDecisao: ultimaDaEtapa.dataDecisao,
       }
-      decisaoTomada.value = ultimaDaEtapa.decisao
+      if (ultimaDaEtapa.decisao === 'REPROVADO') {
+        const statusNorm = (props.currentStatus || '').toLowerCase()
+        const isEmTrabalho =
+          statusNorm.includes('andamento') ||
+          statusNorm.includes('valida') ||
+          statusNorm.includes('pendente') ||
+          !isEtapaConcluida.value
+
+        // Se a carga recebeu novo arquivo ou está em andamento, destrava o gate para reavaliação do Gestor
+        if (isEmTrabalho && isStageMatching.value && !isEtapaConcluida.value) {
+          decisaoTomada.value = null
+        } else {
+          decisaoTomada.value = 'REPROVADO'
+        }
+      } else {
+        decisaoTomada.value = ultimaDaEtapa.decisao
+      }
     } else {
       decisaoHistorico.value = null
       decisaoTomada.value = null
@@ -70,7 +86,7 @@ onMounted(() => {
 })
 
 watch(
-  () => props.processoId,
+  [() => props.processoId, () => props.currentStatus, () => props.currentStage],
   () => {
     carregarDecisaoPrevia()
   },
@@ -218,6 +234,26 @@ const handleConfirmarRejeicao = async () => {
       v-if="isGestorOrAdmin && !readOnly && !isLoadingHistorico && !decisaoTomada && !isEtapaConcluida && isStageMatching"
       class="gate-card card mb-4"
     >
+      <!-- Aviso amigável de tentativa anterior rejeitada / saneada após reprocessamento -->
+      <div
+        v-if="decisaoHistorico && decisaoHistorico.decisao === 'REPROVADO'"
+        class="alert alert-warning mb-3"
+        style="display: flex; gap: 8px; align-items: flex-start; padding: 0.75rem 1rem; border-radius: 6px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08);"
+      >
+        <FiAlertTriangle size="18" style="color: #f59e0b; flex-shrink: 0; margin-top: 2px;" />
+        <div style="font-size: 0.875rem; color: var(--color-text);">
+          <strong>Reavaliação após reprocessamento:</strong> A tentativa anterior desta etapa foi rejeitada
+          <template v-if="decisaoHistorico.gestorNome"> pelo {{ formatarNomeGestor(decisaoHistorico.gestorNome) }}</template>
+          <template v-if="decisaoHistorico.dataDecisao"> em {{ formatarData(decisaoHistorico.dataDecisao) }}</template>.
+          <div v-if="decisaoHistorico.parecer" style="font-style: italic; margin-top: 2px;">
+            Parecer anterior: "{{ decisaoHistorico.parecer }}"
+          </div>
+          <div style="margin-top: 4px; font-weight: 500;">
+            Novo arquivo recebido e em validação. Avalie as verificações automáticas abaixo e decida sobre a aprovação.
+          </div>
+        </div>
+      </div>
+
       <div class="gate-header">
         <div class="gate-title">
           <FiShield size="20" class="gate-icon" />

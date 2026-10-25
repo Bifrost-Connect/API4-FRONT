@@ -205,6 +205,11 @@ const confirmReprocess = async () => {
   const numericId = Number(String(props.details.id).replace(/\D/g, ''))
   if (numericId) {
     try {
+      localStorage.removeItem(`api4_decisoes_${numericId}`)
+    } catch {
+      // ignore storage error
+    }
+    try {
       await uploadService.reprocessarCarga(numericId, fileToUpload)
       await processService.iniciarProcessamento(numericId)
       emit('reload')
