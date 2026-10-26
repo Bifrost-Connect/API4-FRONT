@@ -1,4 +1,12 @@
 /**
+ * @file /mocks para testes automatizados.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock deve ser hardcoded no código de produção (serviços, views ou componentes).
+ * Todos os mocks devem residir exclusivamente aqui (/mocks) para uso em testes automatizados.
+ */
+
+/**
  * ==========================================
  * CONTRATO DE API ESPERADO (BACK-END)
  * ==========================================
@@ -75,15 +83,29 @@ export const mockUploadOptions = {
     { id: '4674', label: 'EPSG:4674 (SIRGAS 2000)' },
   ],
   orgaos: [
-    { id: '5', label: 'IBGE' },
-    { id: '6', label: 'INCRA' },
-    { id: '7', label: 'ANA' },
+    { id: '1', label: 'IBGE' },
+    { id: '2', label: 'INPE' },
+    { id: '3', label: 'INCRA' },
+    { id: '4', label: 'ANA' },
+    { id: '5', label: 'FUNAI' },
+    { id: '6', label: 'IBAMA' },
+    { id: '7', label: 'ICMBio' },
+    { id: '8', label: 'SFB' },
+    { id: '9', label: 'MMA' },
+    { id: '10', label: 'SICAR' },
   ],
   conjuntos: [
-  { id: '2', label: 'Imóveis rurais' },
-  { id: '3', label: 'Malha municipal' },
-  { id: '4', label: 'Reserva legal' },
-  { id: '5', label: 'Uso e cobertura do solo' },
-  { id: '6', label: 'APP Hidrográfica' },
+    { id: '1', label: 'Malha municipal' },
+    { id: '2', label: 'Uso e cobertura do solo' },
+    { id: '3', label: 'Imóveis rurais' },
+    { id: '4', label: 'Reserva legal' },
+    { id: '5', label: 'APP Hidrográfica' },
+    { id: '6', label: 'Terras indígenas' },
+    { id: '7', label: 'Áreas embargadas' },
+    { id: '8', label: 'Unidades de conservação' },
+    { id: '9', label: 'Florestas públicas' },
+    { id: '10', label: 'Assentamentos e Terras quilombolas' },
+    { id: '11', label: 'Queimadas e Desmatamento' },
+    { id: '12', label: 'Limites de biomas' },
   ],
 }

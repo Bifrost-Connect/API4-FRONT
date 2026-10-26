@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   processService,
@@ -9,6 +9,7 @@ import {
 } from '../services/process'
 import { userService } from '../services/user'
 import { dashboardService } from '../services/dashboard'
+import { uploadService } from '../services/upload'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -16,13 +17,11 @@ import ProcessStageValidacao from '../components/process-stages/ProcessStageVali
 import ProcessStageTratamento from '../components/process-stages/ProcessStageTratamento.vue'
 import ProcessStagePublicacao from '../components/process-stages/ProcessStagePublicacao.vue'
 import ProcessStageQuarentena from '../components/process-stages/ProcessStageQuarentena.vue'
-import { mockactive } from '@/services/api'
 import {
   auditoriaService,
   type ProcessVersion,
   type AuditProcessCarga,
 } from '@/services/auditoria'
-import { mockAuditCargas } from '@/services/mocks/auditoria.mock'
 
 interface Props {
   processId?: string
@@ -71,6 +70,9 @@ const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 // Controle do componente Auditoria
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
+const currentCargaLinhagem = computed(() => currentCarga.value?.linhagemCompleta || null)
+const quarentenaStageRef = ref<any>(null)
+const currentUser = computed(() => userService.getCurrentUser())
 
 // Rastreabilidade e Exportação (US05 e US07)
 const traceability = ref<ProcessTraceability | null>(null)
@@ -154,7 +156,10 @@ const warningStepIndex = computed(() => {
   if (!details.value) return undefined
   const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
   const isErrorStatus =
-    details.value.status === 'Falhou' || details.value.status === 'Aguardando validação'
+    details.value.status === 'Falhou' ||
+    details.value.status === 'Em quarentena' ||
+    (details.value.quarantineRecords?.length ?? 0) > 0 ||
+    (details.value.validationChecks?.some((c) => c.status === 'error') ?? false)
   if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
     return processSteps.indexOf(details.value.stage) + 1
   }
@@ -168,33 +173,7 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Só verifica mock se mockactive for true
-    if (mockactive) {
-      const foundMockCarga = mockAuditCargas.find(
-        (c) =>
-          c.id.toLowerCase() === idToLoad.toLowerCase() ||
-          c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
-      )
-
-      if (foundMockCarga) {
-        currentCarga.value = foundMockCarga
-        auditVersions.value = foundMockCarga.versions
-
-        const targetVersion =
-          foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-          foundMockCarga.versions[0]
-
-        if (targetVersion) {
-          details.value = targetVersion
-          activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-          selectedQuarantineStage.value = targetVersion.stage
-        }
-        await loadTraceability(idToLoad, false)
-        return
-      }
-    }
-
-    // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
+    // Carrega detalhes do processo via processService e sintetiza versões pela linhagem/dataset
     const loadedDetails = await processService.getProcessDetails(idToLoad)
     details.value = loadedDetails
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
@@ -210,12 +189,49 @@ const loadData = async (idToLoad: string) => {
     auditVersions.value = versions
 
     await loadTraceability(idToLoad, details.value?.dataSource === 'API')
+    startPollingIfNeeded()
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
   } finally {
     isLoading.value = false
   }
 }
+
+let pollingTimer: any = null
+
+const startPollingIfNeeded = () => {
+  stopPolling()
+  if (details.value?.status === 'Em andamento') {
+    pollingTimer = setInterval(async () => {
+      if (processId.value) {
+        try {
+          const updated = await processService.getProcessDetails(processId.value)
+          if (updated) {
+            details.value = updated
+            activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+            if (updated.status !== 'Em andamento') {
+              stopPolling()
+              loadData(processId.value)
+            }
+          }
+        } catch {
+          // Ignore transient poll errors
+        }
+      }
+    }, 2500)
+  }
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 
 watch(
   () => props.detailsData,
@@ -277,24 +293,16 @@ const openQuarantine = () => {
 }
 
 const handleVersionChange = async (newVersion: ProcessVersion) => {
-  const isMockVersion =
-    mockactive &&
-    mockAuditCargas.some((c) => c.versions.some((v) => v.id === newVersion.id))
-
-  if (!isMockVersion) {
-    try {
-      const fullDetails = await processService.getProcessDetails(newVersion.id)
-      details.value = {
-        ...fullDetails,
-        id: newVersion.id,
-      }
-      if (!props.processId && route?.params?.id !== newVersion.id) {
-        router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
-      }
-    } catch {
-      details.value = newVersion
+  try {
+    const fullDetails = await processService.getProcessDetails(newVersion.id)
+    details.value = {
+      ...fullDetails,
+      id: newVersion.id,
     }
-  } else {
+    if (!props.processId && route?.params?.id !== newVersion.id) {
+      router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
+    }
+  } catch {
     details.value = newVersion
   }
 
@@ -303,6 +311,37 @@ const handleVersionChange = async (newVersion: ProcessVersion) => {
   isQuarantineMode.value = false
 
   await loadTraceability(newVersion.id, details.value?.dataSource === 'API')
+}
+
+const handleNotificarOperadorAuditoria = async (cargaIdStr: string) => {
+  const numericId = Number(String(cargaIdStr || details.value?.id).replace(/\D/g, ''))
+  if (numericId) {
+    try {
+      await uploadService.notificarOperadorQuarentena(numericId)
+      await loadData(processId.value)
+    } catch (e) {
+      console.error('Erro ao notificar operador:', e)
+    }
+  }
+}
+
+const handleAbrirReprocessamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openReprocessModal?.()
+  })
+}
+
+const handleAbrirCancelamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openCancelModal?.()
+  })
+}
+
+const handleQuarantineReload = () => {
+  isQuarantineMode.value = false
+  loadData(processId.value)
 }
 
 const goBack = () => {
@@ -412,7 +451,13 @@ const currentComponent = computed(() => {
               </div>
 
               <div class="quarantine-body">
-                <ProcessStageQuarentena v-if="details" :details="details" :read-only="isReadOnly" />
+                <ProcessStageQuarentena
+                  v-if="details"
+                  ref="quarentenaStageRef"
+                  :details="details"
+                  :read-only="isReadOnly"
+                  @reload="handleQuarantineReload"
+                />
               </div>
             </div>
           </div>
@@ -429,6 +474,7 @@ const currentComponent = computed(() => {
               :versions="auditVersions"
               @open-quarantine="openQuarantine"
               @export="exportIndicator"
+              @reload="loadData(processId)"
             />
           </div>
         </div>
@@ -448,8 +494,13 @@ const currentComponent = computed(() => {
         :cargaDataset="details?.dataset"
         :layerName="details?.layerName"
         :canClose="true"
+        :linhagemCompleta="currentCargaLinhagem"
+        :userRole="currentUser.role"
         @select-version="handleVersionChange"
         @close="closeAuditPanel"
+        @notificar-operador="handleNotificarOperadorAuditoria"
+        @reprocessar="handleAbrirReprocessamentoAuditoria"
+        @cancelar="handleAbrirCancelamentoAuditoria"
       />
     </div>
   </div>
@@ -471,23 +522,29 @@ const currentComponent = computed(() => {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .audit-side-wrapper {
-  width: clamp(300px, 28vw, 380px);
+  width: clamp(380px, 32vw, 480px);
+  min-width: 350px;
   flex-shrink: 0;
   background: var(--color-surface);
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.04);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.05);
+  border-left: 1px solid var(--color-border);
   animation: slideIn 0.25s ease;
+  z-index: 10;
 }
 
-.audit-side-wrapper > :deep(.locations-panel) {
+.audit-side-wrapper > :deep(.audit-drawer-panel) {
   flex: 1;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @keyframes slideIn {

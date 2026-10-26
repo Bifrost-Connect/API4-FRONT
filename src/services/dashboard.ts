@@ -1,6 +1,4 @@
-import api, { mockactive } from './api'
-import { mockProcessosPage, mockMetricasResponse } from './mocks/dashboard.mock'
-import { mockFilterOptions, mockAvailableEditors } from './mocks/filter.mock'
+import api from './api'
 import { userService } from './user'
 import { processService } from './process'
 
@@ -89,19 +87,18 @@ export function mapStatus(backendStatus: string): string {
   if (!backendStatus) return 'Em andamento'
   switch (backendStatus) {
     case 'CONCLUIDA':
-    case 'COM_RESSALVA':
       return 'Concluída'
+    case 'COM_RESSALVA':
+      return 'Com ressalva'
+    case 'EM_VALIDACAO':
+    case 'EM_QUARENTENA':
+      return 'Em quarentena'
     case 'EM_ANDAMENTO':
       return 'Em andamento'
-    case 'EM_VALIDACAO':
-    case 'VALIDACAO':
-      return 'Aguardando validação'
     case 'FALHOU':
       return 'Falhou'
     case 'FECHADO':
       return 'Fechado'
-    case 'EM_QUARENTENA':
-      return 'Em quarentena'
     default:
       return backendStatus
   }
@@ -144,77 +141,31 @@ export function mapMetricasToSummary(metricas: ProcessoMetricasResponse): Dashbo
 
 export const dashboardService = {
   async getDashboardSummary(): Promise<DashboardSummary[]> {
-    try {
-      const res = await api.get('/processos/metricas')
-      return mapMetricasToSummary(res.data)
-    } catch (err: any) {
-      if (!mockactive) throw err
-      console.warn('API indisponível ou não autorizada, usando mock para métricas do dashboard')
-      await delay(400)
-      return mapMetricasToSummary(mockMetricasResponse)
-    }
+    const res = await api.get('/processos/metricas')
+    return mapMetricasToSummary(res.data)
   },
 
   async getDashboardProcesses(filters?: DashboardFilters): Promise<Page<ProcessLog>> {
-    try {
-      const params: any = {}
-      if (filters) {
-        if (filters.dateBegin) params.dataInicio = filters.dateBegin
-        if (filters.dateEnd) params.dataFim = filters.dateEnd
-        if (filters.conjunto) params.conjuntoId = filters.conjunto
-        if (filters.etapa) params.etapaId = filters.etapa
-        if (filters.situacao) params.situacaoId = filters.situacao
-        if (filters.page !== undefined) params.page = filters.page
-        if (filters.size !== undefined) params.size = filters.size
-      }
-
-      const res = await api.get('/processos', { params })
-      if (res.data && res.data.content) {
-        res.data.content.forEach((item: any) => {
-          item.stage = mapStage(item.stage)
-          item.status = mapStatus(item.status)
-        })
-      }
-
-      return { ...res.data, source: 'API' }
-    } catch (err: any) {
-      if (!mockactive) throw err
-      console.warn('API indisponível ou não autorizada, usando mock para processos do dashboard')
-      await delay(600)
-
-      let filteredProcesses = [...mockProcessosPage.content]
-
-      if (filters) {
-        if (filters.conjunto) {
-          const option = mockFilterOptions.conjuntos.find(
-            (o) => String(o.id) === String(filters.conjunto),
-          )
-          if (option)
-            filteredProcesses = filteredProcesses.filter((p) => p.dataset === option.label)
-        }
-        if (filters.etapa) {
-          const option = mockFilterOptions.etapas.find(
-            (o) => String(o.id) === String(filters.etapa),
-          )
-          if (option) filteredProcesses = filteredProcesses.filter((p) => p.stage === option.label)
-        }
-        if (filters.situacao) {
-          const option = mockFilterOptions.situacoes.find(
-            (o) => String(o.id) === String(filters.situacao),
-          )
-          if (option) filteredProcesses = filteredProcesses.filter((p) => p.status === option.label)
-        }
-      }
-
-      return {
-        content: filteredProcesses,
-        totalElements: filteredProcesses.length,
-        totalPages: 1,
-        size: mockProcessosPage.size,
-        number: mockProcessosPage.number,
-        source: 'DEMONSTRACAO',
-      }
+    const params: any = {}
+    if (filters) {
+      if (filters.dateBegin) params.dataInicio = filters.dateBegin
+      if (filters.dateEnd) params.dataFim = filters.dateEnd
+      if (filters.conjunto) params.conjuntoId = filters.conjunto
+      if (filters.etapa) params.etapaId = filters.etapa
+      if (filters.situacao) params.situacaoId = filters.situacao
+      if (filters.page !== undefined) params.page = filters.page
+      if (filters.size !== undefined) params.size = filters.size
     }
+
+    const res = await api.get('/processos', { params })
+    if (res.data && res.data.content) {
+      res.data.content.forEach((item: any) => {
+        item.stage = mapStage(item.stage)
+        item.status = mapStatus(item.status)
+      })
+    }
+
+    return { ...res.data, source: 'API' }
   },
 
   async requestAuditor(processId: string): Promise<void> {
@@ -229,13 +180,8 @@ export const dashboardService = {
     try {
       const res = await api.get('/dominios/filtros')
       return res.data
-    } catch (err) {
-      if (!mockactive) {
-        return { conjuntos: [], etapas: [], situacoes: [] }
-      }
-      console.warn('Endpoint /dominios/filtros não encontrado, usando mockFilterOptions')
-      await delay(400)
-      return mockFilterOptions
+    } catch {
+      return { conjuntos: [], etapas: [], situacoes: [] }
     }
   },
 
@@ -248,47 +194,19 @@ export const dashboardService = {
           name: u.nome || u.name || 'Auditor Sem Nome',
         }))
       }
-      if (!mockactive) {
-        return []
-      }
-      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
-    } catch (err: any) {
-      if (!mockactive) throw err
-      console.warn('API indisponível, usando mock para auditores')
-      await delay(400)
-      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
+      return []
+    } catch {
+      return []
     }
   },
 
   async assignEditor(
     processId: string,
     editorId: number,
-    editorName: string,
+    editorName?: string,
   ): Promise<ProcessLog | null> {
-    try {
-      const res = await api.put(`/processos/${processId}/editor`, { editorId })
-      return res.data
-    } catch (err: any) {
-      if (!mockactive) throw err
-      console.warn('API indisponível ou não autorizada, usando mock para alocação de editor')
-      await delay(400)
-      const process = mockProcessosPage.content.find((p) => p.id === processId)
-      if (process) {
-        process.assignedEditor = editorName
-        process.status = 'Em andamento'
-        process.pauseReason = `Editor ${editorName} alocado para correção do erro na etapa de ${process.stage}.`
-
-        if (mockMetricasResponse.porSituacao) {
-          mockMetricasResponse.porSituacao['Em andamento'] =
-            (mockMetricasResponse.porSituacao['Em andamento'] || 0) + 1
-          mockMetricasResponse.porSituacao['Falhou'] = Math.max(
-            0,
-            (mockMetricasResponse.porSituacao['Falhou'] || 0) - 1,
-          )
-        }
-      }
-      return process || null
-    }
+    const res = await api.put(`/processos/${processId}/editor`, { editorId })
+    return res.data
   },
 
   /**
@@ -300,15 +218,10 @@ export const dashboardService = {
   ): Promise<{ success: boolean }> {
     const usuarioId = userService.getCurrentUser().id
 
-    try {
-      if (/^\d+$/.test(String(item.id))) {
-        await api.patch(`/indicadores/${item.id}/fechar`, null, {
-          headers: { 'X-Gestor-ID': String(usuarioId) },
-        })
-      }
-    } catch (e) {
-      if (!mockactive) throw e
-      console.warn('Backend /fechar indisponível, simulando fechamento local:', e)
+    if (/^\d+$/.test(String(item.id))) {
+      await api.patch(`/indicadores/${item.id}/fechar`, null, {
+        headers: { 'X-Gestor-ID': String(usuarioId) },
+      })
     }
 
     item.decided = true
@@ -336,14 +249,10 @@ export const dashboardService = {
       throw new Error('O parecer técnico é obrigatório para reprovar a carga.')
     }
 
-    try {
-      if (/^\d+$/.test(String(item.id))) {
-        await api.put(`/processos/${item.id}/editor`, {
-          editorId: userService.getCurrentUser().id,
-        })
-      }
-    } catch (e) {
-      console.warn('Erro ao registrar reprovação no backend, simulando localmente:', e)
+    if (/^\d+$/.test(String(item.id))) {
+      await api.put(`/processos/${item.id}/editor`, {
+        editorId: userService.getCurrentUser().id,
+      })
     }
 
     item.decided = true
@@ -365,79 +274,8 @@ export const dashboardService = {
   /**
    * Exporta a versão consolidada em formato CSV ou GeoJSON.
    */
-  async exportarVersao(
-    itemOrId: any,
-    formato: 'csv' | 'geojson',
-  ): Promise<Blob> {
+  async exportarVersao(itemOrId: any, formato: 'csv' | 'geojson'): Promise<Blob> {
     const id = typeof itemOrId === 'object' ? itemOrId.id : String(itemOrId)
-    const item = typeof itemOrId === 'object' ? itemOrId : null
-
-    try {
-      if (/^\d+$/.test(id)) {
-        return await processService.exportIndicator(id, formato)
-      }
-    } catch (err) {
-      if (!mockactive) throw err
-      // Fallback para download local
-    }
-
-    if (!mockactive) {
-      throw new Error(`Exportação oficial indisponível no backend para o processo ${id}`)
-    }
-
-    const dataset = item?.dataset || 'Conjunto Territorial'
-    const safra = item?.year || '2026'
-    const orgao = item?.source || 'Órgão Responsável'
-    const epsg = item?.epsg || 'EPSG:4674'
-    const responsavel = item?.aprovador || userService.getCurrentUser().name
-    const dataPub = item?.dataPublicacao || new Date().toLocaleString('pt-BR')
-
-    if (formato === 'csv') {
-      const csvContent =
-        'id,dataset,safra,orgao,epsg,status,selo,aprovador,dataPublicacao\n' +
-        `"${id}","${dataset}","${safra}","${orgao}","${epsg}","Fechado","Versão Oficial Bloqueada","${responsavel}","${dataPub}"\n`
-      return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    } else {
-      const geojsonContent = {
-        type: 'FeatureCollection',
-        name: `Exportacao_Oficial_${id}`,
-        metadata: {
-          id,
-          dataset,
-          safra,
-          orgao,
-          epsg,
-          versaoOficialBloqueada: true,
-          aprovador: responsavel,
-          dataPublicacao: dataPub,
-        },
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [-47.882, -15.793],
-                  [-47.8, -15.793],
-                  [-47.8, -15.85],
-                  [-47.882, -15.85],
-                  [-47.882, -15.793],
-                ],
-              ],
-            },
-            properties: {
-              id,
-              dataset,
-              status: 'Fechado',
-              selo: 'Versão Oficial Bloqueada',
-            },
-          },
-        ],
-      }
-      return new Blob([JSON.stringify(geojsonContent, null, 2)], {
-        type: 'application/geo+json;charset=utf-8;',
-      })
-    }
+    return await processService.exportIndicator(id, formato)
   },
 }

@@ -1,8 +1,16 @@
-import { ref, computed } from 'vue'
-import { mockCurrentUser } from './mocks/user.mock'
+/**
+ * Serviço de Gerenciamento do Usuário e Sessão de Acesso.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded em produção. Mocks devem residir exclusivamente
+ * no diretório /mocks para uso em testes automatizados.
+ */
+import { ref } from 'vue'
 
 export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador'
 export type DemoUser = { id: number; name: string; role: UserRole }
+
+const defaultUser: DemoUser = { id: 1, name: 'João Silva (Técnico)', role: 'Operador' }
 
 const demoUsers: Record<UserRole, DemoUser> = {
   Operador: { id: 1, name: 'João Silva (Técnico)', role: 'Operador' },
@@ -12,10 +20,10 @@ const demoUsers: Record<UserRole, DemoUser> = {
 }
 
 const readStoredUser = (): DemoUser => {
-  if (typeof localStorage === 'undefined') return mockCurrentUser as DemoUser
+  if (typeof localStorage === 'undefined') return defaultUser
 
   const storedRole = localStorage.getItem('api4-demo-role') as UserRole | null
-  return storedRole && demoUsers[storedRole] ? demoUsers[storedRole] : (mockCurrentUser as DemoUser)
+  return storedRole && demoUsers[storedRole] ? demoUsers[storedRole] : defaultUser
 }
 
 const currentUser = ref<DemoUser>(readStoredUser())
@@ -33,7 +41,7 @@ export const userService = {
   },
 
   clearCurrentUser() {
-    currentUser.value = mockCurrentUser as DemoUser
+    currentUser.value = defaultUser
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('api4-demo-role')
     }

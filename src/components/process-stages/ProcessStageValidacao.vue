@@ -2,42 +2,64 @@
 import { computed } from 'vue'
 import { FiCheckCircle, FiXCircle, FiClock, FiAlertTriangle } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
+import GateDecisaoGestor from '../GateDecisaoGestor.vue'
 
 const props = defineProps<{
   details: ProcessLogDetails
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
+  (e: 'reload'): void
 }>()
 
-/** Erro na validação ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
+/** Erro ou quarentena na validação ocorre quando o status é de erro/quarentena, há registros de quarentena ou checks falharam */
+const isQuarantine = computed(
+  () =>
+    props.details.status === 'Em quarentena' ||
+    (props.details.quarantineRecords?.length ?? 0) > 0 ||
+    checks.value.some((c) => c.status === 'error'),
+)
+
 const isError = computed(
   () =>
     props.details.status === 'Falhou' ||
-    props.details.status === 'Aguardando validação' ||
-    checks.value.some((c) => c.status === 'error'),
+    isQuarantine.value,
 )
 
 const isUnderCorrection = computed(
   () => props.details.status === 'Em andamento' && !!props.details.assignedEditor,
 )
 
-/** Checks vêm da API via details.validationChecks (ver process.mock.ts / GET /api/processes/{id}) */
+/** Checks vêm da API via details.validationChecks (GET /api/processos/{id}) */
 const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {
   if (isUnderCorrection.value) return { label: 'Em Correção (Editor Alocado)', cls: 'warning' }
   const errorCount = checks.value.filter((c) => c.status === 'error').length
-  if (errorCount === 0) return { label: 'Concluído (Sem Erros)', cls: 'success' }
-  if (errorCount < checks.value.length)
-    return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
-  return { label: 'Falhou', cls: 'error' }
+  if (errorCount > 0) return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
+  if (props.details.status === 'Falhou') return { label: 'Falhou', cls: 'error' }
+  if (isQuarantine.value) return { label: 'Em Quarentena', cls: 'error' }
+  if (props.details.stage === 'Validação' && props.details.status === 'Em andamento') {
+    return { label: 'Em Validação', cls: 'warning' }
+  }
+  return { label: 'Concluído (Sem Erros)', cls: 'success' }
 })
 </script>
 
 <template>
   <div class="stage-container">
+    <!-- Gate de Decisão do Gestor na Validação -->
+    <GateDecisaoGestor
+      :processo-id="details.id"
+      etapa="VALIDACAO"
+      :read-only="readOnly"
+      :current-status="details.status"
+      :current-stage="details.stage"
+      @decisao-registrada="emit('reload')"
+    />
+
     <div class="card">
       <div class="card-header">
         <div class="header-left">
@@ -48,7 +70,7 @@ const overallStatus = computed(() => {
         </div>
         <div class="header-right">
           <span class="badge" :class="overallStatus.cls">{{ overallStatus.label }}</span>
-          <button v-if="isError || (details.quarantineRecords?.length ?? 0) > 0" class="btn btn-warning" @click="emit('open-quarantine')">
+          <button v-if="isQuarantine" class="btn btn-warning" @click="emit('open-quarantine')">
             <FiAlertTriangle size="14" />
             Ver Quarentena
           </button>
@@ -76,7 +98,7 @@ const overallStatus = computed(() => {
           </li>
         </ul>
 
-        <div v-if="(isError || (details.quarantineRecords?.length ?? 0) > 0) && details.pauseReason" class="error-alert">
+        <div v-if="isQuarantine && details.pauseReason" class="error-alert">
           <div class="alert-icon">
             <FiAlertTriangle size="22" />
           </div>

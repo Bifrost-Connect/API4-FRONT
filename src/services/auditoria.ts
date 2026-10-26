@@ -1,279 +1,219 @@
-import { mockactive } from './api'
-import { dashboardService, type ProcessLog } from './dashboard'
-import { processService, type ProcessLogDetails } from './process'
-import {
-  mockAuditCargas,
-  type AuditProcessCarga,
-  type ProcessVersion,
-} from './mocks/auditoria.mock'
-import { validationChecksOk, treatmentChecksOk, analyticsDataOk } from './mocks/process.mock'
-
-export type { AuditProcessCarga, ProcessVersion }
-
 /**
- * Converte data "DD/MM/YYYY HH:mm" ou "DD/MM/YYYY" ou ISO para timestamp numérico para ordenação
+ * Serviço de Auditoria, Rastreabilidade e Linhagem de Cargas (US05 - Issue #16).
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as informações de versões, histórico, quarentena e reprocessamentos são obtidas
+ * diretamente via API REST (/carga/{id}/linhagem ou /indicadores/{id}/linhagem).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
  */
-function parseDateToTimestamp(dateStr?: string): number {
-  if (!dateStr) return 0
-  const brMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/)
-  if (brMatch) {
-    const [, day, month, year, hour = '00', minute = '00'] = brMatch
-    return new Date(`${year}-${month}-${day}T${hour}:${minute}:00`).getTime()
-  }
-  const parsed = Date.parse(dateStr)
-  return Number.isNaN(parsed) ? 0 : parsed
+import api from './api'
+import type { ProcessLogDetails } from './process'
+
+export interface ArquivoLinhagem {
+  id: number
+  nomeArquivo: string
+  hashSha256: string
+  dataUpload: string
+  tamanhoBytes?: number
+  usuarioId?: number
+  usuarioNome?: string
+  tentativa: number
 }
 
-/**
- * Gera uma nota de alteração ("changeNote") descritiva a partir do status, etapa e motivo de pausa
- */
-function buildChangeNote(
-  stage: string,
-  status: string,
-  pauseReason?: string,
-  description?: string,
-  isInitial?: boolean,
-): string {
-  if (pauseReason) {
-    return pauseReason
-  }
-  if (description && description !== 'Processo não encontrado no mock. Exibindo dados padrão.') {
-    return description
-  }
-  const normStatus = (status || '').toLowerCase()
-  if (normStatus.includes('conclu')) {
-    return 'Reprojeção concluída, validação aprovada e camada publicada no catálogo.'
-  }
-  if (normStatus.includes('falh') || normStatus.includes('quarentena')) {
-    return `Inconsistência detectada na etapa de ${stage}. Encaminhado para revisão.`
-  }
-  if (normStatus.includes('aguardando') || normStatus.includes('valida')) {
-    return `Aguardando validação técnica na etapa de ${stage}.`
-  }
-  if (isInitial) {
-    return `Carga inicial recebida na etapa de ${stage}.`
-  }
-  return `Processamento em andamento na etapa de ${stage} (${status}).`
+export interface HistoricoEtapaLinhagem {
+  etapa: string
+  situacao: string
+  dataInicio?: string
+  dataFim?: string
+  mensagem?: string
+  resultado?: string
 }
 
-/**
- * Transforma um item resumido do Dashboard (`ProcessLog`) em um `ProcessVersion`
- */
-function mapProcessLogToVersion(
-  item: ProcessLog,
-  versionNumber: number,
-  isLatest: boolean,
-  isInitial: boolean,
-  currentDetails?: ProcessLogDetails | null,
-): ProcessVersion {
-  const isCurrent =
-    currentDetails && String(currentDetails.id).toLowerCase() === String(item.id).toLowerCase()
+export interface LogQuarentenaLinhagem {
+  dataDeteccao: string
+  etapaFalha: string
+  severidade: string
+  mensagemErro: string
+}
 
-  const normalizedStatus: ProcessLogDetails['status'] =
-    item.status === 'Em validação'
-      ? 'Aguardando validação'
-      : item.status === 'Em quarentena'
-        ? 'Falhou'
-        : (item.status as ProcessLogDetails['status'])
+export interface DecisaoGestorLinhagem {
+  id: number
+  gestorId: number
+  gestorNome: string
+  etapa: string
+  decisao: string
+  parecer: string
+  dataDecisao: string
+}
 
-  const versionTag = isLatest
-    ? `v${versionNumber}.0 (Mais recente)`
-    : isInitial && versionNumber === 1
-      ? `v1.0 (Inicial)`
-      : `v${versionNumber}.0`
+export interface EventoAuditoriaLinhagem {
+  id: number
+  usuarioId: number
+  usuarioNome: string
+  acao: string
+  detalhes: string
+  dataHora: string
+}
 
-  const baseDetails: ProcessLogDetails = isCurrent
-    ? currentDetails
-    : {
-        id: String(item.id),
-        dataset: item.dataset || currentDetails?.dataset || 'Conjunto Geoespacial',
-        stage: (item.stage as ProcessLogDetails['stage']) || 'Ingestão',
-        status: normalizedStatus || 'Em andamento',
-        dateTime: item.dateTime || currentDetails?.dateTime || '',
-        layerName: currentDetails?.layerName || item.dataset || `Camada ${item.id}`,
-        source: item.source || currentDetails?.source || 'Órgão Responsável',
-        year: item.year || currentDetails?.year || '2026',
-        epsg: item.epsg || currentDetails?.epsg || 'EPSG:4674',
-        description: currentDetails?.description || '',
-        originalFileUrl: '#',
-        integrityHash: item.integrityHash || '',
-        assignedEditor: item.assignedEditor,
-        pauseReason: item.pauseReason,
-        mapCoordinates: currentDetails?.mapCoordinates || [
-          [-15.793, -47.882],
-          [-15.793, -47.8],
-          [-15.85, -47.8],
-          [-15.85, -47.882],
-        ],
-        logs: {
-          Ingestão: [`[${item.dateTime || '—'}] Registro da carga ${item.id}.`],
-        },
-        validationChecks: mockactive ? validationChecksOk : [],
-        treatmentChecks: mockactive ? treatmentChecksOk(item.epsg || 'EPSG:4674') : [],
-        analyticsData: mockactive ? analyticsDataOk : [],
-      }
+export interface LinhagemCompletaCarga {
+  indicadorId: number
+  processoId: number
+  arquivoOriginalId: number
+  nomeArquivoOriginal: string
+  hashSha256: string
+  parametrosProcessamento: string
+  dataCarga: string
+  statusAtual: string
+  etapaAtual: string
+  historicoEtapas: HistoricoEtapaLinhagem[]
+  logsQuarentena: LogQuarentenaLinhagem[]
+  arquivos: ArquivoLinhagem[]
+  decisoesGestor: DecisaoGestorLinhagem[]
+  eventosAuditoria: EventoAuditoriaLinhagem[]
+}
 
-  return {
-    ...baseDetails,
-    versionNumber,
-    versionTag,
-    isLatest,
-    changeNote: buildChangeNote(
-      baseDetails.stage,
-      baseDetails.status,
-      baseDetails.pauseReason,
-      isCurrent ? currentDetails?.description : undefined,
-      isInitial,
-    ),
-  }
+export interface ProcessVersion extends ProcessLogDetails {
+  versionTag: string
+  versionNumber: number
+  changeNote: string
+  isLatest?: boolean
+  arquivoId?: number
+  tentativa?: number
+}
+
+export interface AuditProcessCarga {
+  id: string
+  dataset: string
+  layerName: string
+  source: string
+  lastUpdate: string
+  totalVersions: number
+  currentStatus: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou'
+  currentStage: string
+  linhagemCompleta?: LinhagemCompletaCarga
+  versions: ProcessVersion[]
 }
 
 export const auditoriaService = {
   /**
-   * Busca ou sintetiza as versões de auditoria para um processo específico.
-   * Adaptação no front-end: agrupa processos do mesmo dataset retornados por GET /processos.
+   * Obtém a linhagem oficial completa da carga via API REST (US05 - Tarefa 15).
+   */
+  async getLinhagemCarga(processoId: string | number): Promise<LinhagemCompletaCarga | null> {
+    const numericId = Number(String(processoId).replace(/\D/g, '')) || processoId
+    try {
+      const res = await api.get(`/carga/${numericId}/linhagem`)
+      return res?.data ?? null
+    } catch {
+      try {
+        const fallbackRes = await api.get(`/indicadores/${numericId}/linhagem`)
+        return fallbackRes?.data ?? null
+      } catch (err) {
+        return null
+      }
+    }
+  },
+
+  /**
+   * Busca e formata o histórico de versões e auditoria para uma carga específica.
+   * Modela as versões a partir das tentativas/arquivos reprocessados e do histórico real de etapas da carga.
    */
   async getVersionsForProcess(
     processId: string,
     currentDetails?: ProcessLogDetails | null,
   ): Promise<{ carga: AuditProcessCarga; versions: ProcessVersion[] }> {
-    // 1. Só verifica mock se mockactive for true
-    if (mockactive) {
-      const foundMockCarga = mockAuditCargas.find(
-        (c) =>
-          c.id.toLowerCase() === processId.toLowerCase() ||
-          c.versions.some((v) => v.id.toLowerCase() === processId.toLowerCase()),
-      )
+    const linhagem = await this.getLinhagemCarga(processId)
 
-      if (foundMockCarga) {
-        return {
-          carga: foundMockCarga,
-          versions: foundMockCarga.versions,
-        }
-      }
-    }
-
-    // 2. Busca linhagem real do backend se for processo com ID numérico
-    if (/^\d+$/.test(processId)) {
-      try {
-        const trace = await processService.getTraceability(processId)
-        if (trace && trace.historicoEtapas && trace.historicoEtapas.length > 0) {
-          const etapas = trace.historicoEtapas
-          const realVersions: ProcessVersion[] = etapas.map((h: any, idx: number) => {
-            const verNum = idx + 1
-            const isLatest = idx === etapas.length - 1
-            const isInitial = idx === 0 && etapas.length > 1
-            const dateStr = h.dataFim || h.dataInicio || trace.dataCarga || ''
-            const mappedStage = (h.etapa || currentDetails?.stage || 'Ingestão') as ProcessVersion['stage']
-            const mappedStatus = (h.situacao === 'CONCLUIDA' ? 'Concluída' : h.situacao === 'FALHOU' ? 'Falhou' : 'Em andamento') as ProcessVersion['status']
-
-            return {
-              id: String(trace.processoId || processId),
-              dataset: currentDetails?.dataset || trace.nomeArquivoOriginal || 'Conjunto Territorial',
-              layerName: currentDetails?.layerName || trace.nomeArquivoOriginal || `Carga ${processId}`,
-              stage: mappedStage,
-              status: mappedStatus,
-              dateTime: dateStr ? new Date(dateStr).toLocaleString('pt-BR') : '',
-              source: currentDetails?.source || 'Órgão Oficial',
-              year: currentDetails?.year || '2026',
-              epsg: currentDetails?.epsg || 'EPSG:4674',
-              originalFileUrl: `/api/carga/download/${processId}`,
-              integrityHash: trace.hashSha256 || '',
-              description: h.mensagem || '',
-              pauseReason: h.mensagem || undefined,
-              versionNumber: verNum,
-              versionTag: isLatest ? `v${verNum}.0 (Mais recente)` : isInitial ? `v1.0 (Inicial)` : `v${verNum}.0`,
-              isLatest,
-              changeNote: h.mensagem || `Etapa de ${h.etapa}: ${h.situacao}`,
-              logs: {
-                [mappedStage]: [
-                  `[${dateStr ? new Date(dateStr).toLocaleTimeString('pt-BR') : '—'}] ${h.etapa} - ${h.situacao}: ${h.mensagem || h.resultado || 'Processado com sucesso'}`,
-                ],
-              },
-            }
-          })
-
-          const reversed = [...realVersions].reverse()
-          const latest = reversed[0]
-          return {
-            carga: {
-              id: String(processId),
-              dataset: currentDetails?.dataset || trace.nomeArquivoOriginal || 'Conjunto Territorial',
-              layerName: currentDetails?.layerName || trace.nomeArquivoOriginal || `Carga ${processId}`,
-              source: currentDetails?.source || 'Órgão Oficial',
-              lastUpdate: latest?.dateTime || '',
-              totalVersions: reversed.length,
-              currentStatus: (latest?.status || 'Em andamento') as AuditProcessCarga['currentStatus'],
-              currentStage: latest?.stage || 'Ingestão',
-              versions: reversed,
+    if (linhagem) {
+      const arquivos = Array.isArray(linhagem.arquivos) && linhagem.arquivos.length > 0
+        ? linhagem.arquivos
+        : [
+            {
+              id: linhagem.arquivoOriginalId || 1,
+              nomeArquivo: linhagem.nomeArquivoOriginal || 'arquivo_original.geojson',
+              hashSha256: linhagem.hashSha256 || '',
+              dataUpload: linhagem.dataCarga || '',
+              tentativa: 1,
             },
-            versions: reversed,
-          }
+          ]
+
+      const totalArquivos = arquivos.length
+      const baseURL = api.defaults.baseURL || 'http://localhost:8080'
+
+      // Cria uma ProcessVersion para cada arquivo/tentativa de envio da carga
+      const versions: ProcessVersion[] = arquivos.map((arq, idx) => {
+        const tentativaNum = arq.tentativa || idx + 1
+        const isLatest = idx === totalArquivos - 1
+        const isInitial = idx === 0
+        const tag = isLatest
+          ? `v${tentativaNum}.0 (Atual)`
+          : `v${tentativaNum}.0 (${isInitial ? 'Inicial' : 'Anterior'})`
+
+        const note = isInitial
+          ? `Arquivo bruto original submetido em ${arq.dataUpload ? new Date(arq.dataUpload).toLocaleString('pt-BR') : '—'}.`
+          : `Novo arquivo submetido em reprocessamento pós-quarentena por ${arq.usuarioNome || 'Operador'}.`
+
+        const versionStatus = isLatest
+          ? (linhagem.statusAtual === 'CONCLUIDA'
+            ? 'Concluída'
+            : linhagem.statusAtual === 'FALHOU'
+              ? 'Falhou'
+              : 'Em andamento')
+          : 'Substituído'
+
+        return {
+          id: String(linhagem.processoId || processId),
+          dataset: currentDetails?.dataset || linhagem.nomeArquivoOriginal || 'Conjunto Territorial',
+          layerName: currentDetails?.layerName || arq.nomeArquivo || `Carga ${processId}`,
+          stage: (linhagem.etapaAtual as any) || currentDetails?.stage || 'Ingestão',
+          status: versionStatus as any,
+          dateTime: arq.dataUpload ? new Date(arq.dataUpload).toLocaleString('pt-BR') : currentDetails?.dateTime || '',
+          source: currentDetails?.source || 'Órgão Oficial',
+          year: currentDetails?.year || '2026',
+          epsg: currentDetails?.epsg || 'EPSG:4674',
+          originalFileUrl: `${baseURL}/carga/download/${processId}`,
+          integrityHash: arq.hashSha256,
+          description: note,
+          versionNumber: tentativaNum,
+          versionTag: tag,
+          isLatest,
+          changeNote: note,
+          arquivoId: arq.id,
+          tentativa: tentativaNum,
+          mapCoordinates: currentDetails?.mapCoordinates || [
+            [-15.793, -47.882],
+            [-15.793, -47.8],
+            [-15.85, -47.8],
+            [-15.85, -47.882],
+          ],
+          logs: currentDetails?.logs || {},
+          validationChecks: currentDetails?.validationChecks || [],
+          treatmentChecks: currentDetails?.treatmentChecks || [],
+          analyticsData: currentDetails?.analyticsData || [],
         }
-      } catch {
-        // Fallback para agrupamento ou processo atual se a chamada falhar
+      })
+
+      // Ordena mais recente primeiro
+      const reversedVersions = [...versions].reverse()
+      const latest = reversedVersions[0]
+
+      const carga: AuditProcessCarga = {
+        id: String(linhagem.processoId || processId),
+        dataset: currentDetails?.dataset || linhagem.nomeArquivoOriginal || 'Conjunto Territorial',
+        layerName: currentDetails?.layerName || linhagem.nomeArquivoOriginal || `Carga ${processId}`,
+        source: currentDetails?.source || 'Órgão Oficial',
+        lastUpdate: latest?.dateTime || currentDetails?.dateTime || '',
+        totalVersions: reversedVersions.length,
+        currentStatus: (latest?.status || currentDetails?.status || 'Em andamento') as AuditProcessCarga['currentStatus'],
+        currentStage: latest?.stage || currentDetails?.stage || 'Ingestão',
+        linhagemCompleta: linhagem,
+        versions: reversedVersions,
       }
+
+      return { carga, versions: reversedVersions }
     }
 
-    // 3. Busca todos os processos na esteira para agrupar por dataset
-    let allProcesses: ProcessLog[] = []
-    try {
-      const page = await dashboardService.getDashboardProcesses()
-      allProcesses = page?.content || []
-    } catch {
-      allProcesses = []
-    }
-
-    const targetDataset = (currentDetails?.dataset || '').trim().toLowerCase()
-
-    // Filtra processos que compartilham o mesmo dataset
-    let relatedProcesses = targetDataset
-      ? allProcesses.filter((p) => (p.dataset || '').trim().toLowerCase() === targetDataset)
-      : allProcesses.filter((p) => String(p.id).toLowerCase() === processId.toLowerCase())
-
-    // Garante que o processo atual esteja na lista mesmo se não veio na página da listagem
-    if (
-      currentDetails &&
-      !relatedProcesses.some(
-        (p) => String(p.id).toLowerCase() === String(currentDetails.id).toLowerCase(),
-      )
-    ) {
-      relatedProcesses = [
-        {
-          id: String(currentDetails.id),
-          dateTime: currentDetails.dateTime,
-          dataset: currentDetails.dataset,
-          stage: currentDetails.stage,
-          status: currentDetails.status,
-          source: currentDetails.source,
-          year: currentDetails.year,
-          epsg: currentDetails.epsg,
-          integrityHash: currentDetails.integrityHash,
-          pauseReason: currentDetails.pauseReason,
-          assignedEditor: currentDetails.assignedEditor,
-        },
-        ...relatedProcesses,
-      ]
-    }
-
-    // Ordena do mais antigo para o mais recente para numerar v1.0, v2.0, v3.0...
-    const sortedOldestFirst = [...relatedProcesses].sort((a, b) => {
-      const timeDiff = parseDateToTimestamp(a.dateTime) - parseDateToTimestamp(b.dateTime)
-      if (timeDiff !== 0) return timeDiff
-      return String(a.id).localeCompare(String(b.id), undefined, { numeric: true })
-    })
-
-    const total = sortedOldestFirst.length
-    const versionsOldestFirst = sortedOldestFirst.map((item, idx) => {
-      const versionNumber = idx + 1
-      const isLatest = idx === total - 1
-      const isInitial = idx === 0 && total > 1
-      return mapProcessLogToVersion(item, versionNumber, isLatest, isInitial, currentDetails)
-    })
-
-    // Inverte para exibir a versão mais recente no topo do painel lateral
-    const versions = versionsOldestFirst.reverse()
-    if (versions.length === 0) {
+    if (!currentDetails) {
       return {
         carga: {
           id: String(processId),
@@ -289,25 +229,49 @@ export const auditoriaService = {
         versions: [],
       }
     }
-    const latestVersion = versions[0]
 
-    const carga: AuditProcessCarga = {
-      id: String(currentDetails?.id || latestVersion?.id || processId),
-      dataset:
-        currentDetails?.dataset || latestVersion?.dataset || 'Conjunto de Dados Geoespaciais',
-      layerName:
-        currentDetails?.layerName ||
-        latestVersion?.layerName ||
-        currentDetails?.dataset ||
-        `Camada ${processId}`,
-      source: currentDetails?.source || latestVersion?.source || 'Fonte Oficial',
-      lastUpdate: latestVersion?.dateTime || currentDetails?.dateTime || '',
-      totalVersions: versions.length,
-      currentStatus: (latestVersion?.status || currentDetails?.status || 'Em andamento') as AuditProcessCarga['currentStatus'],
-      currentStage: latestVersion?.stage || currentDetails?.stage || 'Ingestão',
-      versions,
+    // Se a linhagem ainda não estiver pronta (ex.: erro de conexão), cria entrada para o processo atual a partir dos detalhes carregados
+    const fallbackVersion: ProcessVersion = {
+      id: String(processId),
+      dataset: currentDetails?.dataset || 'Conjunto Territorial',
+      layerName: currentDetails?.layerName || `Carga ${processId}`,
+      stage: currentDetails?.stage || 'Ingestão',
+      status: currentDetails?.status || 'Em andamento',
+      dateTime: currentDetails?.dateTime || new Date().toLocaleString('pt-BR'),
+      source: currentDetails?.source || 'Órgão Oficial',
+      year: currentDetails?.year || '2026',
+      epsg: currentDetails?.epsg || 'EPSG:4674',
+      originalFileUrl: `/api/carga/download/${processId}`,
+      integrityHash: currentDetails?.integrityHash || '',
+      description: currentDetails?.description || 'Processamento inicial da carga.',
+      versionNumber: 1,
+      versionTag: 'v1.0 (Original)',
+      isLatest: true,
+      changeNote: currentDetails?.pauseReason || 'Arquivo inicial recebido na esteira.',
+      mapCoordinates: currentDetails?.mapCoordinates || [
+        [-15.793, -47.882],
+        [-15.793, -47.8],
+        [-15.85, -47.8],
+        [-15.85, -47.882],
+      ],
+      logs: currentDetails?.logs || {},
+      validationChecks: currentDetails?.validationChecks || [],
+      treatmentChecks: currentDetails?.treatmentChecks || [],
+      analyticsData: currentDetails?.analyticsData || [],
     }
 
-    return { carga, versions }
+    const carga: AuditProcessCarga = {
+      id: String(processId),
+      dataset: currentDetails?.dataset || 'Conjunto Territorial',
+      layerName: currentDetails?.layerName || `Carga ${processId}`,
+      source: currentDetails?.source || 'Órgão Oficial',
+      lastUpdate: fallbackVersion.dateTime,
+      totalVersions: 1,
+      currentStatus: fallbackVersion.status as any,
+      currentStage: fallbackVersion.stage,
+      versions: [fallbackVersion],
+    }
+
+    return { carga, versions: [fallbackVersion] }
   },
 }

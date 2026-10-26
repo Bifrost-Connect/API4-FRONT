@@ -7,8 +7,10 @@ import {
   FiXCircle,
   FiBell,
   FiCheckCircle,
+  FiUserCheck,
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
+import { processService } from '../../services/process'
 import { dashboardService } from '../../services/dashboard'
 import { userService } from '../../services/user'
 import { uploadService } from '../../services/upload'
@@ -20,6 +22,8 @@ const props = withDefaults(
   }>(),
   { readOnly: false },
 )
+
+const emit = defineEmits<{ (e: 'reload'): void }>()
 
 const currentUser = computed(() => userService.getCurrentUser())
 const isAuditor = computed(() => currentUser.value.role === 'Auditor')
@@ -40,6 +44,40 @@ const showErrorToast = (msg: string) => {
 const showSuccessToast = (msg: string) => {
   toastSuccess.value = msg
   toastError.value = null
+}
+
+// Alocação de Auditor pelo Gestor
+const showAlocarAuditorModal = ref(false)
+const auditores = ref<Array<{ id: number; nome: string; email: string }>>([])
+const selectedAuditorId = ref<number | null>(null)
+const isAlocandoAuditor = ref(false)
+
+const openAlocarAuditorModal = async () => {
+  try {
+    auditores.value = await processService.getAuditores()
+    if (auditores.value.length > 0) {
+      selectedAuditorId.value = auditores.value[0]?.id ?? null
+    }
+  } catch (err) {
+    console.error('Falha ao obter lista de auditores:', err)
+  }
+  showAlocarAuditorModal.value = true
+}
+
+const confirmAlocarAuditor = async () => {
+  if (!selectedAuditorId.value) return
+  isAlocandoAuditor.value = true
+  try {
+    const numericId = Number(String(props.details.id).replace(/\D/g, ''))
+    await processService.alocarAuditor(numericId || props.details.id, selectedAuditorId.value, currentUser.value.id || 1)
+    const auditorObj = auditores.value.find((a) => a.id === selectedAuditorId.value)
+    showSuccessToast(`Auditor ${auditorObj ? auditorObj.nome : ''} alocado com sucesso para a carga ${props.details.id}!`)
+    showAlocarAuditorModal.value = false
+  } catch (err: any) {
+    showErrorToast(err?.response?.data?.message || err?.message || 'Falha ao alocar auditor.')
+  } finally {
+    isAlocandoAuditor.value = false
+  }
 }
 
 // Tarefa 5: Sinalizar / Solicitar Reprocessamento ao Operador (apenas flag operacional)
@@ -69,13 +107,34 @@ const signalOperatorReprocess = async () => {
 }
 
 // Tarefa 6 e Tarefa 10: Exportar Motivos de Rejeição (CSV / JSON) com validação de vazio
-const exportQuarantine = (format: 'csv' | 'json') => {
+const exportQuarantine = async (format: 'csv' | 'json') => {
   const records = props.details.quarantineRecords ?? []
   if (records.length === 0) {
     showErrorToast(
       'Não foi possível exportar: o relatório de motivos de rejeição está vazio para esta carga.',
     )
     return
+  }
+
+  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
+  if (format === 'csv' && numericId) {
+    try {
+      const blob = await uploadService.exportarRejeicoesCsv(numericId)
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `rejeicoes_carga_${numericId}.csv`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+        showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
+        return
+      }
+    } catch {
+      // Fallback para os registros locais em memória
+    }
   }
 
   let content = ''
@@ -105,6 +164,17 @@ const exportQuarantine = (format: 'csv' | 'json') => {
   }
 }
 
+defineExpose({
+  openReprocessModal: () => {
+    showReprocessModal.value = true
+  },
+  openCancelModal: () => {
+    showCancelModal.value = true
+  },
+  signalOperatorReprocess,
+  exportQuarantine,
+})
+
 // Tarefa 7 e Tarefa 10: Modal de Reprocessar Carga com anexo obrigatório
 const showReprocessModal = ref(false)
 const selectedFile = ref<File | null>(null)
@@ -125,9 +195,10 @@ const confirmReprocess = async () => {
   const fileToUpload = selectedFile.value
   showReprocessModal.value = false
   props.details.status = 'Em andamento'
+  props.details.stage = 'Validação'
   props.details.pauseReason = `Reprocessamento iniciado com o arquivo ${fileToUpload.name}.`
   showSuccessToast(
-    `Arquivo "${fileToUpload.name}" vinculado à carga ${props.details.id} e enviado para reprocessamento.`,
+    `Arquivo "${fileToUpload.name}" enviado com sucesso! Recarregando esteira de processamento...`,
   )
   selectedFile.value = null
   reprocessNote.value = ''
@@ -135,9 +206,25 @@ const confirmReprocess = async () => {
   const numericId = Number(String(props.details.id).replace(/\D/g, ''))
   if (numericId) {
     try {
+      localStorage.removeItem(`api4_decisoes_${numericId}`)
+    } catch {
+      // ignore storage error
+    }
+    try {
       await uploadService.reprocessarCarga(numericId, fileToUpload)
+      emit('reload')
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.reload()
+        }
+      }, 700)
     } catch (e: any) {
       console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.reload()
+        }
+      }, 700)
     }
   }
 }
@@ -268,6 +355,19 @@ const confirmCancelLoad = async () => {
 
       <!-- Barra de Ações por Perfil (Tarefas 5, 7, 8 e 9) -->
       <div class="mt-4 border-top pt-4 action-footer">
+        <!-- Alocar Auditor pelo Gestor / Administrador -->
+        <button
+          v-if="isAdmin || (currentUser.role as string) === 'Gestor'"
+          type="button"
+          class="btn btn_outline"
+          style="color: #3b82f6; border-color: #3b82f6; display: flex; align-items: center; gap: 0.4rem"
+          data-testid="btn-alocar-auditor"
+          @click="openAlocarAuditorModal"
+        >
+          <FiUserCheck size="14" />
+          Alocar Auditor
+        </button>
+
         <!-- Tarefa 5: Botão do Auditor / Admin para Sinalizar Reprocessamento ao Operador -->
         <button
           v-if="isAuditor || isAdmin"
@@ -362,6 +462,55 @@ const confirmCancelLoad = async () => {
             @click="confirmReprocess"
           >
             Confirmar Reprocessamento
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Alocar Auditor pelo Gestor -->
+    <div
+      v-if="showAlocarAuditorModal"
+      class="modal-backdrop"
+      data-testid="alocar-auditor-modal"
+      @click.self="showAlocarAuditorModal = false"
+    >
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h4>Designar Auditor para a Carga #{{ details.id }}</h4>
+          <button type="button" class="modal-close" @click="showAlocarAuditorModal = false">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size: 0.9rem; color: var(--color-text); margin-bottom: 1rem">
+            Selecione o auditor que será responsável por analisar as inconformidades e emitir parecer para o operador.
+          </p>
+
+          <div class="form-field">
+            <label for="select-auditor">Auditor Responsável *</label>
+            <select
+              id="select-auditor"
+              v-model="selectedAuditorId"
+              class="text-input"
+              style="height: 40px; box-sizing: border-box"
+            >
+              <option v-for="aud in auditores" :key="aud.id" :value="aud.id">
+                {{ aud.nome }} ({{ aud.email }})
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn_outline" @click="showAlocarAuditorModal = false">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="!selectedAuditorId || isAlocandoAuditor"
+            @click="confirmAlocarAuditor"
+          >
+            {{ isAlocandoAuditor ? 'Alocando...' : 'Confirmar Designação' }}
           </button>
         </div>
       </div>

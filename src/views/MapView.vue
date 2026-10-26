@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { mapService } from '../services/map'
@@ -26,6 +26,7 @@ interface TerritoryProperties {
 }
 
 const route = useRoute()
+const router = useRouter()
 const mapElement = ref<HTMLElement | null>(null)
 const searchTerm = ref('')
 const selectedLocation = ref<MapLocation | null>(null)
@@ -34,9 +35,35 @@ const mapError = ref('')
 
 const locations = ref<MapLocation[]>([])
 
+interface BaseLayerItem {
+  id: string
+  name: string
+  type: string
+  processoId?: string | number
+  color: string
+  visible: boolean
+  featureCount: number
+  layer: L.GeoJSON
+  bounds?: L.LatLngBounds
+}
+
+const baseLayers = ref<BaseLayerItem[]>([])
+
+const DEFAULT_PALETTE = [
+  '#10b981', // Verde Esmeralda
+  '#3b82f6', // Azul Royal
+  '#8b5cf6', // Roxo Violeta
+  '#f59e0b', // Âmbar / Laranja
+  '#ec4899', // Rosa
+  '#06b6d4', // Ciano
+  '#ef4444', // Vermelho
+  '#14b8a6', // Verde Água
+  '#84cc16', // Lima
+  '#6366f1', // Índigo
+]
+
 let map: L.Map | null = null
 let markers: L.LayerGroup | null = null
-let territories: L.GeoJSON | null = null
 
 const markerIcon = L.divIcon({
   className: 'map-marker-wrapper',
@@ -51,6 +78,159 @@ const selectLocation = (location: MapLocation) => {
   map?.flyTo([location.latitude, location.longitude], 8, { duration: 0.8 })
 }
 
+const clearBaseLayers = () => {
+  baseLayers.value.forEach((b) => {
+    if (b.layer && map) {
+      map.removeLayer(b.layer)
+    }
+  })
+  baseLayers.value = []
+}
+
+const buildBaseLayersFromGeoJson = (geojson: any) => {
+  clearBaseLayers()
+  if (!geojson || !Array.isArray(geojson.features) || geojson.features.length === 0) {
+    return
+  }
+
+  // Agrupa feições por processoId ou categoria
+  const groups = new Map<string, any[]>()
+  geojson.features.forEach((feature: any) => {
+    const key = String(
+      feature.properties?.processoId ||
+      feature.properties?.category ||
+      feature.properties?.source ||
+      'base_padrao'
+    )
+    if (!groups.has(key)) {
+      groups.set(key, [])
+    }
+    groups.get(key)!.push(feature)
+  })
+
+  let index = 0
+  const allBounds: L.LatLngBounds[] = []
+
+  groups.forEach((features, key) => {
+    const color = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length]
+    index++
+
+    // Encontra dados correspondentes da base
+    const locMatch = locations.value.find((l) => String(l.id) === key)
+    const baseName =
+      locMatch?.name ||
+      features[0]?.properties?.name ||
+      features[0]?.properties?.category ||
+      `Base #${key}`
+    const baseType =
+      locMatch?.type ||
+      (features[0]?.properties?.anoSafra ? `Safra ${features[0].properties.anoSafra}` : 'Camada Territorial')
+
+    const layer = L.geoJSON(
+      { type: 'FeatureCollection', features },
+      {
+        style: () => ({
+          color,
+          weight: 2,
+          opacity: 1,
+          fillColor: color,
+          fillOpacity: 0.3,
+        }),
+        onEachFeature: (feature, fLayer) => {
+          const props = feature.properties || {}
+          const title = props.codigoImovel || props.name || `Feição #${props.id || ''}`
+          const details = [
+            props.areaHectares ? `Área: ${props.areaHectares} ha` : null,
+            props.category ? `Categoria: ${props.category}` : null,
+            props.anoSafra ? `Safra: ${props.anoSafra}` : null,
+            props.processoId ? `Processo: #${props.processoId}` : null,
+            baseName ? `Base: ${baseName}` : null,
+          ].filter(Boolean)
+
+          fLayer.bindTooltip(title)
+          fLayer.bindPopup(
+            `<div style="font-size: 0.85rem; line-height: 1.4;">
+              <strong style="color: ${color}; font-size: 0.95rem;">${title}</strong><br />
+              ${details.join('<br />')}
+              ${props.processoId ? `<div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px;">
+                <a href="/processo/${props.processoId}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
+              </div>` : ''}
+            </div>`
+          )
+        },
+      }
+    )
+
+    if (map) {
+      layer.addTo(map)
+    }
+
+    const bounds = layer.getBounds().isValid() ? layer.getBounds() : undefined
+    if (bounds) allBounds.push(bounds)
+
+    baseLayers.value.push({
+      id: key,
+      name: baseName,
+      type: baseType,
+      processoId: features[0]?.properties?.processoId,
+      color,
+      visible: true,
+      featureCount: features.length,
+      layer,
+      bounds,
+    })
+  })
+
+  // Ajusta zoom do mapa para englobar todas as camadas ativas
+  if (map && allBounds.length > 0) {
+    const combined = allBounds[0]
+    for (let i = 1; i < allBounds.length; i++) {
+      combined.extend(allBounds[i])
+    }
+    if (combined.isValid()) {
+      map.fitBounds(combined.pad(0.12), { maxZoom: 14 })
+    }
+  }
+}
+
+const toggleBaseVisibility = (base: BaseLayerItem) => {
+  if (!map || !base.layer) return
+  if (base.visible) {
+    if (!map.hasLayer(base.layer)) {
+      base.layer.addTo(map)
+    }
+  } else {
+    if (map.hasLayer(base.layer)) {
+      map.removeLayer(base.layer)
+    }
+  }
+}
+
+const updateBaseColor = (base: BaseLayerItem) => {
+  if (!base.layer) return
+  base.layer.setStyle({
+    color: base.color,
+    fillColor: base.color,
+  })
+}
+
+const zoomToBase = (base: BaseLayerItem) => {
+  if (!map) return
+  if (base.bounds && base.bounds.isValid()) {
+    map.fitBounds(base.bounds.pad(0.12), { maxZoom: 14 })
+  } else {
+    const loc = locations.value.find((l) => l.id === base.id)
+    if (loc) selectLocation(loc)
+  }
+}
+
+const toggleAllBases = (visible: boolean) => {
+  baseLayers.value.forEach((base) => {
+    base.visible = visible
+    toggleBaseVisibility(base)
+  })
+}
+
 const findLocation = async () => {
   const normalizedTerm = searchTerm.value.trim().toLowerCase()
   if (!normalizedTerm) return
@@ -63,10 +243,7 @@ const findLocation = async () => {
   // US09: Atualiza as camadas territoriais filtradas por busca textual no servidor
   try {
     const fetchedTerritories = await mapService.getTerritories({ busca: searchTerm.value.trim() })
-    if (territories && map) {
-      map.removeLayer(territories)
-      territories = createTerritoryLayer(fetchedTerritories as any).addTo(map)
-    }
+    buildBaseLayersFromGeoJson(fetchedTerritories)
   } catch (err) {
     console.warn('Falha ao filtrar camadas no mapa:', err)
   }
@@ -114,38 +291,80 @@ const locateUser = () => {
   )
 }
 
-const territoryStyle: L.PathOptions = {
-  color: '#f26522',
-  weight: 2,
-  opacity: 1,
-  fillColor: '#f26522',
-  fillOpacity: 0.28,
+const limparFiltroProcesso = async () => {
+  router.push({ path: '/mapa' })
+  searchTerm.value = ''
+  try {
+    const fetchedTerritories = await mapService.getTerritories()
+    buildBaseLayersFromGeoJson(fetchedTerritories)
+  } catch (err) {
+    console.warn('Erro ao restaurar territórios:', err)
+  }
 }
 
-const createTerritoryLayer = (data: GeoJSON.GeoJsonObject) =>
-  L.geoJSON(data, {
-    style: territoryStyle,
-    onEachFeature: (feature, layer) => {
-      const properties = feature.properties as TerritoryProperties | null
-      if (!properties) return
+const carregarCamadasElocais = async () => {
+  const rawLocations = await mapService.getPublishedLocations()
+  locations.value = Array.isArray(rawLocations)
+    ? rawLocations.map((loc: any) => ({
+        id: String(loc.id ?? ''),
+        name: String(loc.name ?? loc.nome ?? `Base #${loc.id}`),
+        type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
+        latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
+        longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
+        status: (loc.status ?? 'Concluída') as any,
+      }))
+    : []
 
-      const title =
-        properties.codigoImovel || properties.name || `Feição #${properties.id || ''}`
-      const details = [
-        properties.category ? properties.category : null,
-        properties.anoSafra ? `Safra: ${properties.anoSafra}` : null,
-        properties.processoId ? `Processo: #${properties.processoId}` : null,
-        properties.status ? `Status: ${properties.status}` : null,
-        properties.source ? `<small>${properties.source}</small>` : null,
-      ].filter(Boolean)
+  const targetProcessoId = (route.query?.processoId || route.query?.id)
+    ? Number(route.query.processoId || route.query.id)
+    : undefined
+  const requestedBase = String(route.query?.base || '').trim()
+  const requestedYear = String(route.query?.year || '').trim()
 
-      layer.bindPopup(
-        `<strong>${title}</strong>${details.length ? '<br />' + details.join('<br />') : ''}`,
-      )
-    },
-  })
+  const initialFilters: any = {}
+  if (targetProcessoId) {
+    initialFilters.processoId = targetProcessoId
+  } else {
+    if (requestedBase) initialFilters.busca = requestedBase
+    if (requestedYear) initialFilters.anoSafra = requestedYear
+  }
+
+  const fetchedTerritories = await mapService.getTerritories(initialFilters)
+  buildBaseLayersFromGeoJson(fetchedTerritories)
+
+  if (markers && map) {
+    markers.clearLayers()
+    locations.value.forEach((location) => {
+      if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
+        const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
+          .bindTooltip(location.name)
+          .on('click', () => selectLocation(location))
+        marker.addTo(markers as L.LayerGroup)
+      }
+    })
+  }
+
+  if (requestedBase || requestedYear) {
+    if (requestedBase) searchTerm.value = requestedBase
+    const match = locations.value.find(
+      (item) =>
+        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
+        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
+    )
+    if (match) {
+      selectLocation(match)
+    } else if (locations.value[0]) {
+      selectLocation(locations.value[0])
+    }
+  }
+}
 
 onMounted(async () => {
+  const scrollContainer = document.querySelector('.content-scroll-container')
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0
+  }
+
   if (!mapElement.value) return
 
   map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
@@ -163,60 +382,20 @@ onMounted(async () => {
     maxZoom: 19,
   })
 
-  const fetchedTerritories = await mapService.getTerritories()
-  territories = createTerritoryLayer(fetchedTerritories).addTo(map)
   L.control
     .layers(
       {
         Satélite: satelliteLayer,
         'Mapa de ruas': streetsLayer,
       },
-      {
-        Delimitações: territories,
-      },
+      {},
       { position: 'topright' },
     )
     .addTo(map)
 
-  locations.value = await mapService.getPublishedLocations()
-
   markers = L.layerGroup().addTo(map)
-  locations.value.forEach((location) => {
-    const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
-      .bindTooltip(location.name)
-      .on('click', () => selectLocation(location))
-    marker.addTo(markers as L.LayerGroup)
-  })
 
-  const requestedBase = String(route.query?.base || '').trim()
-  const requestedYear = String(route.query?.year || '').trim()
-  if (requestedBase || requestedYear) {
-    if (requestedBase) searchTerm.value = requestedBase
-    const match = locations.value.find(
-      (item) =>
-        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
-        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
-    )
-    if (match) {
-      selectLocation(match)
-    } else if (locations.value[0]) {
-      selectLocation(locations.value[0])
-    }
-
-    // US09: Atualiza camadas do mapa com os filtros vindos do catálogo de bases
-    try {
-      const filteredTerritories = await mapService.getTerritories({
-        busca: requestedBase || undefined,
-        anoSafra: requestedYear || undefined,
-      })
-      if (territories && map) {
-        map.removeLayer(territories)
-        territories = createTerritoryLayer(filteredTerritories as any).addTo(map)
-      }
-    } catch (err) {
-      console.warn('Erro ao carregar delimitações da base solicitada:', err)
-    }
-  }
+  await carregarCamadasElocais()
 
   map.on('click', ({ latlng }) => {
     selectedLocation.value = null
@@ -225,11 +404,20 @@ onMounted(async () => {
   })
 })
 
+watch(
+  () => [route.query?.processoId, route.query?.id, route.query?.base, route.query?.year],
+  async () => {
+    if (map) {
+      await carregarCamadasElocais()
+    }
+  },
+)
+
 onBeforeUnmount(() => {
+  clearBaseLayers()
   map?.remove()
   map = null
   markers = null
-  territories = null
 })
 </script>
 
@@ -247,6 +435,11 @@ onBeforeUnmount(() => {
         <span aria-hidden="true">⌖</span>
         Minha localização
       </button>
+    </div>
+
+    <div v-if="route.query?.processoId || route.query?.id" class="filter-badge-banner" role="status">
+      <span>Exibindo delimitações da <strong>Carga #{{ route.query?.processoId || route.query?.id }}</strong></span>
+      <button type="button" class="btn-clear-filter" @click="limparFiltroProcesso">Ver todas as cargas</button>
     </div>
 
     <section class="map-toolbar" aria-label="Ferramentas do mapa">
@@ -275,28 +468,104 @@ onBeforeUnmount(() => {
       <aside class="locations-panel" aria-label="Bases cadastradas">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Pontos monitorados</p>
+            <p class="eyebrow">Camadas e Delimitações</p>
             <h2>Bases cadastradas</h2>
           </div>
-          <span class="location-count">{{ locations.length }}</span>
+          <span class="location-count">{{ baseLayers.length || locations.length }}</span>
+        </div>
+
+        <!-- Atalhos de visualização rápida -->
+        <div v-if="baseLayers.length > 0" class="layer-quick-actions">
+          <button type="button" class="btn-quick-toggle" @click="toggleAllBases(true)">
+            Mostrar todas
+          </button>
+          <span class="action-divider">|</span>
+          <button type="button" class="btn-quick-toggle" @click="toggleAllBases(false)">
+            Ocultar todas
+          </button>
         </div>
 
         <div class="location-list">
-          <button
-            v-for="location in locations"
-            :key="location.id"
-            type="button"
-            class="location-item"
-            :class="{ 'location-item-active': selectedLocation?.id === location.id }"
-            @click="selectLocation(location)"
+          <div
+            v-if="baseLayers.length === 0 && locations.length === 0"
+            class="empty-locations-state"
+            style="padding: 1.5rem 0.5rem; text-align: center; color: var(--vis-c-text-dark-2); font-size: 0.82rem;"
           >
-            <span class="location-dot" :class="`status-${location.status.toLowerCase().replace(' ', '-')}`"></span>
-            <span class="location-content">
-              <strong>{{ location.name }}</strong>
-              <small>{{ location.type }}</small>
-              <small>{{ location.latitude.toFixed(4) }}, {{ location.longitude.toFixed(4) }}</small>
-            </span>
-          </button>
+            Nenhuma base oficial cadastrada ainda.
+          </div>
+
+          <!-- Camadas carregadas com polígonos e controle de cores -->
+          <template v-if="baseLayers.length > 0">
+            <div
+              v-for="base in baseLayers"
+              :key="base.id"
+              class="base-layer-card"
+              :class="{ 'base-layer-inactive': !base.visible }"
+            >
+              <div class="base-layer-header">
+                <!-- Checkbox de ativação/desativação da base -->
+                <label class="base-checkbox-label" title="Ativar ou desativar esta base no mapa">
+                  <input
+                    type="checkbox"
+                    v-model="base.visible"
+                    class="base-checkbox"
+                    @change="toggleBaseVisibility(base)"
+                  />
+                </label>
+
+                <!-- Seletor de cor com amostra interativa -->
+                <div class="color-picker-control" title="Clique para escolher a cor dos polígonos desta base">
+                  <input
+                    type="color"
+                    v-model="base.color"
+                    class="native-color-picker"
+                    @input="updateBaseColor(base)"
+                  />
+                  <span
+                    class="color-indicator-swatch"
+                    :style="{ backgroundColor: base.color }"
+                  ></span>
+                </div>
+
+                <!-- Informações e zoom na base -->
+                <div class="base-layer-info" @click="zoomToBase(base)">
+                  <strong>{{ base.name }}</strong>
+                  <small>{{ base.type }} &bull; {{ base.featureCount }} polígonos</small>
+                </div>
+
+                <button
+                  type="button"
+                  class="btn-zoom-target"
+                  title="Focar nesta base no mapa"
+                  @click="zoomToBase(base)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Fallback para lista de pontos se não houver polígonos carregados -->
+          <template v-else>
+            <button
+              v-for="location in locations"
+              :key="location.id"
+              type="button"
+              class="location-item"
+              :class="{ 'location-item-active': selectedLocation?.id === location.id }"
+              @click="selectLocation(location)"
+            >
+              <span class="location-dot" :class="`status-${location.status.toLowerCase().replace(' ', '-')}`"></span>
+              <span class="location-content">
+                <strong>{{ location.name }}</strong>
+                <small>{{ location.type }}</small>
+                <small>{{ location.latitude.toFixed(4) }}, {{ location.longitude.toFixed(4) }}</small>
+              </span>
+            </button>
+          </template>
         </div>
 
         <div class="coordinates-card">
@@ -353,6 +622,35 @@ h2 {
 .page-description {
   margin-top: 4px;
   color: var(--color-text);
+}
+
+.filter-badge-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 1rem;
+  background: rgba(242, 101, 34, 0.12);
+  border: 1px solid rgba(242, 101, 34, 0.35);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: var(--color-heading);
+}
+
+.btn-clear-filter {
+  background: transparent;
+  border: 1px solid var(--vis-brand-orange, #f26522);
+  color: var(--vis-brand-orange, #f26522);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear-filter:hover {
+  background: var(--vis-brand-orange, #f26522);
+  color: #fff;
 }
 
 .locate-button {
@@ -436,6 +734,147 @@ h2 {
   display: grid;
   gap: 4px;
   margin-top: 18px;
+}
+
+/* Controles de Camadas e Cores */
+.layer-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.76rem;
+}
+
+.btn-quick-toggle {
+  background: transparent;
+  border: none;
+  color: var(--vis-brand-orange, #f26522);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.btn-quick-toggle:hover {
+  opacity: 0.8;
+}
+
+.action-divider {
+  color: var(--color-border);
+}
+
+.base-layer-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-surface-soft, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+  margin-bottom: 6px;
+}
+
+.base-layer-card:hover {
+  border-color: var(--color-brand);
+}
+
+.base-layer-inactive {
+  opacity: 0.55;
+  background: transparent;
+}
+
+.base-layer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.base-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin: 0;
+}
+
+.base-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--vis-brand-orange, #f26522);
+  cursor: pointer;
+}
+
+.color-picker-control {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.native-color-picker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-indicator-swatch {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  transition: transform 0.15s ease;
+}
+
+.color-picker-control:hover .color-indicator-swatch {
+  transform: scale(1.15);
+}
+
+.base-layer-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.base-layer-info strong {
+  font-size: 0.82rem;
+  color: var(--color-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.base-layer-info small {
+  font-size: 0.72rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-zoom-target {
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.btn-zoom-target:hover {
+  color: var(--vis-brand-orange, #f26522);
 }
 
 .location-item {

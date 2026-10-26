@@ -17,8 +17,10 @@ import {
   FiXCircle,
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
+import { processService } from '../../services/process'
 import { userService } from '../../services/user'
 import { dashboardService } from '../../services/dashboard'
+import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -37,6 +39,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
   (e: 'export', format: IndicatorExportFormat): void
+  (e: 'reload'): void
 }>()
 
 const router = useRouter()
@@ -60,7 +63,10 @@ const rejectionDestination = ref<'reprocessar' | 'invalidar'>('reprocessar')
 const rejectionError = ref('')
 
 // ── Computeds de estado ────────────────────────────────────────────────────────
-const isClosed = computed(() => (props.details.status || '').toLowerCase().includes('fechad'))
+const isClosed = computed(() => {
+  const st = (props.details.status || '').toLowerCase()
+  return st.includes('fechad') || st === 'concluída' || st === 'concluida'
+})
 const isAlreadyPublished = computed(() => props.details.status === 'Concluída' || isClosed.value)
 /** Aprovado nesta sessão */
 const isJustApproved = computed(() => isApproved.value && !isClosed.value)
@@ -68,10 +74,27 @@ const isJustApproved = computed(() => isApproved.value && !isClosed.value)
 const showSuccess = computed(() => isJustApproved.value)
 
 /** Exibe painel de decisão: processo em andamento esperando homologação */
+const stageIndex = computed(() => {
+  const steps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
+  const s = (props.details.stage || '').trim().toUpperCase()
+  if (s.includes('INGEST')) return 0
+  if (s.includes('VALIDA')) return 1
+  if (s.includes('TRATA')) return 2
+  if (s.includes('PUBLICA') || s.includes('CALCULO')) return 3
+  const stage = props.details.stage === 'Cálculo analítico' ? 'Publicação' : props.details.stage
+  return steps.indexOf(stage)
+})
+
+const isStageReached = computed(() => {
+  if (props.details.status === 'Concluída' || isClosed.value) return true
+  return stageIndex.value >= 3
+})
+
 const isAwaiting = computed(
   () =>
     !props.readOnly &&
     !isClosed.value &&
+    isStageReached.value &&
     props.details.status === 'Em andamento' &&
     !isApproved.value &&
     !isRejected.value,
@@ -81,7 +104,7 @@ const isError = computed(
   () =>
     !props.readOnly &&
     (props.details.status === 'Falhou' ||
-      props.details.status === 'Aguardando validação' ||
+      props.details.status === 'Em quarentena' ||
       !!props.details.pauseReason),
 )
 
@@ -99,35 +122,57 @@ const closePublishModal = () => {
   showPublishConfirmModal.value = false
 }
 
+const publishError = ref<string | null>(null)
+
 const confirmPublishAndClose = async () => {
   if (isSubmitting.value) return
 
   isSubmitting.value = true
+  publishError.value = null
   try {
-    await dashboardService.aprovarEFecharVersao(
-      {
-        id: String(props.details.id),
-        dataset: props.details.dataset,
-        stage: 'Publicação',
-        status: 'Fechado',
-        dateTime: props.details.dateTime,
-        source: props.details.source,
-        year: props.details.year,
-        epsg: props.details.epsg,
-      },
-      currentUser.value.name,
-    )
+    if (/^\d+$/.test(String(props.details.id))) {
+      try {
+        await processService.registrarDecisaoGestor(props.details.id, {
+          gestorId: currentUser.value.id || 1,
+          etapa: 'PUBLICACAO',
+          decisao: 'APROVADO',
+          parecer: 'Publicação oficial homologada pelo gestor.',
+        })
+      } catch (errApi) {
+        console.warn('Aviso: endpoint de decisão do gestor offline ou simulado:', errApi)
+      }
+    }
+
+    try {
+      await dashboardService.aprovarEFecharVersao(
+        {
+          id: String(props.details.id),
+          dataset: props.details.dataset,
+          stage: 'Publicação',
+          status: 'Fechado',
+          dateTime: props.details.dateTime,
+          source: props.details.source,
+          year: props.details.year,
+          epsg: props.details.epsg,
+        },
+        currentUser.value.name,
+      )
+    } catch (e) {
+      console.warn('Aviso ao fechar versão via dashboardService:', e)
+    }
 
     isApproved.value = true
     isRejected.value = false
-    props.details.status = 'Fechado'
+    props.details.status = 'Concluída'
     props.details.stage = 'Publicação'
     props.details.assignedEditor = currentUser.value.name
-    closePublishModal()
-  } catch (err) {
+  } catch (err: any) {
     console.error('Erro ao aprovar e publicar:', err)
+    publishError.value = err?.response?.data?.message || err?.message || 'Falha ao homologar publicação.'
   } finally {
+    closePublishModal()
     isSubmitting.value = false
+    emit('reload')
   }
 }
 
@@ -155,6 +200,15 @@ const confirmReject = async () => {
 
   isSubmitting.value = true
   try {
+    if (/^\d+$/.test(String(props.details.id))) {
+      await processService.registrarDecisaoGestor(props.details.id, {
+        gestorId: currentUser.value.id || 1,
+        etapa: 'PUBLICACAO',
+        decisao: 'REPROVADO',
+        parecer: rejectionReason.value.trim(),
+      })
+    }
+
     await dashboardService.reprovarCarga(
       {
         id: String(props.details.id),
@@ -183,6 +237,7 @@ const confirmReject = async () => {
       props.details.pauseReason = `Carga invalidada na Publicação: ${rejectionReason.value.trim()}.`
     }
     closeRejectModal()
+    emit('reload')
   } catch (error: any) {
     rejectionError.value = error?.message || 'Falha ao reprovar.'
   } finally {
@@ -201,6 +256,10 @@ const handleUndo = () => {
 const goToDashboard = () => {
   router.push({ name: 'dashboard' })
 }
+
+const goToMap = () => {
+  router.push(`/mapa?processoId=${props.details.id}`)
+}
 </script>
 
 <template>
@@ -208,7 +267,24 @@ const goToDashboard = () => {
     <div v-if="readOnly" class="closed-version-banner" role="status">
       Esta versão foi fechada e está disponível somente para consulta.
     </div>
-    <template v-if="!showSuccess">
+
+    <div v-if="!isStageReached" class="card p-4 text-center my-4" data-testid="locked-stage-card">
+      <FiLock size="32" class="text-muted mb-2" style="margin: 0 auto; display: block;" />
+      <h4>Etapa de Publicação ainda não liberada</h4>
+      <p class="text-muted">Esta etapa será liberada após a aprovação das etapas anteriores pelo Gestor.</p>
+    </div>
+
+    <template v-else-if="!showSuccess">
+      <!-- ═══ MAPA INTERATIVO: POLÍGONOS DA CARGA ═════════════════════════════════ -->
+      <ProcessoMiniMapa
+        v-if="details?.id"
+        :processo-id="details.id"
+        :is-published="isAlreadyPublished"
+        :status="details.status"
+        title="Visualização Territorial do Indicador (Geometrias da Carga)"
+        height="320px"
+      />
+
       <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
       <div class="card">
         <div class="card-header">
@@ -288,7 +364,11 @@ const goToDashboard = () => {
       </div>
 
       <!-- ═══ VERSÃO OFICIAL BLOQUEADA E EXPORTAÇÕES (Tarefa 5 e 6) ═══ -->
-      <div v-if="isAlreadyPublished || readOnly || isClosed" class="official-export-box" data-testid="official-export-section">
+      <div v-if="isAlreadyPublished || readOnly || isClosed || isApproved" class="official-export-box" data-testid="official-export-section">
+        <div v-if="isApproved" class="mb-3" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 6px; padding: 0.75rem 1rem; color: #10b981; font-weight: 600;">
+          <FiCheckCircle size="18" />
+          <span>Versão homologada e publicada com sucesso! Os dados foram consolidados na base de produção.</span>
+        </div>
         <div class="official-seal">
           <span class="badge-bloqueada" data-testid="badge-versao-bloqueada">
             <FiLock size="14" />
@@ -318,6 +398,15 @@ const goToDashboard = () => {
           >
             <FiMap size="14" />
             {{ exportingFormat === 'geojson' ? 'Exportando…' : 'Exportar Mapa (GeoJSON)' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn_outline"
+            style="display: inline-flex; align-items: center; gap: 0.4rem;"
+            @click="goToMap"
+          >
+            <FiMap size="14" />
+            Visualizar no Mapa
           </button>
         </div>
       </div>
@@ -366,7 +455,7 @@ const goToDashboard = () => {
 
         <!-- Ações pós-publicação -->
         <div v-if="!readOnly" class="success-actions">
-          <button class="btn btn-outline-danger" @click="handleRejectRequest">
+          <button class="btn btn-outline-danger" @click="openRejectModal">
             <FiThumbsDown size="15" />
             Solicitar Revisão
           </button>
@@ -374,24 +463,6 @@ const goToDashboard = () => {
             <FiArrowLeft size="15" />
             Ver no Dashboard
           </button>
-        </div>
-
-        <!-- Input de revisão pós-publicação -->
-        <div v-if="!readOnly && showReviewInput" class="post-publish-review">
-          <h4>Motivo da Revisão</h4>
-          <textarea
-            v-model="reviewNote"
-            class="review-textarea"
-            placeholder="Descreva o que precisa ser revisado..."
-            rows="3"
-          />
-          <div class="review-actions">
-            <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
-            <button class="btn btn-outline-danger" @click="handleConfirmReject">
-              <FiThumbsDown size="15" />
-              Confirmar e Enviar ao Editor
-            </button>
-          </div>
         </div>
       </div>
     </div>

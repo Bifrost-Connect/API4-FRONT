@@ -199,6 +199,15 @@ const loadPage = async (pageNumber: number, currentFilters?: any) => {
     dataSource.value = page.source ?? 'API'
     currentPage.value = page.number ?? 0
     totalPages.value = Math.max(1, page.totalPages ?? 1)
+
+    // Se nenhuma base for vigente/concluída mas existirem cargas cadastradas, auto-chavear para TODAS
+    if (
+      processos.value.length > 0 &&
+      processos.value.filter(isVigente).length === 0 &&
+      selectedCategory.value === 'CONCLUIDAS'
+    ) {
+      selectedCategory.value = 'TODAS'
+    }
   } catch (error: any) {
     console.error('Não foi possível carregar o catálogo de bases:', error)
     loadError.value = true

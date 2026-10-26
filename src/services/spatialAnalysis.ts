@@ -1,5 +1,12 @@
-import api, { mockactive } from './api'
-import { mockSpatialAnalysisResponse, mockSpatialDocuments } from './mocks/spatial-analysis.mock'
+/**
+ * Serviço de Análise Territorial e Cruzamentos Espaciais.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as requisições utilizam exclusivamente a API real do backend (/analise/*, /mapa/*).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ */
+import api from './api'
 import { catalogoService } from './catalogo'
 
 export type SpatialLayerCategory = 'CAR' | 'ALERTA' | 'APP' | 'RESERVA_LEGAL' | 'TERRA_INDIGENA'
@@ -43,19 +50,52 @@ export interface SpatialAnalysisResponse {
   source?: 'API' | 'DEMONSTRACAO'
 }
 
-const findMockDocument = (id: string) => mockSpatialDocuments.find((document) => document.id === id)
+export const CAMADAS_REFERENCIA_OFICIAIS: SpatialAnalysisDocument[] = [
+  {
+    id: 'ref-app',
+    name: 'Área de Preservação Permanente (APP)',
+    category: 'APP',
+    source: 'PostGIS / Novo Código Florestal',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+  {
+    id: 'ref-reserva-legal',
+    name: 'Reserva Legal (RL)',
+    category: 'RESERVA_LEGAL',
+    source: 'PostGIS / SICAR',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+  {
+    id: 'ref-alerta',
+    name: 'Alertas de Desmatamento e Embargos',
+    category: 'ALERTA',
+    source: 'PostGIS / DETER & IBAMA',
+    year: '',
+    zone: 'REFERENCIA',
+    status: 'DISPONIVEL',
+    featureCount: 1,
+  },
+]
 
 export const spatialAnalysisService = {
   /**
    * Lista documentos/camadas disponíveis para análise territorial.
-   * Integra com o Catálogo de Bases (/catalogo/bases) da US09 e mescla com
-   * documentos demonstrativos locais para garantir opções completas de cruzamento.
+   * Integra com o Catálogo de Bases (/catalogo/bases) da US09 e inclui
+   * as camadas de referência oficiais do PostGIS (APP, Reserva Legal e Alertas).
    */
   async listDocuments(): Promise<SpatialAnalysisDocument[]> {
     try {
       const bases = await catalogoService.listarBases()
+      let catalogDocs: SpatialAnalysisDocument[] = []
+
       if (bases && bases.length > 0) {
-        const catalogDocs: SpatialAnalysisDocument[] = bases.map((b) => {
+        catalogDocs = bases.map((b) => {
           const nomeConjunto = (b.conjunto || '').toUpperCase()
           const cat: SpatialLayerCategory = nomeConjunto.includes('ALERTA')
             ? 'ALERTA'
@@ -78,26 +118,22 @@ export const spatialAnalysisService = {
             featureCount: b.total_feicoes || 0,
           }
         })
-
-        // Garante que haja opções padrão do mock apenas se mockactive for true
-        if (mockactive) {
-          const hasCar = catalogDocs.some((d) => d.category === 'CAR')
-          const mockCars = hasCar ? [] : mockSpatialDocuments.filter((d) => d.category === 'CAR')
-          return [...catalogDocs, ...mockCars, ...mockSpatialDocuments.filter((d) => d.category !== 'CAR')]
-        }
-        return catalogDocs
       }
-      return mockactive ? mockSpatialDocuments : []
-    } catch (error: any) {
-      if (!mockactive) throw error
-      console.warn('Usando bases demonstrativas para análise espacial:', error)
-      return mockSpatialDocuments
+
+      // Inclui sempre as camadas de referência oficiais do PostGIS (APP, RESERVA_LEGAL, ALERTA)
+      const referenciasPostGIS = CAMADAS_REFERENCIA_OFICIAIS.filter(
+        (ref) => !catalogDocs.some((cd) => cd.id === ref.id),
+      )
+
+      return [...catalogDocs, ...referenciasPostGIS]
+    } catch {
+      return [...CAMADAS_REFERENCIA_OFICIAIS]
     }
   },
 
   /**
    * Obtém as geometrias em GeoJSON da camada/documento selecionado.
-   * Prioriza arquivos locais, depois a API /mapa/camadas (filtrada por BBox) e fallback nos mocks.
+   * Consulta arquivos locais ou a API /mapa/camadas (filtrada por BBox).
    */
   async getDocumentGeoJSON(
     documentId: string,
@@ -112,26 +148,18 @@ export const spatialAnalysisService = {
     if (/^\d+$/.test(documentId)) {
       try {
         const response = await api.get('/mapa/camadas', {
-          params: bbox ? { bbox } : undefined,
+          params: {
+            processoId: Number(documentId),
+            bbox: bbox || undefined,
+          },
         })
         if (response.data && response.data.type === 'FeatureCollection' && response.data.features?.length > 0) {
           return response.data
         }
       } catch {
-        // Fallback silencioso
+        // Continua
       }
     }
-
-    // Se não encontrou no banco e mockactive for false, retorna vazio
-    if (!mockactive) {
-      return { type: 'FeatureCollection', features: [] }
-    }
-
-    // Fallback para geometria pré-carregada do mock (quando mockactive for true)
-    const localDocument = mockSpatialDocuments.find((document) => document.id === documentId)
-    if (localDocument?.geojson) return localDocument.geojson
-    const document = findMockDocument(documentId)
-    if (document?.geojson) return document.geojson
 
     // Tenta /mapa/camadas com bbox
     try {
@@ -142,7 +170,7 @@ export const spatialAnalysisService = {
         return fallbackResponse.data
       }
     } catch {
-      // Retorna coleção vazia sem disparar erro 404 no console
+      // Retorna coleção vazia
     }
 
     return { type: 'FeatureCollection', features: [] }
@@ -171,10 +199,33 @@ export const spatialAnalysisService = {
         if (/^\d+$/.test(id)) processoIds.push(Number(id))
       })
 
+      // Mapeia restrições selecionadas para categorias correspondentes ['APP', 'RESERVA_LEGAL', 'ALERTA']
+      const categoriasSet = new Set<string>()
+      request.restrictionDocumentIds.forEach((id) => {
+        const lower = id.toLowerCase()
+        if (lower.includes('app')) {
+          categoriasSet.add('APP')
+        } else if (lower.includes('reserva') || lower.includes('rl')) {
+          categoriasSet.add('RESERVA_LEGAL')
+        } else if (lower.includes('alerta') || lower.includes('alert')) {
+          categoriasSet.add('ALERTA')
+        } else {
+          const doc = CAMADAS_REFERENCIA_OFICIAIS.find((d) => d.id === id)
+          if (doc && (doc.category === 'APP' || doc.category === 'RESERVA_LEGAL' || doc.category === 'ALERTA')) {
+            categoriasSet.add(doc.category)
+          }
+        }
+      })
+
+      const categorias =
+        categoriasSet.size > 0
+          ? Array.from(categoriasSet).sort()
+          : ['ALERTA', 'APP', 'RESERVA_LEGAL']
+
       const payload = {
         processoIds: processoIds.length > 0 ? processoIds : undefined,
         anoSafra: request.safra || undefined,
-        categorias: ['ALERTA', 'APP', 'RESERVA_LEGAL'],
+        categorias,
       }
 
       const response = await api.post('/analise/cruzamento', payload)
@@ -209,21 +260,15 @@ export const spatialAnalysisService = {
         }
       }
 
-      if (!mockactive) {
-        return {
-          id: `analise-${Date.now()}`,
-          status: 'CONCLUIDO',
-          createdAt: new Date().toISOString(),
-          results: [],
-          source: 'API',
-        }
+      return {
+        id: `analise-${Date.now()}`,
+        status: 'CONCLUIDO',
+        createdAt: new Date().toISOString(),
+        results: [],
+        source: 'API',
       }
-
-      return { ...mockSpatialAnalysisResponse, source: 'API' }
     } catch (error: any) {
-      if (!mockactive) throw error
-      console.warn('API /analise/cruzamento indisponível ou sem bases publicadas para o filtro. Usando dados demonstrativos:', error)
-      return { ...mockSpatialAnalysisResponse, source: 'DEMONSTRACAO' }
+      throw error
     }
   },
 

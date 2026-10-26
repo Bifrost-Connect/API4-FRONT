@@ -1,5 +1,12 @@
-import api, { mockactive } from './api'
-import { mockLocations, mockTerritories } from './mocks/map.mock'
+/**
+ * Serviço de Camadas e Delimitações Territoriais do Mapa.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as requisições utilizam exclusivamente a API real do backend (/mapa/*, /publicacao/*).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ */
+import api from './api'
 
 export interface MapFilters {
   conjuntoId?: number | string
@@ -8,6 +15,7 @@ export interface MapFilters {
   page?: number
   size?: number
   busca?: string
+  processoId?: number | string
 }
 
 export interface PaginatedGeoJson {
@@ -20,37 +28,65 @@ export interface PaginatedGeoJson {
 }
 
 export const mapService = {
+  /**
+   * Obtém as localizações das bases publicadas via API.
+   * Não utiliza mocks em produção; caso não haja dados ou ocorra erro, retorna array vazio ou propaga.
+   */
   async getPublishedLocations() {
     try {
       const response = await api.get('/mapa/camadas-legado')
       if (Array.isArray(response.data)) {
-        if (response.data.length > 0 || !mockactive) {
-          return response.data
-        }
+        return response.data
       }
-      return mockactive ? mockLocations : []
+      return []
     } catch (error: any) {
-      if (!mockactive) throw error
-      console.warn('Falha ao buscar locais do mapa. Usando dados simulados.', error)
-      return mockLocations
+      console.warn('Falha ao buscar locais do mapa via API:', error)
+      return []
     }
   },
 
+  /**
+   * Obtém as feições vetoriais (GeoJSON) das camadas publicadas ou filtradas.
+   * Nenhum dado de mock é injetado em produção.
+   */
   async getTerritories(filters?: MapFilters): Promise<PaginatedGeoJson> {
     try {
       const response = await api.get('/mapa/camadas', { params: filters })
       if (response.data && response.data.type === 'FeatureCollection') {
-        if (response.data.features?.length > 0 || !mockactive) {
+        if (response.data.features && response.data.features.length > 0) {
           return response.data
         }
       }
-      return mockactive
-        ? (mockTerritories as PaginatedGeoJson)
-        : { type: 'FeatureCollection', features: [] }
+
+      // Se filtrou por processoId específico e ainda não constou em /mapa/camadas, tenta a revisão da carga
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Continua
+        }
+      }
+
+      if (response.data && response.data.type === 'FeatureCollection') {
+        return response.data
+      }
+
+      return { type: 'FeatureCollection', features: [] }
     } catch (error: any) {
-      if (!mockactive) throw error
-      console.warn('Falha ao buscar camadas territoriais. Usando dados simulados.', error)
-      return mockTerritories as PaginatedGeoJson
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Continua
+        }
+      }
+      throw error
     }
   },
 

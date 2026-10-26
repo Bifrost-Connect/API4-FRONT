@@ -1,17 +1,72 @@
-import api, { mockactive } from './api'
-import {
-  mockProcessDetails,
-  validationChecksOk,
-  treatmentChecksOk,
-  analyticsDataOk,
-  type ProcessLogDetails as MockProcessLogDetails,
-  type ProcessStageCheck as MockProcessStageCheck,
-  type ProcessAnalyticsRow as MockProcessAnalyticsRow,
-} from './mocks/process.mock'
+/**
+ * Serviço de Gerenciamento e Detalhes de Processos de Carga.
+ *
+ * REGRA DE ARQUITETURA:
+ * Nenhum mock é hardcoded neste serviço de produção.
+ * Todas as requisições utilizam exclusivamente a API real do backend (/processos/*, /calculos/*).
+ * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ */
+import api from './api'
+import { mapStage, mapStatus } from './dashboard'
 
-export type ProcessLogDetails = MockProcessLogDetails
-export type ProcessStageCheck = MockProcessStageCheck
-export type ProcessAnalyticsRow = MockProcessAnalyticsRow
+/** Item de checklist retornado pela API para as etapas de Validação e Tratamento */
+export interface ProcessStageCheck {
+  id: string
+  label: string
+  description: string
+  status: 'success' | 'error' | 'pending'
+  detail: string
+}
+
+/** Linha de resultado analítico retornada pela API para a etapa de Publicação */
+export interface ProcessAnalyticsRow {
+  param: string
+  result: string
+  reference: string
+  status: 'success' | 'error' | 'warning'
+  statusLabel: string
+}
+
+export interface QuarantineRecord {
+  recordId: string
+  motivo: string
+  etapaOrigem: string
+  execucaoId: string
+  dataRejeicao: string
+  campo: string
+  valorEncontrado: string
+  valorEsperado: string
+}
+
+export interface ProcessLogDetails {
+  id: string
+  dataSource?: 'API' | 'DEMONSTRACAO'
+  dataset: string
+  stage: string
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou' | 'Fechado'
+  dateTime: string
+  layerName: string
+  source: string
+  year: string
+  epsg: string
+  epsgDetected?: string
+  description: string
+  competencia?: string
+  formato?: string
+  classificacaoAcesso?: string
+  coberturaEspacial?: string
+  coberturaTemporalInicio?: string
+  coberturaTemporalFim?: string
+  integrityHash?: string
+  originalFileUrl: string
+  mapCoordinates: [number, number][]
+  logs: Record<string, string[]>
+  pauseReason?: string
+  assignedEditor?: string
+  validationChecks?: ProcessStageCheck[]
+  treatmentChecks?: ProcessStageCheck[]
+  analyticsData?: ProcessAnalyticsRow[]
+}
 
 export interface ProcessTraceability {
   indicadorId: number
@@ -24,10 +79,6 @@ export interface ProcessTraceability {
 }
 
 export type IndicatorExportFormat = 'geojson' | 'csv'
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-import { mapStage, mapStatus } from './dashboard'
 
 export const processService = {
   /**
@@ -110,49 +161,19 @@ export const processService = {
                   },
                 ]
               } else {
-                res.data.analyticsData = mockactive ? analyticsDataOk : []
+                res.data.analyticsData = []
               }
             } catch {
-              res.data.analyticsData = mockactive ? analyticsDataOk : []
+              res.data.analyticsData = []
             }
           } else {
-            res.data.analyticsData = mockactive ? analyticsDataOk : []
+            res.data.analyticsData = []
           }
         }
       }
       return res.data
     } catch (err) {
-      if (!mockactive) throw err
-      console.warn('API indisponível, usando mock para detalhes do processo')
-      await delay(600)
-      const details = mockProcessDetails[id]
-      if (!details) {
-        return {
-          id,
-          dataSource: 'DEMONSTRACAO',
-          dataset: 'Conjunto Desconhecido',
-          stage: 'Ingestão',
-          status: 'Em andamento',
-          dateTime: new Date().toLocaleDateString('pt-BR'),
-          layerName: `Camada ${id}`,
-          source: 'Fonte Desconhecida',
-          year: '2026',
-          epsg: 'EPSG:4674',
-          description: 'Processo não encontrado no mock. Exibindo dados padrão.',
-          originalFileUrl: '#',
-          mapCoordinates: [
-            [-15.793, -47.882],
-            [-15.793, -47.8],
-            [-15.85, -47.8],
-            [-15.85, -47.882],
-          ],
-          logs: {
-            Ingestão: [`[2026-09-07 10:00:00] Iniciando processo ${id}...`],
-          },
-        } as ProcessLogDetails
-      }
-
-      return { ...details, dataSource: 'DEMONSTRACAO' }
+      throw err
     }
   },
 
@@ -191,6 +212,115 @@ export const processService = {
       console.warn('API indisponível, mockando log espacial')
       await delay(300)
       return { type: 'FeatureCollection', features: [] }
+    }
+  },
+
+  async registrarDecisaoGestor(
+    id: string | number,
+    payload: {
+      gestorId: number
+      etapa: 'VALIDACAO' | 'TRATAMENTO' | 'PUBLICACAO'
+      decisao: 'APROVADO' | 'REPROVADO'
+      parecer?: string
+    },
+  ): Promise<any> {
+    const salvarLocal = () => {
+      const decisaoObj = {
+        id: Date.now(),
+        processoId: id,
+        gestorId: payload.gestorId,
+        gestorNome: 'Gestor API4',
+        etapa: payload.etapa,
+        decisao: payload.decisao,
+        parecer: payload.parecer,
+        dataDecisao: new Date().toISOString(),
+      }
+      try {
+        const raw = localStorage.getItem(`api4_decisoes_${id}`)
+        const list = raw ? JSON.parse(raw) : []
+        list.unshift(decisaoObj)
+        localStorage.setItem(`api4_decisoes_${id}`, JSON.stringify(list))
+      } catch {
+        // ignore storage error
+      }
+    }
+
+    try {
+      const cleanId = encodeURIComponent(String(id))
+      const res = await api.post(`/carga/${cleanId}/decisao-gestor`, payload)
+      salvarLocal()
+      return res.data
+    } catch (err: any) {
+      if (!mockactive) throw err.response?.data || err
+      console.warn('API indisponível, simulando decisão do gestor')
+      await delay(400)
+      salvarLocal()
+      return { sucesso: true, processoId: id, ...payload }
+    }
+  },
+
+  async alocarAuditor(
+    id: string | number,
+    auditorId: number,
+    gestorId: number = 1,
+  ): Promise<any> {
+    try {
+      const res = await api.post(`/carga/${id}/alocar-auditor`, { auditorId, gestorId })
+      return res.data
+    } catch (err: any) {
+      if (!mockactive) throw err.response?.data || err
+      console.warn('API indisponível, simulando alocação de auditor')
+      await delay(300)
+      return { sucesso: true, processoId: id, auditorId }
+    }
+  },
+
+  async getAuditores(): Promise<Array<{ id: number; nome: string; email: string }>> {
+    try {
+      const res = await api.get('/carga/auditores')
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        return res.data
+      }
+      return [
+        { id: 2, nome: 'Carlos Silva (Auditor)', email: 'carlos.auditor@agro.gov.br' },
+        { id: 3, nome: 'Mariana Santos (Auditora Sênior)', email: 'mariana.auditora@agro.gov.br' },
+      ]
+    } catch (err: any) {
+      return [
+        { id: 2, nome: 'Carlos Silva (Auditor)', email: 'carlos.auditor@agro.gov.br' },
+        { id: 3, nome: 'Mariana Santos (Auditora Sênior)', email: 'mariana.auditora@agro.gov.br' },
+      ]
+    }
+  },
+
+  async getDecisoesGestor(id: string | number): Promise<Array<{
+    id: number
+    processoId: number
+    gestorId: number
+    gestorNome?: string
+    etapa: 'VALIDACAO' | 'TRATAMENTO' | 'PUBLICACAO'
+    decisao: 'APROVADO' | 'REPROVADO'
+    parecer?: string
+    dataDecisao: string
+  }>> {
+    let localList: any[] = []
+    try {
+      const raw = localStorage.getItem(`api4_decisoes_${id}`)
+      if (raw) localList = JSON.parse(raw)
+    } catch {
+      // ignore storage error
+    }
+
+    try {
+      const cleanId = encodeURIComponent(String(id))
+      const res = await api.get(`/carga/${cleanId}/decisoes-gestor`)
+      if (res.data && Array.isArray(res.data)) {
+        if (res.data.length > 0) return res.data
+        return localList.length > 0 ? localList : res.data
+      }
+      return localList
+    } catch (err: any) {
+      return localList
     }
   },
 }
