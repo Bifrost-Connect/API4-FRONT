@@ -59,6 +59,13 @@ const showToast = (msg: string) => {
   }, 3000)
 }
 
+const formatShortHash = (hash?: string): string => {
+  if (!hash) return 'Não calculado'
+  const clean = hash.trim().replace(/^sha256:/i, '')
+  if (clean.length <= 16) return clean
+  return `${clean.slice(0, 8)}...${clean.slice(-6)}`
+}
+
 const selectedVersion = computed(() => {
   return props.versions.find((v) => v.id === props.selectedVersionId) || props.versions[0] || null
 })
@@ -228,11 +235,13 @@ const formatDateTime = (dt?: string) => {
             <div class="hash-box">
               <span class="hash-label">Hash SHA-256:</span>
               <div class="hash-row">
-                <code class="hash-code" :title="ver.integrityHash">{{ ver.integrityHash || 'Não calculado' }}</code>
+                <code class="hash-code" :title="ver.integrityHash">
+                  {{ formatShortHash(ver.integrityHash) }}
+                </code>
                 <button
                   type="button"
                   class="btn-icon"
-                  title="Copiar hash SHA-256"
+                  :title="copiedHash === ver.integrityHash ? 'Hash copiado!' : 'Copiar hash SHA-256 completo'"
                   @click.stop="copyHash(ver.integrityHash)"
                 >
                   <FiCheck v-if="copiedHash === ver.integrityHash" class="icon-success" />
@@ -538,8 +547,11 @@ const formatDateTime = (dt?: string) => {
 }
 
 .version-cards-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .version-card {
@@ -551,6 +563,9 @@ const formatDateTime = (dt?: string) => {
   transition: all 0.15s;
   box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .version-card:hover {
@@ -567,9 +582,10 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .attempt-badge {
@@ -578,6 +594,11 @@ const formatDateTime = (dt?: string) => {
   padding: 3px 8px;
   border-radius: 6px;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.card-top .badge {
+  flex-shrink: 0;
 }
 
 .badge-primary {
@@ -591,8 +612,11 @@ const formatDateTime = (dt?: string) => {
 }
 
 .card-body {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .file-name-row {
@@ -600,6 +624,7 @@ const formatDateTime = (dt?: string) => {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  width: 100%;
 }
 
 .file-icon {
@@ -626,6 +651,9 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hash-label {
@@ -641,11 +669,13 @@ const formatDateTime = (dt?: string) => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .hash-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--color-text, #0f172a);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -679,12 +709,21 @@ const formatDateTime = (dt?: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   font-size: 0.74rem;
   color: var(--color-text-muted, #64748b);
   padding-top: 6px;
   border-top: 1px dashed var(--color-border, #e2e8f0);
+  min-width: 0;
+  width: 100%;
+}
+
+.date-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-download {
@@ -694,6 +733,7 @@ const formatDateTime = (dt?: string) => {
   color: #0284c7;
   font-weight: 600;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .btn-download:hover {
