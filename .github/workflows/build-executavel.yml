@@ -1,0 +1,36 @@
+name: Build Executavel Frontend
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-frontend-exe:
+    name: Compilar Executável do Frontend (Linux x86_64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Instalar Dependências
+        run: npm ci --legacy-peer-deps
+
+      - name: Compilar Executável Nativo Autossuficiente
+        run: npm run build:exe
+
+      - name: Upload do Executável como Artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: geodatahub-frontend-linux-x86_64
+          path: executavel/
+          retention-days: 14
+

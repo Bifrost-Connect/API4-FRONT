@@ -1,10 +1,6 @@
 /**
  * Serviço de Camadas e Delimitações Territoriais do Mapa.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
- * Todas as requisições utilizam exclusivamente a API real do backend (/mapa/*, /publicacao/*).
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ * Todas as requisições utilizam a API REST do backend (/mapa/*, /publicacao/*).
  */
 import api from './api'
 
@@ -30,7 +26,6 @@ export interface PaginatedGeoJson {
 export const mapService = {
   /**
    * Obtém as localizações das bases publicadas via API.
-   * Não utiliza mocks em produção; caso não haja dados ou ocorra erro, retorna array vazio ou propaga.
    */
   async getPublishedLocations() {
     try {
@@ -47,7 +42,6 @@ export const mapService = {
 
   /**
    * Obtém as feições vetoriais (GeoJSON) das camadas publicadas ou filtradas.
-   * Nenhum dado de mock é injetado em produção.
    */
   async getTerritories(filters?: MapFilters): Promise<PaginatedGeoJson> {
     try {

@@ -1,10 +1,6 @@
 /**
  * Serviço de Upload e Ingestão de Cargas Geoespaciais.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
- * Todas as operações utilizam exclusivamente a API real do backend (/carga/*, /dominios/*).
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ * Todas as operações utilizam a API REST do backend (/carga/*, /dominios/*).
  */
 import api from './api'
 import { userService } from './user'

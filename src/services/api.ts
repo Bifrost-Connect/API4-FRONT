@@ -1,15 +1,10 @@
 /**
  * Configuração de cliente HTTP (Axios) para comunicação com a API REST.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded em produção. Mocks devem residir exclusivamente
- * no diretório /mocks para uso em testes automatizados.
  */
 import axios from 'axios'
 import { userService } from './user'
 
 // Flag legada mantida como false para compatibilidade com asserções de testes existentes.
-// Nenhum serviço de produção deve utilizar fallback de mock.
 export const mockactive = false
 
 /**

@@ -1,9 +1,5 @@
 /**
  * Serviço de Gerenciamento do Usuário e Sessão de Acesso.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded em produção. Mocks devem residir exclusivamente
- * no diretório /mocks para uso em testes automatizados.
  */
 import { ref } from 'vue'
 

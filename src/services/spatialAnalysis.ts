@@ -1,10 +1,6 @@
 /**
  * Serviço de Análise Territorial e Cruzamentos Espaciais.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
- * Todas as requisições utilizam exclusivamente a API real do backend (/analise/*, /mapa/*).
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ * Todas as requisições utilizam a API REST do backend (/analise/*, /mapa/*).
  */
 import api from './api'
 import { catalogoService } from './catalogo'

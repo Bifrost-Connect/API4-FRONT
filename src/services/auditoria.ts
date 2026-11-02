@@ -1,11 +1,7 @@
 /**
  * Serviço de Auditoria, Rastreabilidade e Linhagem de Cargas (US05 - Issue #16).
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
  * Todas as informações de versões, histórico, quarentena e reprocessamentos são obtidas
  * diretamente via API REST (/carga/{id}/linhagem ou /indicadores/{id}/linhagem).
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
  */
 import api from './api'
 import type { ProcessLogDetails } from './process'

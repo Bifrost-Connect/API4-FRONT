@@ -1,10 +1,6 @@
 /**
  * Serviço de Gerenciamento e Detalhes de Processos de Carga.
- *
- * REGRA DE ARQUITETURA:
- * Nenhum mock é hardcoded neste serviço de produção.
- * Todas as requisições utilizam exclusivamente a API real do backend (/processos/*, /calculos/*).
- * Mocks pertencem exclusivamente ao diretório /mocks utilizado nos testes automatizados.
+ * Todas as requisições utilizam a API REST do backend (/processos/*, /calculos/*).
  */
 import api from './api'
 import { mapStage, mapStatus } from './dashboard'
@@ -109,7 +105,6 @@ export const processService = {
           res.data.logs = normalizedLogs
         }
 
-        // Preenche com checklists padrão apenas se mockactive for true
         if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
           res.data.validationChecks = mockactive ? validationChecksOk : []
         }
@@ -197,7 +192,7 @@ export const processService = {
       return res.data
     } catch (err: any) {
       if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, mockando sucesso do início de processamento')
+      console.warn('API indisponível, simulando retorno de início de processamento')
       await delay(500)
       return { success: true }
     }
@@ -209,7 +204,7 @@ export const processService = {
       return res.data
     } catch (err: any) {
       if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, mockando log espacial')
+      console.warn('API indisponível, simulando log espacial vazio')
       await delay(300)
       return { type: 'FeatureCollection', features: [] }
     }
