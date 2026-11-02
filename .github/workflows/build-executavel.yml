@@ -18,11 +18,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
 
       - name: Instalar Dependências
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       - name: Compilar Executável Nativo Autossuficiente
         run: npm run build:exe
@@ -33,4 +31,3 @@ jobs:
           name: geodatahub-frontend-linux-x86_64
           path: executavel/
           retention-days: 14
-
