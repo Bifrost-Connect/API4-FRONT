@@ -788,7 +788,7 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .page-description {
   margin: 8px 0 0;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
 }
 
 .auditor-badge-header {
@@ -797,8 +797,9 @@ const requestAuditor = async (item: ProcessLog) => {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(2, 132, 199, 0.1);
-  color: #0284c7;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -810,8 +811,9 @@ const requestAuditor = async (item: ProcessLog) => {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.1);
-  color: #7c3aed;
+  background: var(--badge-editor-bg);
+  color: var(--badge-editor-text);
+  border: 1px solid var(--badge-editor-border);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -836,7 +838,7 @@ const requestAuditor = async (item: ProcessLog) => {
   border-radius: 6px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -846,12 +848,12 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .category-tab-btn:hover {
   background: var(--color-surface-soft);
-  color: var(--color-text);
+  color: var(--color-heading);
 }
 
 .category-tab-btn.active {
-  background: var(--vis-brand-orange);
-  border-color: var(--vis-brand-orange);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #fff;
 }
 
@@ -999,15 +1001,16 @@ const requestAuditor = async (item: ProcessLog) => {
   text-transform: uppercase;
 }
 
-.badge_success { background: #dcfce7; color: #166534; }
-.badge_info { background: #e0f2fe; color: #0369a1; }
-.badge_warning { background: #fef3c7; color: #b45309; }
-.badge_danger { background: #fee2e2; color: #b91c1c; }
-.badge_primary { background: #f1f5f9; color: #475569; }
+.badge_success { background: var(--badge-success-bg); color: var(--badge-success-text); border: 1px solid var(--badge-success-border); }
+.badge_info { background: var(--badge-info-bg); color: var(--badge-info-text); border: 1px solid var(--badge-info-border); }
+.badge_warning { background: var(--badge-warning-bg); color: var(--badge-warning-text); border: 1px solid var(--badge-warning-border); }
+.badge_danger { background: var(--badge-danger-bg); color: var(--badge-danger-text); border: 1px solid var(--badge-danger-border); }
+.badge_primary { background: var(--badge-neutral-bg); color: var(--badge-neutral-text); border: 1px solid var(--badge-neutral-border); }
 
 .badge-editor-assigned {
-  background: #ede9fe;
-  color: #6d28d9;
+  background: var(--badge-editor-bg);
+  color: var(--badge-editor-text);
+  border: 1px solid var(--badge-editor-border);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1068,7 +1071,7 @@ const requestAuditor = async (item: ProcessLog) => {
   margin: 0;
   padding-left: 1.25rem;
   font-size: 0.82rem;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
 }
 
 .expanded-actions {
@@ -1102,9 +1105,9 @@ const requestAuditor = async (item: ProcessLog) => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #7c3aed;
-  color: #7c3aed;
-  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid var(--badge-editor-border);
+  color: var(--badge-editor-text);
+  background: var(--badge-editor-bg);
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 0.6rem 1.25rem;
@@ -1116,7 +1119,7 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .btn_action_editor:hover {
-  background: #7c3aed;
+  background: var(--badge-editor-text);
   color: #fff;
 }
 
@@ -1124,9 +1127,9 @@ const requestAuditor = async (item: ProcessLog) => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--vis-c-danger, #ef4444);
-  color: var(--vis-c-danger, #ef4444);
-  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 0.6rem 1.25rem;
@@ -1152,7 +1155,8 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .alert-warning {
-  background-color: rgba(234, 179, 8, 0.15);
+  background-color: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   color: var(--color-text);
   padding: 0.75rem;
   border-radius: 4px;
@@ -1162,11 +1166,7 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .alert-warning strong {
-  color: #b45309;
-}
-
-:root[data-theme='dark'] .alert-warning strong {
-  color: #fef08a;
+  color: var(--badge-warning-text);
 }
 
 .loading-state {
@@ -1188,16 +1188,16 @@ const requestAuditor = async (item: ProcessLog) => {
   text-align: center;
 }
 
-.text-success { color: #16a34a; }
-.text-muted { color: var(--vis-c-text-dark-2); }
+.text-success { color: var(--vis-c-success); }
+.text-muted { color: var(--color-text-muted); }
 
 .alert-success-notification {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background-color: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
+  background-color: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
+  color: var(--badge-success-text);
   padding: 0.75rem 1.25rem;
   border-radius: 8px;
   font-weight: 500;
@@ -1205,9 +1205,10 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .alert-info {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: var(--badge-info-bg);
+  border: 1px solid var(--badge-info-border);
+  border-left: 3px solid var(--vis-c-info);
   color: var(--color-text);
-  border-left: 3px solid #3b82f6;
   padding: 0.65rem 0.85rem;
   border-radius: 4px;
   display: flex;
@@ -1292,7 +1293,7 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .modal-hint {
   font-size: 0.8rem;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   margin-top: 0.75rem;
 }
 

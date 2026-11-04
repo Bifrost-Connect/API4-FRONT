@@ -399,20 +399,20 @@ const lineageTree = computed(() => {
   gap: 0.85rem;
   padding: 1rem 1.25rem;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-left: 4px solid #d97706;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
+  border-left: 4px solid var(--badge-warning-text);
   color: var(--color-text);
 }
 
 .epsg-alert-icon {
-  color: #d97706;
+  color: var(--badge-warning-text);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .epsg-divergence-alert strong {
-  color: #b45309;
+  color: var(--badge-warning-text);
   display: block;
   margin-bottom: 0.2rem;
 }
@@ -435,8 +435,8 @@ const lineageTree = computed(() => {
 }
 
 .epsg-comparison-box--warning {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: #f59e0b;
+  background: var(--badge-warning-bg);
+  border-color: var(--badge-warning-border);
 }
 
 .epsg-col {
@@ -449,7 +449,7 @@ const lineageTree = computed(() => {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
 }
 
 .epsg-code {
@@ -461,16 +461,16 @@ const lineageTree = computed(() => {
 .epsg-divider {
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
 }
 
 .epsg-tag-warning {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #f59e0b;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   font-size: 0.75rem;
@@ -481,9 +481,9 @@ const lineageTree = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #86efac;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   font-size: 0.75rem;
@@ -491,8 +491,9 @@ const lineageTree = computed(() => {
 }
 
 .badge_warning {
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
   padding: 0.25rem 0.6rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -570,7 +571,7 @@ const lineageTree = computed(() => {
 
 .file-id-tag {
   font-size: 0.82rem;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   font-weight: 400;
 }
 
@@ -661,15 +662,15 @@ const lineageTree = computed(() => {
 }
 
 .lineage-node--ok {
-  border-left-color: #16a34a;
+  border-left-color: var(--badge-success-border);
 }
 
 .lineage-node--warning {
-  border-left-color: #d97706;
+  border-left-color: var(--badge-warning-border);
 }
 
 .lineage-node--error {
-  border-left-color: #dc2626;
+  border-left-color: var(--badge-danger-border);
 }
 
 .lineage-node-marker {
@@ -682,15 +683,15 @@ const lineageTree = computed(() => {
 }
 
 .lineage-node--ok .lineage-node-marker {
-  background: #16a34a;
+  background: var(--badge-success-text);
 }
 
 .lineage-node--warning .lineage-node-marker {
-  background: #d97706;
+  background: var(--badge-warning-text);
 }
 
 .lineage-node--error .lineage-node-marker {
-  background: #dc2626;
+  background: var(--badge-danger-text);
 }
 
 .lineage-node-content {
@@ -705,7 +706,7 @@ const lineageTree = computed(() => {
 }
 
 .lineage-node-content span {
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   word-break: break-all;
 }
 </style>

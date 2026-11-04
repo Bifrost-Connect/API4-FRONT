@@ -187,13 +187,13 @@ const overallStatus = computed(() => {
 }
 
 .checklist-item.success {
-  border-color: rgba(22, 163, 74, 0.25);
-  background: rgba(22, 163, 74, 0.04);
+  border-color: var(--badge-success-border);
+  background: var(--badge-success-bg);
 }
 
 .checklist-item.error {
-  border-color: rgba(220, 53, 69, 0.25);
-  background: rgba(220, 53, 69, 0.04);
+  border-color: var(--badge-danger-border);
+  background: var(--badge-danger-bg);
 }
 
 .check-icon {
@@ -207,18 +207,18 @@ const overallStatus = computed(() => {
 }
 
 .check-icon.success {
-  color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
+  color: var(--badge-success-text);
+  background: var(--badge-success-bg);
 }
 
 .check-icon.error {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.1);
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
 }
 
 .check-icon.pending {
-  color: #a16207;
-  background: rgba(234, 179, 8, 0.1);
+  color: var(--badge-warning-text);
+  background: var(--badge-warning-bg);
 }
 
 .check-body {
@@ -235,8 +235,7 @@ const overallStatus = computed(() => {
 
 .check-desc {
   font-size: 0.82rem;
-  color: var(--color-text);
-  opacity: 0.6;
+  color: var(--color-text-muted);
 }
 
 .check-detail {
@@ -246,10 +245,10 @@ const overallStatus = computed(() => {
 }
 
 .check-detail.success {
-  color: #16a34a;
+  color: var(--badge-success-text);
 }
 .check-detail.error {
-  color: #dc3545;
+  color: var(--badge-danger-text);
 }
 
 /* BADGES */
@@ -262,15 +261,15 @@ const overallStatus = computed(() => {
 }
 
 .badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.25);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  border: 1px solid rgba(220, 53, 69, 0.2);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .check-badge {
@@ -282,12 +281,14 @@ const overallStatus = computed(() => {
 }
 
 .check-badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 .check-badge.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 /* ERROR ALERT */
@@ -297,20 +298,20 @@ const overallStatus = computed(() => {
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: 8px;
-  background: rgba(220, 53, 69, 0.06);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  border-left: 4px solid #dc3545;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-left: 4px solid var(--badge-danger-text);
 }
 
 .alert-icon {
   flex-shrink: 0;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   padding-top: 0.1rem;
 }
 
 .alert-content strong {
   display: block;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
 }
@@ -337,13 +338,13 @@ const overallStatus = computed(() => {
 }
 
 .btn-warning {
-  background-color: rgba(234, 179, 8, 0.15);
-  color: #92400e;
-  border: 1px solid rgba(234, 179, 8, 0.4);
+  background-color: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .btn-warning:hover {
-  background-color: #f59e0b;
+  background-color: var(--badge-warning-text);
   color: #fff;
 }
 </style>

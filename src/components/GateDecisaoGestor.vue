@@ -238,9 +238,9 @@ const handleConfirmarRejeicao = async () => {
       <div
         v-if="decisaoHistorico && decisaoHistorico.decisao === 'REPROVADO'"
         class="alert alert-warning mb-3"
-        style="display: flex; gap: 8px; align-items: flex-start; padding: 0.75rem 1rem; border-radius: 6px; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08);"
+        style="display: flex; gap: 8px; align-items: flex-start; padding: 0.75rem 1rem; border-radius: 6px; border-left: 4px solid var(--vis-c-warning); background: var(--badge-warning-bg);"
       >
-        <FiAlertTriangle size="18" style="color: #f59e0b; flex-shrink: 0; margin-top: 2px;" />
+        <FiAlertTriangle size="18" style="color: var(--vis-c-warning); flex-shrink: 0; margin-top: 2px;" />
         <div style="font-size: 0.875rem; color: var(--color-text);">
           <strong>Reavaliação após reprocessamento:</strong> A tentativa anterior desta etapa foi rejeitada
           <template v-if="decisaoHistorico.gestorNome"> pelo {{ formatarNomeGestor(decisaoHistorico.gestorNome) }}</template>
@@ -383,12 +383,12 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .gate-icon-success {
-  color: var(--vis-c-success, #10b981);
+  color: var(--vis-c-success);
   flex-shrink: 0;
 }
 
 .gate-icon-danger {
-  color: #ef4444;
+  color: var(--vis-c-danger);
   flex-shrink: 0;
 }
 
@@ -407,7 +407,7 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .gate-icon {
-  color: #3b82f6;
+  color: var(--vis-c-info);
   flex-shrink: 0;
 }
 
@@ -421,8 +421,7 @@ const handleConfirmarRejeicao = async () => {
 .gate-desc {
   margin: 0.2rem 0 0 0;
   font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-text-muted);
 }
 
 .gate-actions {
@@ -432,7 +431,7 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .btn-success {
-  background-color: var(--vis-c-success, #10b981);
+  background-color: var(--vis-c-success);
   color: white;
   border: none;
   display: flex;
@@ -452,8 +451,8 @@ const handleConfirmarRejeicao = async () => {
 
 .btn-outline-danger {
   background: transparent;
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  color: var(--vis-c-danger);
+  border: 1px solid var(--vis-c-danger);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -465,11 +464,11 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .btn-outline-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--badge-danger-bg);
 }
 
 .btn-danger {
-  background-color: #ef4444;
+  background-color: var(--vis-c-danger);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -488,15 +487,15 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .alert-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--vis-c-success, #10b981);
-  border-left: 3px solid var(--vis-c-success, #10b981);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border-left: 3px solid var(--badge-success-border);
 }
 
 .alert-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border-left: 3px solid #ef4444;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border-left: 3px solid var(--badge-danger-border);
 }
 
 /* Modal */
@@ -573,11 +572,11 @@ const handleConfirmarRejeicao = async () => {
   gap: 0.75rem;
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface-soft, rgba(0, 0, 0, 0.02));
+  background: var(--color-surface-soft);
 }
 
 .error-text {
-  color: #ef4444;
+  color: var(--vis-c-danger);
   font-size: 0.85rem;
   margin: 0;
 }

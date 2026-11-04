@@ -804,14 +804,14 @@ const getStatusBadgeClass = (status: string) => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  border-left: 4px solid #dc2626;
-  color: #991b1b;
+  background-color: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-left: 4px solid var(--vis-c-danger);
+  color: var(--badge-danger-text);
   padding: 0.85rem 1.25rem;
   border-radius: 8px;
   margin-bottom: 1.5rem;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .toast-error-content {
@@ -832,7 +832,7 @@ const getStatusBadgeClass = (status: string) => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #dc2626;
+  background: var(--vis-c-danger);
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -845,7 +845,7 @@ const getStatusBadgeClass = (status: string) => {
 .btn-toast-close {
   background: transparent;
   border: none;
-  color: #991b1b;
+  color: var(--badge-danger-text);
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
@@ -878,7 +878,7 @@ const getStatusBadgeClass = (status: string) => {
 }
 
 .page-subtitle {
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   margin: 0;
   font-size: 0.95rem;
 }
@@ -886,8 +886,9 @@ const getStatusBadgeClass = (status: string) => {
 .demo-label {
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
-  background: rgba(242, 101, 34, 0.12);
-  color: var(--vis-brand-orange, #f26522);
+  background: var(--badge-primary-bg);
+  color: var(--badge-primary-text);
+  border: 1px solid var(--badge-primary-border);
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
@@ -906,7 +907,7 @@ const getStatusBadgeClass = (status: string) => {
   border-radius: 6px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -916,12 +917,12 @@ const getStatusBadgeClass = (status: string) => {
 
 .category-tab-btn:hover {
   background: var(--color-surface-soft);
-  color: var(--color-text);
+  color: var(--color-heading);
 }
 
 .category-tab-btn.active {
-  background: var(--vis-brand-orange, #f26522);
-  border-color: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #fff;
 }
 
@@ -1046,8 +1047,8 @@ const getStatusBadgeClass = (status: string) => {
   top: 50%;
   left: 0.85rem;
   transform: translateY(-50%);
-  color: var(--vis-c-text-dark-2);
-  opacity: 0.7;
+  color: var(--color-text-muted);
+  opacity: 0.8;
 }
 
 .search-input {
@@ -1113,7 +1114,7 @@ const getStatusBadgeClass = (status: string) => {
   background: var(--color-surface);
   border: 1px dashed var(--color-border);
   border-radius: 10px;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1194,9 +1195,9 @@ const getStatusBadgeClass = (status: string) => {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  background-color: #dcfce7;
-  color: #15803d;
-  border: 1px solid #86efac;
+  background-color: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -1210,28 +1211,33 @@ const getStatusBadgeClass = (status: string) => {
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   text-transform: uppercase;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
 .status-concluida {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .status-andamento {
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .status-validacao {
-  background: #ffedd5;
-  color: #c2410c;
+  background: var(--badge-primary-bg);
+  color: var(--badge-primary-text);
+  border: 1px solid var(--badge-primary-border);
 }
 
 .status-falhou {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .card-dataset {
@@ -1244,7 +1250,7 @@ const getStatusBadgeClass = (status: string) => {
 
 .card-stage {
   font-size: 0.82rem;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   margin: 0 0 1rem;
 }
 
@@ -1270,7 +1276,7 @@ const getStatusBadgeClass = (status: string) => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
 }
 
 .meta-item dd {
@@ -1333,7 +1339,7 @@ const getStatusBadgeClass = (status: string) => {
   justify-content: center;
   gap: 14px;
   margin: 24px 0 8px;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   font-size: 0.85rem;
 }
 

@@ -115,7 +115,7 @@ const handleRowClick = (item: any, event: Event) => {
   border-bottom: 2px solid var(--color-border);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background-color: var(--color-background-soft);
+  background-color: var(--color-surface-soft);
 }
 
 .component-table td {
@@ -132,32 +132,25 @@ const handleRowClick = (item: any, event: Event) => {
 }
 
 .clickable-row:hover {
-  background-color: var(--color-background-mute);
+  background-color: var(--color-surface-soft);
 }
 
 .expanded-row td.expanded-cell {
   padding: 0;
   border-bottom: 1px solid var(--color-border);
-  background-color: #fafafa;
-}
-
-@media (prefers-color-scheme: dark) {
-  .expanded-row td.expanded-cell {
-    background-color: rgba(255, 255, 255, 0.02);
-  }
+  background-color: var(--color-surface-soft);
 }
 
 .expanded-content-wrapper {
   padding: 1.5rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: var(--color-text);
+  color: var(--color-text-muted);
   font-style: italic;
-  opacity: 0.7;
 }
 
 :deep(.badge) {

@@ -129,14 +129,14 @@ const onStepClick = (index: number) => {
 }
 
 .step--warning .step__indicator {
-  border-color: #eab308;
-  background-color: #fef08a;
-  color: #854d0e;
-  box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.2);
+  border-color: var(--vis-c-warning);
+  background-color: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
 }
 
 .step--active.step--warning .step__indicator {
-  background-color: #eab308;
+  background-color: var(--vis-c-warning);
   color: #ffffff;
 }
 
@@ -150,28 +150,24 @@ const onStepClick = (index: number) => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-text);
-  opacity: 0.5;
+  color: var(--color-text-muted);
   text-align: center;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, color 0.3s ease;
   white-space: normal;
   word-wrap: break-word;
   max-width: 100%;
 }
 
 .step--active .step__label {
-  opacity: 1;
-  color: var(--vis-brand-orange);
+  color: var(--color-brand);
 }
 
 .step--completed .step__label {
-  opacity: 0.8;
   color: var(--vis-c-success);
 }
 
 .step--warning .step__label {
-  opacity: 1;
-  color: #eab308;
+  color: var(--badge-warning-text);
 }
 
 .step--clickable {

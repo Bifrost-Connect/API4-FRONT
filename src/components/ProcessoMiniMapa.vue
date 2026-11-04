@@ -128,8 +128,8 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
 
       layer.bindTooltip(cod)
       layer.bindPopup(`
-        <div style="font-size: 0.85rem;">
-          <strong style="color: #f26522;">${cod}</strong><br/>
+        <div style="font-size: 0.85rem; color: var(--color-text);">
+          <strong style="color: var(--color-brand);">${cod}</strong><br/>
           ${area > 0 ? `Área: ${area.toFixed(4)} ha<br/>` : ''}
           Feição ID: #${props.id || ''}
         </div>
@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 1.15rem;
-  background: var(--color-surface-soft, rgba(0, 0, 0, 0.02));
+  background: var(--color-surface-soft);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -256,8 +256,9 @@ onBeforeUnmount(() => {
   font-size: 0.76rem;
   font-weight: 600;
   padding: 0.2rem 0.55rem;
-  background: rgba(242, 101, 34, 0.12);
-  color: var(--vis-brand-orange, #f26522);
+  background: var(--badge-primary-bg);
+  color: var(--badge-primary-text);
+  border: 1px solid var(--badge-primary-border);
   border-radius: 999px;
 }
 
@@ -265,9 +266,9 @@ onBeforeUnmount(() => {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.25rem 0.65rem;
-  background: var(--color-surface-soft, rgba(0, 0, 0, 0.05));
-  color: var(--color-text, #64748b);
-  border: 1px dashed var(--color-border, #cbd5e1);
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
   border-radius: 999px;
 }
 
@@ -277,9 +278,9 @@ onBeforeUnmount(() => {
   gap: 0.4rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--vis-brand-orange, #f26522);
+  color: var(--color-brand);
   background: transparent;
-  border: 1px solid var(--vis-brand-orange, #f26522);
+  border: 1px solid var(--color-brand);
   padding: 0.35rem 0.75rem;
   border-radius: 5px;
   cursor: pointer;
@@ -287,7 +288,7 @@ onBeforeUnmount(() => {
 }
 
 .btn-ver-mapa:hover {
-  background: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand);
   color: #fff;
 }
 
@@ -303,7 +304,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   background: var(--color-background);
   font-size: 0.85rem;
 }

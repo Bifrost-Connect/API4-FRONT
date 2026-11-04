@@ -736,9 +736,9 @@ const resetForm = () => {
 /* Alertas */
 .alert-error {
   margin-bottom: 1rem;
-  color: #991b1b;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  color: var(--badge-danger-text);
+  background-color: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
   padding: 1rem;
   border-radius: 8px;
 }
@@ -756,8 +756,7 @@ const resetForm = () => {
 }
 
 .card-description {
-  color: var(--color-text);
-  opacity: 0.7;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   margin: 0 0 1.5rem 0;
   line-height: 1.5;
@@ -799,7 +798,7 @@ const resetForm = () => {
   border: 2px dashed var(--color-border);
   border-radius: 12px;
   padding: 3rem 2rem;
-  background-color: var(--color-surface-soft, var(--vis-c-light-soft));
+  background-color: var(--color-surface-soft);
   text-align: center;
 }
 
@@ -835,8 +834,7 @@ const resetForm = () => {
 
 .dropzone__subtitle {
   font-size: 0.9rem;
-  color: var(--color-text);
-  opacity: 0.6;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -921,8 +919,7 @@ const resetForm = () => {
 }
 
 .confirmation__subtitle {
-  color: var(--color-text);
-  opacity: 0.7;
+  color: var(--color-text-muted);
   margin: 0 0 2rem 0;
   font-size: 1rem;
 }
@@ -962,8 +959,7 @@ const resetForm = () => {
 }
 
 .detail-row span {
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-text-muted);
 }
 
 .detail-row strong {
@@ -991,8 +987,7 @@ const resetForm = () => {
 
 .epsg-label {
   font-size: 0.8rem;
-  color: var(--color-text);
-  opacity: 0.7;
+  color: var(--color-text-muted);
 }
 
 .epsg-val {
@@ -1001,12 +996,12 @@ const resetForm = () => {
 }
 
 .warning-bg {
-  background-color: rgba(234, 179, 8, 0.1);
-  border-left: 3px solid var(--vis-c-warning, #eab308);
+  background-color: var(--badge-warning-bg);
+  border-left: 3px solid var(--badge-warning-border);
 }
 
 .text-warning {
-  color: #a16207;
+  color: var(--badge-warning-text);
 }
 
 .hash-text {
@@ -1014,7 +1009,9 @@ const resetForm = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
   font-family: monospace;

@@ -417,7 +417,7 @@ const formatDateTime = (dt?: string) => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--vis-brand-orange, #ea580c);
+  color: var(--color-brand);
   margin-bottom: 4px;
 }
 
@@ -433,7 +433,7 @@ const formatDateTime = (dt?: string) => {
   border: none;
   font-size: 1.35rem;
   line-height: 1;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 4px;
@@ -442,15 +442,15 @@ const formatDateTime = (dt?: string) => {
 
 .btn-close:hover {
   color: var(--color-heading);
-  background: var(--color-surface-soft, #f8fafc);
+  background: var(--color-surface-soft);
 }
 
 .audit-toast {
   margin-top: 10px;
   padding: 8px 12px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
+  color: var(--badge-success-text);
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 6px;
@@ -459,8 +459,8 @@ const formatDateTime = (dt?: string) => {
 .carga-summary-card {
   margin-top: 14px;
   padding: 12px 14px;
-  background: var(--color-surface-soft, #f8fafc);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -476,7 +476,7 @@ const formatDateTime = (dt?: string) => {
 }
 
 .summary-line .label {
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
@@ -498,9 +498,10 @@ const formatDateTime = (dt?: string) => {
   gap: 4px;
   margin-top: 14px;
   margin-bottom: 12px;
-  background: var(--color-surface-soft, #f1f5f9);
+  background: var(--color-background);
   padding: 4px;
   border-radius: 8px;
+  border: 1px solid var(--color-border);
 }
 
 .tab-btn {
@@ -511,7 +512,7 @@ const formatDateTime = (dt?: string) => {
   padding: 8px 2px;
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -528,9 +529,9 @@ const formatDateTime = (dt?: string) => {
 }
 
 .tab-btn.active {
-  background: #ffffff;
+  background: var(--color-surface);
   color: var(--color-heading);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .tab-content {
@@ -541,7 +542,7 @@ const formatDateTime = (dt?: string) => {
 
 .tab-intro {
   font-size: 0.78rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   margin: 0;
   line-height: 1.4;
 }
@@ -556,8 +557,8 @@ const formatDateTime = (dt?: string) => {
 
 .version-card {
   padding: 12px 14px;
-  background: var(--color-surface-soft, #f8fafc);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
@@ -569,13 +570,13 @@ const formatDateTime = (dt?: string) => {
 }
 
 .version-card:hover {
-  border-color: #cbd5e1;
+  border-color: var(--color-brand);
 }
 
 .version-card-active {
-  border-color: var(--vis-brand-orange, #ea580c);
-  background: #fffaf0;
-  box-shadow: 0 0 0 1px var(--vis-brand-orange, #ea580c);
+  border-color: var(--color-brand);
+  background: var(--badge-primary-bg);
+  box-shadow: 0 0 0 1px var(--color-brand);
 }
 
 .card-top {
@@ -602,13 +603,15 @@ const formatDateTime = (dt?: string) => {
 }
 
 .badge-primary {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .badge-secondary {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .card-body {
@@ -628,7 +631,7 @@ const formatDateTime = (dt?: string) => {
 }
 
 .file-icon {
-  color: var(--vis-brand-orange, #ea580c);
+  color: var(--color-brand);
   flex-shrink: 0;
 }
 
@@ -644,8 +647,8 @@ const formatDateTime = (dt?: string) => {
 }
 
 .hash-box {
-  background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 8px 10px;
   display: flex;
@@ -660,7 +663,7 @@ const formatDateTime = (dt?: string) => {
   font-size: 0.68rem;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   letter-spacing: 0.05em;
 }
 
@@ -676,7 +679,7 @@ const formatDateTime = (dt?: string) => {
 .hash-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.75rem;
-  color: var(--color-text, #0f172a);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -688,7 +691,7 @@ const formatDateTime = (dt?: string) => {
   background: transparent;
   border: none;
   cursor: pointer;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   padding: 4px;
   border-radius: 4px;
   display: grid;
@@ -698,11 +701,11 @@ const formatDateTime = (dt?: string) => {
 
 .btn-icon:hover {
   color: var(--color-heading);
-  background: var(--color-surface-soft, #f1f5f9);
+  background: var(--color-surface-soft);
 }
 
 .icon-success {
-  color: #16a34a;
+  color: var(--vis-c-success);
 }
 
 .card-footer-info {
@@ -711,9 +714,9 @@ const formatDateTime = (dt?: string) => {
   align-items: center;
   gap: 8px;
   font-size: 0.74rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   padding-top: 6px;
-  border-top: 1px dashed var(--color-border, #e2e8f0);
+  border-top: 1px dashed var(--color-border);
   min-width: 0;
   width: 100%;
 }
@@ -730,7 +733,7 @@ const formatDateTime = (dt?: string) => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #0284c7;
+  color: var(--vis-c-info);
   font-weight: 600;
   text-decoration: none;
   flex-shrink: 0;
@@ -746,7 +749,7 @@ const formatDateTime = (dt?: string) => {
   gap: 14px;
   position: relative;
   padding-left: 16px;
-  border-left: 2px solid var(--color-border, #e2e8f0);
+  border-left: 2px solid var(--color-border);
   margin-left: 6px;
 }
 
@@ -761,17 +764,17 @@ const formatDateTime = (dt?: string) => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #cbd5e1;
+  background: var(--color-border);
 }
 
 .timeline-bullet.badge-success {
-  background: #16a34a;
+  background: var(--vis-c-success);
 }
 .timeline-bullet.badge-danger {
-  background: #dc2626;
+  background: var(--vis-c-danger);
 }
 .timeline-bullet.badge-warning {
-  background: #f59e0b;
+  background: var(--vis-c-warning);
 }
 
 .timeline-content {
@@ -788,7 +791,7 @@ const formatDateTime = (dt?: string) => {
 
 .timeline-dates {
   font-size: 0.7rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .timeline-msg {
@@ -808,7 +811,7 @@ const formatDateTime = (dt?: string) => {
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .btn-action {
@@ -826,39 +829,40 @@ const formatDateTime = (dt?: string) => {
 }
 
 .btn-outline {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
 .btn-outline:hover {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
+  border-color: var(--color-border-hover);
 }
 
 .btn-notify {
-  background: #fef3c7;
-  border-color: #fde68a;
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  border-color: var(--badge-warning-border);
+  color: var(--badge-warning-text);
 }
 .btn-notify:hover {
-  background: #fde68a;
+  opacity: 0.9;
 }
 
 .btn-reprocess {
-  background: #e0f2fe;
-  border-color: #bae6fd;
-  color: #0369a1;
+  background: var(--badge-info-bg);
+  border-color: var(--badge-info-border);
+  color: var(--badge-info-text);
 }
 .btn-reprocess:hover {
-  background: #bae6fd;
+  opacity: 0.9;
 }
 
 .btn-cancel {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #b91c1c;
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+  color: var(--badge-danger-text);
 }
 .btn-cancel:hover {
-  background: #fecaca;
+  opacity: 0.9;
 }
 
 .quarantine-logs-box {
@@ -881,8 +885,8 @@ const formatDateTime = (dt?: string) => {
 
 .quarantine-log-entry {
   padding: 8px 10px;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
   border-radius: 6px;
   display: grid;
   gap: 4px;
@@ -896,7 +900,7 @@ const formatDateTime = (dt?: string) => {
 }
 
 .badge-severidade {
-  background: #be123c;
+  background: var(--vis-c-danger);
   color: #ffffff;
   font-weight: 700;
   padding: 1px 6px;
@@ -906,12 +910,12 @@ const formatDateTime = (dt?: string) => {
 
 .log-stage,
 .log-time {
-  color: #881337;
+  color: var(--badge-danger-text);
 }
 
 .log-error-text {
   font-size: 0.75rem;
-  color: #4c0519;
+  color: var(--color-text);
   margin: 0;
   line-height: 1.35;
 }
@@ -924,8 +928,8 @@ const formatDateTime = (dt?: string) => {
 
 .decisao-card {
   padding: 10px;
-  background: var(--color-surface-soft, #f8fafc);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   display: grid;
   gap: 4px;
@@ -940,7 +944,7 @@ const formatDateTime = (dt?: string) => {
 
 .decisao-meta {
   font-size: 0.7rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .decisao-parecer {
@@ -961,30 +965,35 @@ const formatDateTime = (dt?: string) => {
 }
 
 .badge-success {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 .badge-warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 .badge-danger {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 .badge-info {
-  background: #e0f2fe;
-  color: #075985;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 .badge-neutral {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
 .empty-state {
   padding: 24px 12px;
   text-align: center;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-size: 0.8rem;
 }
 </style>

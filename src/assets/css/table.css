@@ -7,8 +7,10 @@
   padding: 1.2rem;
   border-bottom: 1px solid var(--color-border);
   text-align: left;
+  color: var(--color-text);
 }
 .component-table th {
-  background-color: var(--color-background-soft);
-  font-weight: 600;
+  background-color: var(--color-surface-soft);
+  color: var(--color-heading);
+  font-weight: 700;
 }

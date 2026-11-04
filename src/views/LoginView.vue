@@ -125,7 +125,7 @@ const handleLogin = () => {
   padding: 2.5rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background-color: var(--color-background-soft);
+  background-color: var(--color-surface);
   width: 100%;
   max-width: 400px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -150,6 +150,7 @@ const handleLogin = () => {
 .form-group .label {
   margin-bottom: 0.5rem;
   font-weight: 500;
+  color: var(--color-heading);
 }
 
 .password-input-wrapper {
@@ -173,13 +174,14 @@ const handleLogin = () => {
   align-items: center;
   justify-content: center;
   padding: 0.25rem;
-  color: var(--color-text);
-  opacity: 0.6;
+  color: var(--color-text-muted);
+  opacity: 0.7;
   transition: opacity 0.2s;
 }
 
 .btn-visualizar:hover {
   opacity: 1;
+  color: var(--color-brand);
 }
 
 .login-card .btn {
@@ -198,8 +200,7 @@ const handleLogin = () => {
 
 .notice-card p {
   margin-bottom: 2rem;
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-text-muted);
 }
 
 .roles-container {
@@ -211,9 +212,10 @@ const handleLogin = () => {
 
 .roles-container .btn {
   width: 100%;
-  color: #000;
-  border-color: var(--color-border);
-  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: all 0.2s ease;
 }
 
 .roles-container .btn::before {
@@ -221,20 +223,22 @@ const handleLogin = () => {
 }
 
 .roles-container .btn:hover:not(:disabled),
-.roles-container .btn:focus-visible,
-.roles-container .role-selected {
-  color: #000;
-  border-color: var(--color-border);
-  background: transparent;
+.roles-container .btn:focus-visible {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: var(--color-surface-soft);
 }
 
 .roles-container .btn:focus-visible {
   box-shadow:
     0 0 0 2px var(--color-background),
-    0 0 0 4px var(--color-border);
+    0 0 0 4px var(--color-brand);
 }
 
 .roles-container .role-selected {
-  color: #000;
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: var(--badge-primary-bg);
+  font-weight: 800;
 }
 </style>

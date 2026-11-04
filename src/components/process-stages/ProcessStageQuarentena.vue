@@ -360,7 +360,7 @@ const confirmCancelLoad = async () => {
           v-if="isAdmin || (currentUser.role as string) === 'Gestor'"
           type="button"
           class="btn btn_outline"
-          style="color: #3b82f6; border-color: #3b82f6; display: flex; align-items: center; gap: 0.4rem"
+          style="color: var(--color-brand); border-color: var(--color-brand); display: flex; align-items: center; gap: 0.4rem"
           data-testid="btn-alocar-auditor"
           @click="openAlocarAuditorModal"
         >
@@ -587,17 +587,17 @@ const confirmCancelLoad = async () => {
 }
 
 .toast-alert--error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-left: 4px solid #dc2626;
-  color: #991b1b;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-left: 4px solid var(--badge-danger-text);
+  color: var(--badge-danger-text);
 }
 
 .toast-alert--success {
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  border-left: 4px solid #16a34a;
-  color: #065f46;
+  background: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
+  border-left: 4px solid var(--badge-success-text);
+  color: var(--badge-success-text);
 }
 
 .toast-close {
@@ -610,18 +610,19 @@ const confirmCancelLoad = async () => {
 }
 
 .alert-warning {
-  background-color: rgba(234, 179, 8, 0.15);
+  background-color: var(--badge-warning-bg);
   color: var(--color-text);
   padding: 1rem;
   border-radius: 8px;
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  border-left: 4px solid var(--vis-c-warning, #eab308);
+  border: 1px solid var(--badge-warning-border);
+  border-left: 4px solid var(--badge-warning-text);
 }
 
 .alert-icon {
-  color: #a16207;
+  color: var(--badge-warning-text);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -659,7 +660,7 @@ const confirmCancelLoad = async () => {
 }
 
 .error-text {
-  color: #ef4444;
+  color: var(--badge-danger-text);
   font-weight: 500;
 }
 
@@ -687,8 +688,8 @@ const confirmCancelLoad = async () => {
   align-items: center;
   gap: 0.4rem;
   background: transparent;
-  color: #dc2626;
-  border: 1px solid #dc2626;
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
   padding: 0.55rem 1.1rem;
   border-radius: 6px;
   cursor: pointer;
@@ -696,7 +697,7 @@ const confirmCancelLoad = async () => {
 }
 
 .btn-danger {
-  background: #dc2626;
+  background: var(--badge-danger-text);
   color: #fff;
   border: none;
   padding: 0.55rem 1.1rem;
@@ -706,8 +707,8 @@ const confirmCancelLoad = async () => {
 }
 
 .btn-signal {
-  border-color: #0284c7;
-  color: #0284c7;
+  border-color: var(--badge-info-border);
+  color: var(--badge-info-text);
 }
 
 .action-footer {
@@ -737,11 +738,13 @@ const confirmCancelLoad = async () => {
 .data-table th {
   font-weight: 600;
   color: var(--color-heading);
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--color-surface-soft);
 }
 
 .badge {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--color-surface-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -860,8 +863,8 @@ const confirmCancelLoad = async () => {
   gap: 0.65rem;
   padding: 0.85rem;
   border-radius: 6px;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   font-size: 0.84rem;
   color: var(--color-text);
 }

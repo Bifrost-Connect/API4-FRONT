@@ -630,31 +630,35 @@ const currentComponent = computed(() => {
 
 .status-badge.concluída,
 .status-badge.concluida {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.3);
+  color: var(--badge-success-text);
+  border-color: var(--badge-success-border);
+  background-color: var(--badge-success-bg);
 }
 
 .status-badge.em-andamento {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.3);
+  color: var(--badge-warning-text);
+  border-color: var(--badge-warning-border);
+  background-color: var(--badge-warning-bg);
 }
 
 .status-badge.aguardando-validação,
 .status-badge.aguardando-validacao {
-  color: #0284c7;
-  border-color: rgba(2, 132, 199, 0.3);
+  color: var(--badge-info-text);
+  border-color: var(--badge-info-border);
+  background-color: var(--badge-info-bg);
 }
 
 .status-badge.falhou {
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.3);
+  color: var(--badge-danger-text);
+  border-color: var(--badge-danger-border);
+  background-color: var(--badge-danger-bg);
 }
 
 .status-badge.fechado,
 .status-badge.fechada {
-  color: #64748b;
-  border-color: rgba(100, 116, 139, 0.3);
-  background: rgba(100, 116, 139, 0.08);
+  color: var(--badge-neutral-text);
+  border-color: var(--badge-neutral-border);
+  background-color: var(--badge-neutral-bg);
 }
 
 .audit-toggle-btn {
@@ -700,9 +704,9 @@ const currentComponent = computed(() => {
   margin-bottom: 1.5rem;
   padding: 0.85rem 1.25rem;
   border-radius: 6px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  color: #475569;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -749,7 +753,7 @@ const currentComponent = computed(() => {
 .traceability-id {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .traceability-grid {
@@ -761,7 +765,7 @@ const currentComponent = computed(() => {
 
 .traceability-grid dt {
   font-size: 0.75rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   margin-bottom: 0.25rem;
 }
 
@@ -785,11 +789,11 @@ const currentComponent = computed(() => {
 .traceability-state {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .traceability-error {
-  color: #dc2626;
+  color: var(--badge-danger-text);
 }
 
 .page-content {

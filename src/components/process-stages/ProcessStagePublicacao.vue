@@ -365,7 +365,7 @@ const goToMap = () => {
 
       <!-- ═══ VERSÃO OFICIAL BLOQUEADA E EXPORTAÇÕES (Tarefa 5 e 6) ═══ -->
       <div v-if="isAlreadyPublished || readOnly || isClosed || isApproved" class="official-export-box" data-testid="official-export-section">
-        <div v-if="isApproved" class="mb-3" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 6px; padding: 0.75rem 1rem; color: #10b981; font-weight: 600;">
+        <div v-if="isApproved" class="mb-3" style="display: flex; align-items: center; gap: 0.5rem; background: var(--badge-success-bg); border: 1px solid var(--badge-success-border); border-radius: 6px; padding: 0.75rem 1rem; color: var(--badge-success-text); font-weight: 600;">
           <FiCheckCircle size="18" />
           <span>Versão homologada e publicada com sucesso! Os dados foram consolidados na base de produção.</span>
         </div>
@@ -667,8 +667,7 @@ const goToMap = () => {
 .header-desc {
   margin: 0;
   font-size: 0.85rem;
-  opacity: 0.6;
-  color: var(--color-text);
+  color: var(--color-text-muted);
 }
 
 .card-body {
@@ -701,10 +700,9 @@ const goToMap = () => {
 }
 
 .data-table th {
-  background: var(--color-background);
+  background: var(--color-surface-soft);
   font-weight: 600;
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-heading);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -739,9 +737,9 @@ const goToMap = () => {
 }
 
 .badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.25);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge-sm {
@@ -753,16 +751,19 @@ const goToMap = () => {
 }
 
 .badge-sm.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 .badge-sm.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 .badge-sm.warning {
-  background: rgba(234, 179, 8, 0.12);
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 /* ACTION PANEL */
@@ -876,16 +877,17 @@ const goToMap = () => {
 }
 
 .alert-banner.danger {
-  background: rgba(220, 53, 69, 0.06);
-  border-color: #dc3545;
-  border-right: 1px solid rgba(220, 53, 69, 0.2);
-  border-top: 1px solid rgba(220, 53, 69, 0.2);
-  border-bottom: 1px solid rgba(220, 53, 69, 0.2);
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+  border-left: 5px solid var(--badge-danger-text);
+  border-right: 1px solid var(--badge-danger-border);
+  border-top: 1px solid var(--badge-danger-border);
+  border-bottom: 1px solid var(--badge-danger-border);
 }
 
 .alert-icon-lg {
   flex-shrink: 0;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   padding-top: 0.1rem;
 }
 
@@ -911,12 +913,12 @@ const goToMap = () => {
 .success-card {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(22, 163, 74, 0.3);
+  border: 1px solid var(--badge-success-border);
 }
 
 .success-content {
   padding: 3rem 2rem;
-  background: linear-gradient(135deg, rgba(22, 163, 74, 0.06) 0%, var(--color-surface) 100%);
+  background: linear-gradient(135deg, var(--badge-success-bg) 0%, var(--color-surface) 100%);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -927,17 +929,17 @@ const goToMap = () => {
   width: 5rem;
   height: 5rem;
   border-radius: 50%;
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.25rem;
-  border: 2px solid rgba(22, 163, 74, 0.2);
+  border: 2px solid var(--badge-success-border);
 }
 
 .success-content h3 {
-  color: #16a34a;
+  color: var(--badge-success-text);
   font-size: 1.6rem;
   margin: 0 0 0.75rem 0;
 }
@@ -956,12 +958,12 @@ const goToMap = () => {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
-  background: rgba(22, 163, 74, 0.06);
+  background: var(--badge-success-bg);
   padding: 0.75rem 1.5rem;
   border-radius: 50px;
   font-size: 0.88rem;
   color: var(--color-text);
-  border: 1px solid rgba(22, 163, 74, 0.2);
+  border: 1px solid var(--badge-success-border);
 }
 
 .meta-divider {
@@ -1022,12 +1024,12 @@ const goToMap = () => {
 
 .btn-outline-danger {
   background: transparent;
-  border: 1.5px solid #dc3545;
-  color: #dc3545;
+  border: 1.5px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
 }
 
 .btn-outline-danger:hover {
-  background: #dc3545;
+  background: var(--badge-danger-text);
   color: #fff;
 }
 
@@ -1046,8 +1048,8 @@ const goToMap = () => {
   align-items: center;
   gap: 0.3rem;
   background: transparent;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #dc3545;
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
   padding: 0.4rem 0.9rem;
   border-radius: 6px;
   font-weight: 600;
@@ -1059,7 +1061,7 @@ const goToMap = () => {
 }
 
 .btn-ghost-small:hover {
-  background: rgba(220, 53, 69, 0.08);
+  background: var(--badge-danger-bg);
 }
 
 .btn-warning-outline {
@@ -1067,8 +1069,8 @@ const goToMap = () => {
   align-items: center;
   gap: 0.4rem;
   background: transparent;
-  border: 1px solid rgba(234, 179, 8, 0.5);
-  color: #92400e;
+  border: 1px solid var(--badge-warning-border);
+  color: var(--badge-warning-text);
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
@@ -1080,7 +1082,7 @@ const goToMap = () => {
 }
 
 .btn-warning-outline:hover {
-  background: #f59e0b;
+  background: var(--badge-warning-text);
   color: #fff;
 }
 
@@ -1090,8 +1092,8 @@ const goToMap = () => {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.25rem;
   flex-wrap: wrap;
@@ -1108,9 +1110,9 @@ const goToMap = () => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
   padding: 0.35rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.82rem;
@@ -1120,7 +1122,7 @@ const goToMap = () => {
 
 .official-seal-desc {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .official-export-buttons {
@@ -1143,23 +1145,23 @@ const goToMap = () => {
 }
 
 .btn-export-csv {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .btn-export-csv:hover:not(:disabled) {
-  background: #dcfce7;
+  filter: brightness(0.95);
 }
 
 .btn-export-geojson {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .btn-export-geojson:hover:not(:disabled) {
-  background: #dbeafe;
+  filter: brightness(0.95);
 }
 
 /* Modals */
@@ -1184,7 +1186,7 @@ const goToMap = () => {
 
 .modal-header {
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1200,15 +1202,15 @@ const goToMap = () => {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-heading);
 }
 
 .modal-danger-icon {
-  color: #ef4444;
+  color: var(--badge-danger-text);
 }
 
 .modal-lock-icon {
-  color: #059669;
+  color: var(--badge-success-text);
 }
 
 .btn-close {
@@ -1216,12 +1218,12 @@ const goToMap = () => {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #9ca3af;
+  color: var(--color-text-muted);
   line-height: 1;
 }
 
 .btn-close:hover {
-  color: #111827;
+  color: var(--color-heading);
 }
 
 .modal-body {
@@ -1234,7 +1236,7 @@ const goToMap = () => {
 .modal-info {
   margin: 0;
   font-size: 0.9rem;
-  color: #4b5563;
+  color: var(--color-text-muted);
 }
 
 .form-group {
@@ -1246,11 +1248,11 @@ const goToMap = () => {
 .form-label {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #374151;
+  color: var(--color-heading);
 }
 
 .required-mark {
-  color: #ef4444;
+  color: var(--badge-danger-text);
 }
 
 .radio-options {
@@ -1265,17 +1267,19 @@ const goToMap = () => {
   gap: 0.5rem;
   font-size: 0.88rem;
   cursor: pointer;
-  color: #374151;
+  color: var(--color-text);
 }
 
 .form-textarea {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 0.88rem;
   font-family: inherit;
   resize: vertical;
+  background: var(--color-background);
+  color: var(--color-text);
 }
 
 .form-textarea:focus {
@@ -1285,7 +1289,7 @@ const goToMap = () => {
 
 .error-text {
   font-size: 0.8rem;
-  color: #dc2626;
+  color: var(--badge-danger-text);
   font-weight: 600;
 }
 
@@ -1293,16 +1297,16 @@ const goToMap = () => {
   display: flex;
   align-items: flex-start;
   gap: 0.85rem;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   border-radius: 8px;
   padding: 1rem;
-  color: #92400e;
+  color: var(--color-text);
   font-size: 0.88rem;
 }
 
 .alert-warning-icon {
-  color: #d97706;
+  color: var(--badge-warning-text);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -1310,12 +1314,12 @@ const goToMap = () => {
 .alert-box-warning p {
   margin: 0.35rem 0 0 0;
   line-height: 1.4;
-  color: #78350f;
+  color: var(--color-text);
 }
 
 .publish-meta-box {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1rem;
   display: flex;
@@ -1330,22 +1334,22 @@ const goToMap = () => {
 }
 
 .meta-label {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 
 .modal-footer {
   padding: 1.25rem 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  background: #f9fafb;
+  background: var(--color-surface-soft);
 }
 
 .btn-cancel {
-  background: white;
-  border: 1px solid #d1d5db;
-  color: #374151;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   padding: 0.6rem 1.15rem;
   border-radius: 6px;
   font-weight: 600;
@@ -1354,7 +1358,7 @@ const goToMap = () => {
 }
 
 .btn-cancel:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-soft);
 }
 
 .btn-confirm-rejection {
