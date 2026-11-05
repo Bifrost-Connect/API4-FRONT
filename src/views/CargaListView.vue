@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * View do Catálogo de Bases Geoespaciais e Consulta de Linhagem.
+ * Permite buscar bases, filtrar por categoria, órgão ou safra,
+ * visualizar geometrias no mapa ou auditar linhagem completa.
+ */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -11,19 +16,27 @@ import {
   FiCheckCircle,
   FiRefreshCw,
 } from 'vue-icons-plus/fi'
+import ProcessFilterBar, {
+  type StandardFilters,
+  type FilterOptionsData,
+} from '@/components/ProcessFilterBar.vue'
 import { dashboardService, type ProcessLog } from '@/services/dashboard'
-import { userService } from '@/services/user'
+import {
+  type ProcessCategory,
+  isErrorOrQuarantined,
+  isProcessVigente,
+  matchesCategory,
+  matchesStandardFilters,
+  getStatusBadgeClass,
+} from '@/utils/processUtils'
 
 const router = useRouter()
 
-// Filtros rápidos por categoria/status
-type QuickCategory =
-  'CONCLUIDAS' | 'TODAS' | 'ATTENTION' | 'QUARENTENA' | 'VALIDACAO' | 'TRATAMENTO' | 'EM_CORRECAO'
-// Por padrão, selecionado para mostrar somente as cargas concluídas
-const selectedCategory = ref<QuickCategory>('CONCLUIDAS')
+// Categoria selecionada na aba rápida (padrão: Concluídas / Vigentes)
+const selectedCategory = ref<ProcessCategory>('CONCLUIDAS')
 
-// Filtros tradicionais padronizados com o Dashboard
-const filters = ref({
+// Filtros de formulário tradicionais
+const filters = ref<StandardFilters>({
   dateBeggin: '',
   dateEnd: '',
   conjunto: '',
@@ -31,18 +44,14 @@ const filters = ref({
   situacao: '',
 })
 
-// Busca textual rápida e filtros adicionais de safra/órgão
+// Busca textual rápida e filtros específicos de safra/órgão do Catálogo
 const searchQuery = ref('')
 const selectedSource = ref('')
 const selectedYear = ref('')
 
 // Dados e paginação
 const processos = ref<ProcessLog[]>([])
-const filterOptions = ref<{
-  conjuntos: { id: number | string; label: string }[]
-  etapas: { id: number | string; label: string }[]
-  situacoes: { id: number | string; label: string }[]
-}>({
+const filterOptions = ref<FilterOptionsData>({
   conjuntos: [],
   etapas: [],
   situacoes: [],
@@ -54,45 +63,8 @@ const dataSource = ref<'API' | 'DEMONSTRACAO' | ''>('')
 const currentPage = ref(0)
 const totalPages = ref(1)
 
-// Permissão para abrir auditoria detalhada e visualização de processo
-const currentUser = computed(() => userService.getCurrentUser())
-const canAuditProcess = computed(() => true)
-
 /**
- * Identifica se um processo possui erro, inconsistência ou retenção.
- */
-const isErrorOrQuarantined = (item: ProcessLog): boolean => {
-  const status = (item.status || '').toLowerCase()
-  const stage = (item.stage || '').toLowerCase()
-
-  if (
-    status.includes('falh') ||
-    status.includes('quarentena') ||
-    status.includes('valida') ||
-    status.includes('ressalva')
-  ) {
-    return true
-  }
-
-  if (stage.includes('valida') || stage.includes('trata')) {
-    if (!status.includes('conclu')) {
-      return true
-    }
-  }
-
-  if (item.assignedEditor) {
-    return true
-  }
-
-  if (item.quarantined || Boolean(item.pauseReason)) {
-    return true
-  }
-
-  return false
-}
-
-/**
- * Extrai um ano válido a partir do campo year ou da data de publicação.
+ * Extrai o ano da safra com fallback para data ou ano corrente.
  */
 const resolveYear = (process: ProcessLog): string => {
   if (process.year && String(process.year).trim()) {
@@ -103,7 +75,7 @@ const resolveYear = (process: ProcessLog): string => {
 }
 
 /**
- * Resolve o órgão/fonte da base com fallback amigável.
+ * Resolve o órgão ou fonte da base.
  */
 const resolveSource = (process: ProcessLog): string => {
   if (process.source && String(process.source).trim()) {
@@ -125,20 +97,7 @@ const resolveSource = (process: ProcessLog): string => {
 }
 
 /**
- * Verifica se a base está vigente (publicada / concluída / fechada).
- */
-const isVigente = (process: ProcessLog): boolean => {
-  const norm = (process.status || '').toLowerCase()
-  return (
-    norm.includes('conclu') ||
-    norm.includes('fechad') ||
-    norm.includes('publicad') ||
-    norm.includes('vigente')
-  )
-}
-
-/**
- * Opções dinâmicas de Categorias/Conjuntos (servidor + dados carregados).
+ * Lista consolidada de opções de conjuntos disponíveis.
  */
 const availableConjuntos = computed(() => {
   const map = new Map<string, { id: string; label: string }>()
@@ -154,7 +113,7 @@ const availableConjuntos = computed(() => {
 })
 
 /**
- * Opções dinâmicas de Órgão de Origem.
+ * Lista consolidada de opções de órgãos disponíveis.
  */
 const availableSources = computed(() => {
   const set = new Set<string>()
@@ -165,7 +124,7 @@ const availableSources = computed(() => {
 })
 
 /**
- * Opções dinâmicas de Ano da Safra.
+ * Lista consolidada de opções de anos de safra.
  */
 const availableYears = computed(() => {
   const set = new Set<string>()
@@ -176,7 +135,7 @@ const availableYears = computed(() => {
 })
 
 /**
- * Carrega o catálogo do servidor aplicando filtros padrão quando aplicável.
+ * Carrega a página de processos do catálogo via API.
  */
 const loadPage = async (pageNumber: number, currentFilters?: any) => {
   isLoading.value = true
@@ -200,16 +159,16 @@ const loadPage = async (pageNumber: number, currentFilters?: any) => {
     currentPage.value = page.number ?? 0
     totalPages.value = Math.max(1, page.totalPages ?? 1)
 
-    // Se nenhuma base for vigente/concluída mas existirem cargas cadastradas, auto-chavear para TODAS
+    // Se nenhuma carga for vigente mas existirem outras, chaveia para TODAS
     if (
       processos.value.length > 0 &&
-      processos.value.filter(isVigente).length === 0 &&
+      processos.value.filter(isProcessVigente).length === 0 &&
       selectedCategory.value === 'CONCLUIDAS'
     ) {
       selectedCategory.value = 'TODAS'
     }
   } catch (error: any) {
-    console.error('Não foi possível carregar o catálogo de bases:', error)
+    console.error('Falha ao carregar catálogo de bases:', error)
     loadError.value = true
     const isTimeout =
       error?.code === 'ECONNABORTED' ||
@@ -233,7 +192,7 @@ onMounted(async () => {
       filterOptions.value.situacoes = opts.situacoes || []
     }
   } catch {
-    // Segue com opções derivadas dos itens carregados
+    // Segue com opções derivadas
   }
   await loadPage(0)
 })
@@ -243,65 +202,26 @@ const applyFilters = async () => {
 }
 
 /**
- * Filtra os itens combinando as abas rápidas, filtros tradicionais, órgão, safra e busca textual.
+ * Filtra as bases combinando abas rápidas, filtros tradicionais e busca textual/órgão/safra.
  */
 const filteredProcessos = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
 
-  // Resolve o label do conjunto caso o filtro selecionado seja um ID numérico
-  const selectedConjuntoOption = availableConjuntos.value.find(
-    (c) => String(c.id) === String(filters.value.conjunto),
-  )
-  const targetConjuntoLabel = selectedConjuntoOption
-    ? selectedConjuntoOption.label.toLowerCase()
-    : filters.value.conjunto.trim().toLowerCase()
-
   return processos.value.filter((process) => {
-    const status = (process.status || '').toLowerCase()
-    const stage = (process.stage || '').toLowerCase()
-    const itemSource = resolveSource(process)
-    const itemYear = resolveYear(process)
-    const itemDataset = (process.dataset || '').toLowerCase()
-
-    // 1. Filtros Rápidos por Aba
-    if (selectedCategory.value === 'CONCLUIDAS') {
-      if (!isVigente(process)) return false
-    } else if (selectedCategory.value === 'ATTENTION') {
-      if (!isErrorOrQuarantined(process)) return false
-    } else if (selectedCategory.value === 'QUARENTENA') {
-      if (!status.includes('quarentena') && !process.quarantined) return false
-    } else if (selectedCategory.value === 'VALIDACAO') {
-      if (!stage.includes('valida')) return false
-    } else if (selectedCategory.value === 'TRATAMENTO') {
-      if (!stage.includes('trata')) return false
-    } else if (selectedCategory.value === 'EM_CORRECAO') {
-      if (!process.assignedEditor) return false
-    }
-
-    // 2. Filtros Tradicionais
-    if (
-      targetConjuntoLabel &&
-      itemDataset !== targetConjuntoLabel &&
-      !itemDataset.includes(targetConjuntoLabel)
-    ) {
+    // 1. Abas rápidas
+    if (!matchesCategory(process, selectedCategory.value)) {
       return false
     }
 
-    if (filters.value.etapa) {
-      const opt = filterOptions.value.etapas.find(
-        (e) => String(e.id) === String(filters.value.etapa),
-      )
-      if (opt && !stage.includes(opt.label.toLowerCase())) return false
-    }
-
-    if (filters.value.situacao) {
-      const opt = filterOptions.value.situacoes.find(
-        (s) => String(s.id) === String(filters.value.situacao),
-      )
-      if (opt && !status.includes(opt.label.toLowerCase())) return false
+    // 2. Filtros de formulário padrão
+    if (!matchesStandardFilters(process, filters.value, filterOptions.value)) {
+      return false
     }
 
     // 3. Filtros específicos do Catálogo (Órgão e Ano da Safra)
+    const itemSource = resolveSource(process)
+    const itemYear = resolveYear(process)
+
     if (selectedSource.value && itemSource.toLowerCase() !== selectedSource.value.toLowerCase()) {
       return false
     }
@@ -310,7 +230,7 @@ const filteredProcessos = computed(() => {
       return false
     }
 
-    // 4. Filtro de busca rápida por texto
+    // 4. Busca textual rápida
     if (q) {
       const searchable = [
         process.id,
@@ -319,7 +239,7 @@ const filteredProcessos = computed(() => {
         itemYear,
         process.stage,
         process.status,
-        isVigente(process) ? 'vigente' : '',
+        isProcessVigente(process) ? 'vigente' : '',
       ]
         .filter(Boolean)
         .map((v) => String(v).toLowerCase())
@@ -344,6 +264,7 @@ const clearFilters = async () => {
     filters.value.situacao ||
     filters.value.dateBeggin ||
     filters.value.dateEnd
+
   searchQuery.value = ''
   selectedCategory.value = 'CONCLUIDAS'
   selectedSource.value = ''
@@ -379,20 +300,11 @@ const viewOnMap = (process: ProcessLog) => {
     },
   })
 }
-
-const getStatusBadgeClass = (status: string) => {
-  const norm = (status || '').toLowerCase()
-  if (norm.includes('conclu') || norm.includes('fechad')) return 'status-badge status-concluida'
-  if (norm.includes('andamento')) return 'status-badge status-andamento'
-  if (norm.includes('valida')) return 'status-badge status-validacao'
-  if (norm.includes('falh') || norm.includes('quarentena')) return 'status-badge status-falhou'
-  return 'status-badge'
-}
 </script>
 
 <template>
   <main class="catalog-view">
-    <!-- Toast de Erro / Timeout (Tarefa 4) -->
+    <!-- Alerta de Erro / Timeout -->
     <Transition name="fade">
       <div
         v-if="toastErrorMessage"
@@ -433,220 +345,85 @@ const getStatusBadgeClass = (status: string) => {
       <span v-if="dataSource === 'DEMONSTRACAO'" class="demo-label">Base demonstrativa</span>
     </header>
 
-    <!-- Filtro Rápido em Abas por Categoria / Status (Padrão: Concluídas / Vigentes) -->
-    <div class="category-tabs mt-4">
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'CONCLUIDAS' }"
-        data-testid="tab-concluidas"
-        @click="selectedCategory = 'CONCLUIDAS'"
-      >
-        Concluídas ({{ processos.filter(isVigente).length }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'TODAS' }"
-        data-testid="tab-todas"
-        @click="selectedCategory = 'TODAS'"
-      >
-        Todas as Cargas ({{ processos.length }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'ATTENTION' }"
-        data-testid="tab-attention"
-        @click="selectedCategory = 'ATTENTION'"
-      >
-        Requerem Atenção ({{ processos.filter(isErrorOrQuarantined).length }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'QUARENTENA' }"
-        @click="selectedCategory = 'QUARENTENA'"
-      >
-        Quarentena ({{
-          processos.filter(
-            (p) => (p.status || '').toLowerCase().includes('quarentena') || p.quarantined,
-          ).length
-        }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'VALIDACAO' }"
-        @click="selectedCategory = 'VALIDACAO'"
-      >
-        Validação ({{
-          processos.filter((p) => (p.stage || '').toLowerCase().includes('valida')).length
-        }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'TRATAMENTO' }"
-        @click="selectedCategory = 'TRATAMENTO'"
-      >
-        Tratamento ({{
-          processos.filter((p) => (p.stage || '').toLowerCase().includes('trata')).length
-        }})
-      </button>
-      <button
-        type="button"
-        class="category-tab-btn"
-        :class="{ active: selectedCategory === 'EM_CORRECAO' }"
-        @click="selectedCategory = 'EM_CORRECAO'"
-      >
-        Com Especialista ({{ processos.filter((p) => Boolean(p.assignedEditor)).length }})
-      </button>
-    </div>
-
-    <!-- Barra de Busca Rápida e Metadados do Catálogo (Safra / Órgão) + Filtros Tradicionais Padronizada com o Dashboard -->
-    <section class="card filter-panel mt-3" aria-label="Busca e refinamento do catálogo">
-      <div class="search-row">
-        <div class="search-input-wrapper">
-          <FiSearch class="search-icon" size="18" />
-          <input
-            v-model="searchQuery"
-            type="search"
-            data-testid="search-input"
-            placeholder="Pesquisar por nome da base, ID, órgão emissor ou ano..."
-            class="search-input"
-          />
-        </div>
-        <button
-          v-if="
-            searchQuery ||
-            filters.conjunto ||
-            filters.etapa ||
-            filters.situacao ||
-            filters.dateBeggin ||
-            filters.dateEnd ||
-            selectedSource ||
-            selectedYear ||
-            selectedCategory !== 'CONCLUIDAS'
-          "
-          type="button"
-          class="btn btn_outline btn-clear"
-          data-testid="clear-filters"
-          @click="clearFilters"
-        >
-          Limpar filtros
-        </button>
-      </div>
-
-      <div class="selectors-row">
-        <div class="filter-field">
-          <label for="filter-source">Órgão de Origem:</label>
-          <select
-            id="filter-source"
-            v-model="selectedSource"
-            data-testid="filter-source"
-            class="filter-select"
-          >
-            <option value="">Todos os órgãos</option>
-            <option v-for="src in availableSources" :key="src" :value="src">
-              {{ src }}
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-field">
-          <label for="filter-year">Ano da Safra:</label>
-          <select
-            id="filter-year"
-            v-model="selectedYear"
-            data-testid="filter-year"
-            class="filter-select"
-          >
-            <option value="">Todos os anos</option>
-            <option v-for="yr in availableYears" :key="yr" :value="yr">
-              {{ yr }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="card-content filters-container">
-        <div class="filter-item filter-dates">
-          <div class="date-row">
-            <label for="dateBeggin">Início:</label>
+    <!-- Barra de Filtros e Categorias Compartilhada -->
+    <ProcessFilterBar
+      class="mt-4"
+      v-model="filters"
+      v-model:selectedCategory="selectedCategory"
+      :items="processos"
+      :filterOptions="filterOptions"
+      :showConcluidasTab="true"
+      @filter="applyFilters"
+      @conjunto-change="handleConjuntoChange"
+    >
+      <template #extra-filters>
+        <!-- Linha de Busca Textual -->
+        <div class="search-row">
+          <div class="search-input-wrapper">
+            <FiSearch class="search-icon" size="18" />
             <input
-              type="date"
-              id="dateBeggin"
-              name="dateBeggin"
-              class="input-inline"
-              v-model="filters.dateBeggin"
+              v-model="searchQuery"
+              type="search"
+              data-testid="search-input"
+              placeholder="Pesquisar por nome da base, ID, órgão emissor ou ano..."
+              class="search-input"
             />
           </div>
-          <div class="date-row">
-            <label for="dateEnd">Fim:</label>
-            <input
-              type="date"
-              id="dateEnd"
-              name="dateEnd"
-              class="input-inline"
-              v-model="filters.dateEnd"
-            />
-          </div>
-        </div>
-
-        <div class="filter-item">
-          <label for="filter-conjunto">Conjunto:</label>
-          <select
-            id="filter-conjunto"
-            class="input-inline"
-            v-model="filters.conjunto"
-            data-testid="filter-conjunto"
-            @change="handleConjuntoChange"
+          <button
+            v-if="
+              searchQuery ||
+              filters.conjunto ||
+              filters.etapa ||
+              filters.situacao ||
+              filters.dateBeggin ||
+              filters.dateEnd ||
+              selectedSource ||
+              selectedYear ||
+              selectedCategory !== 'CONCLUIDAS'
+            "
+            type="button"
+            class="btn btn_outline btn-clear"
+            data-testid="clear-filters"
+            @click="clearFilters"
           >
-            <option value="">Todos</option>
-            <option v-for="opt in availableConjuntos" :key="opt.id" :value="String(opt.id)">
-              {{ opt.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-item">
-          <label for="filter-etapa">Etapa:</label>
-          <select
-            id="filter-etapa"
-            class="input-inline"
-            v-model="filters.etapa"
-            data-testid="filter-etapa"
-          >
-            <option value="">Todas</option>
-            <option v-for="opt in filterOptions.etapas" :key="opt.id" :value="opt.id">
-              {{ opt.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-item">
-          <label for="filter-situacao">Situação:</label>
-          <select
-            id="filter-situacao"
-            class="input-inline"
-            v-model="filters.situacao"
-            data-testid="filter-situacao"
-          >
-            <option value="">Todas</option>
-            <option v-for="opt in filterOptions.situacoes" :key="opt.id" :value="opt.id">
-              {{ opt.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="filter-actions">
-          <button class="btn btn-filter" data-testid="apply-filters" @click="applyFilters">
-            FILTRAR
+            Limpar filtros
           </button>
         </div>
-      </div>
-    </section>
+
+        <!-- Seletores de Órgão de Origem e Ano da Safra -->
+        <div class="selectors-row">
+          <div class="filter-field">
+            <label for="filter-source">Órgão de Origem:</label>
+            <select
+              id="filter-source"
+              v-model="selectedSource"
+              data-testid="filter-source"
+              class="filter-select"
+            >
+              <option value="">Todos os órgãos</option>
+              <option v-for="src in availableSources" :key="src" :value="src">
+                {{ src }}
+              </option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="filter-year">Ano da Safra:</label>
+            <select
+              id="filter-year"
+              v-model="selectedYear"
+              data-testid="filter-year"
+              class="filter-select"
+            >
+              <option value="">Todos os anos</option>
+              <option v-for="yr in availableYears" :key="yr" :value="yr">
+                {{ yr }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </template>
+    </ProcessFilterBar>
 
     <!-- Estado de Carregamento -->
     <div v-if="isLoading" class="state-card mt-4" role="status" data-testid="loading-state">
@@ -654,7 +431,7 @@ const getStatusBadgeClass = (status: string) => {
       <p>Carregando catálogo de bases...</p>
     </div>
 
-    <!-- Empty State Amigável (Tarefa 4) -->
+    <!-- Empty State -->
     <div
       v-else-if="filteredProcessos.length === 0"
       class="state-card empty-state mt-4"
@@ -686,7 +463,7 @@ const getStatusBadgeClass = (status: string) => {
       </button>
     </div>
 
-    <!-- Grid do Catálogo (Tarefas 1 e 2) -->
+    <!-- Grid de Cards de Bases -->
     <section v-else class="catalog-section mt-4" aria-label="Lista de bases disponíveis">
       <div class="catalog-grid" data-testid="catalog-grid">
         <article
@@ -695,26 +472,26 @@ const getStatusBadgeClass = (status: string) => {
           class="catalog-card"
           data-testid="catalog-card"
         >
-          <!-- Topo do Card: ID e Tag Verde "Vigente" -->
+          <!-- Topo do Card: ID e Tag Vigente -->
           <div class="card-top">
             <span class="carga-id">Base #{{ process.id }}</span>
             <div class="card-badges">
-              <span v-if="isVigente(process)" class="badge-vigente" data-testid="badge-vigente">
+              <span v-if="isProcessVigente(process)" class="badge-vigente" data-testid="badge-vigente">
                 <FiCheckCircle size="12" /> Vigente
               </span>
-              <span :class="getStatusBadgeClass(process.status)">
+              <span :class="getStatusBadgeClass(process.status, 'status-badge')">
                 {{ process.status }}
               </span>
             </div>
           </div>
 
-          <!-- Nome do Conjunto / Categoria -->
+          <!-- Nome do Conjunto -->
           <h2 class="card-dataset">{{ process.dataset }}</h2>
           <p class="card-stage">
             Etapa atual: <strong>{{ process.stage }}</strong>
           </p>
 
-          <!-- Metadados Resumidos (Tarefa 2) -->
+          <!-- Metadados da Base -->
           <dl class="card-metadata">
             <div class="meta-item">
               <dt>Fonte / Órgão</dt>
@@ -737,7 +514,7 @@ const getStatusBadgeClass = (status: string) => {
             </div>
           </dl>
 
-          <!-- Ações do Card (Tarefa 3) -->
+          <!-- Ações do Card -->
           <div class="card-actions">
             <button
               type="button"
@@ -750,7 +527,6 @@ const getStatusBadgeClass = (status: string) => {
             </button>
 
             <button
-              v-if="canAuditProcess"
               type="button"
               class="btn-card-audit"
               data-testid="btn-audit-process"
@@ -798,28 +574,323 @@ const getStatusBadgeClass = (status: string) => {
   color: var(--color-text);
 }
 
-/* Toast de Erro */
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--vis-brand-orange);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--color-heading);
+  font-size: 1.8rem;
+}
+
+.page-subtitle {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+}
+
+.demo-label {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Linhas de Filtros Extras */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+  flex-wrap: wrap;
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.6rem 2.4rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-size: 0.88rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--vis-brand-orange);
+}
+
+.btn-clear {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  padding: 0.55rem 1rem;
+}
+
+.selectors-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  padding: 0 0.75rem 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .selectors-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.filter-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+}
+
+.filter-field label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-heading);
+}
+
+.filter-select {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Cards do Catálogo */
+.catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .catalog-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .catalog-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.catalog-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.catalog-card:hover {
+  border-color: var(--vis-brand-orange);
+  transform: translateY(-2px);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.carga-id {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-vigente {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.card-dataset {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  color: var(--color-heading);
+}
+
+.card-stage {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.card-metadata {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem;
+  background: var(--color-background);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.meta-item dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.meta-item dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-heading);
+  display: flex;
+  align-items: center;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.btn-card-map,
+.btn-card-audit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.55rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-card-map {
+  background: transparent;
+  border: 1px solid var(--vis-brand-orange, #f26522);
+  color: var(--vis-brand-orange, #f26522);
+}
+
+.btn-card-map:hover {
+  background: var(--vis-brand-orange, #f26522);
+  color: #fff;
+}
+
+.btn-card-audit {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
+}
+
+.btn-card-audit:hover {
+  background: var(--color-border);
+}
+
+/* Estados */
+.state-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-icon {
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  font-size: 0.88rem;
+}
+
 .toast-error {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background-color: var(--badge-danger-bg);
-  border: 1px solid var(--badge-danger-border);
-  border-left: 4px solid var(--vis-c-danger);
-  color: var(--badge-danger-text);
   padding: 0.85rem 1.25rem;
   border-radius: 8px;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-left: 4px solid var(--badge-danger-text);
+  color: var(--badge-danger-text);
   margin-bottom: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .toast-error-content {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  font-weight: 600;
-  font-size: 0.9rem;
+  gap: 0.6rem;
 }
 
 .toast-error-actions {
@@ -829,397 +900,39 @@ const getStatusBadgeClass = (status: string) => {
 }
 
 .btn-toast-retry {
+  background: transparent;
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  background: var(--vis-c-danger);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
+  gap: 4px;
 }
 
 .btn-toast-close {
   background: transparent;
   border: none;
-  color: var(--badge-danger-text);
-  font-size: 1.35rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 0.25rem;
-}
-
-/* Cabeçalho */
-.page-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: var(--vis-brand-orange, #f26522);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.page-title {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin: 0 0 0.4rem;
-}
-
-.page-subtitle {
-  color: var(--color-text-muted);
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.demo-label {
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  background: var(--badge-primary-bg);
-  color: var(--badge-primary-text);
-  border: 1px solid var(--badge-primary-border);
-  font-size: 0.75rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-/* Abas de categoria rápida padronizadas */
-.category-tabs {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.category-tab-btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-
-.category-tab-btn:hover {
-  background: var(--color-surface-soft);
-  color: var(--color-heading);
-}
-
-.category-tab-btn.active {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-  color: #fff;
-}
-
-/* Barra de Filtros Tradicionais Padronizada */
-.card-filters {
-  background: var(--color-surface);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-}
-
-.filters-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.75rem;
-  padding: 0.75rem;
-}
-
-@media (min-width: 768px) {
-  .filters-container {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (min-width: 1200px) {
-  .filters-container {
-    grid-template-columns: auto 1fr 1fr 1fr auto;
-    align-items: stretch;
-  }
-}
-
-.filter-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
-  background: var(--color-background);
-  min-width: 0;
-}
-
-.filter-item label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--color-heading);
-}
-
-.filter-dates {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.25rem;
-}
-
-.date-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-
-.input-inline {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  outline: none;
-  color: var(--color-text);
-  font-size: 0.8rem;
-  padding: 0;
+  color: inherit;
+  font-size: 1.2rem;
   cursor: pointer;
 }
 
-.filter-actions {
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-}
-
-.btn-filter {
-  border: 1px solid var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
-  background: transparent;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.5rem 1.4rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  height: 100%;
-}
-
-.btn-filter:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
-}
-
-/* Painel de Busca e Filtros de Safra/Órgão */
-.filter-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.search-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.search-input-wrapper {
-  position: relative;
-  flex: 1;
-}
-
-.search-icon {
-  position: absolute;
-  top: 50%;
-  left: 0.85rem;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-  opacity: 0.8;
-}
-
-.search-input {
-  width: 100%;
-  padding: 0.55rem 0.85rem 0.55rem 2.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 0.88rem;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.search-input:focus {
-  border-color: var(--vis-brand-orange, #f26522);
-}
-
-.selectors-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-
-.filter-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.35rem 0.75rem;
-  background: var(--color-background);
-}
-
-.filter-field label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  white-space: nowrap;
-}
-
-.filter-select {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-size: 0.82rem;
-  outline: none;
-  cursor: pointer;
-}
-
-.btn-clear {
-  white-space: nowrap;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.8rem;
-}
-
-/* Estados de Carregamento e Vazio */
-.state-card {
-  text-align: center;
-  padding: 3.5rem 2rem;
-  background: var(--color-surface);
-  border: 1px dashed var(--color-border);
-  border-radius: 10px;
-  color: var(--color-text-muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.empty-icon {
-  color: var(--vis-brand-orange, #f26522);
-  opacity: 0.75;
-  margin-bottom: 0.5rem;
-}
-
-.empty-state h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  color: var(--color-heading);
-}
-
-.empty-state p {
-  margin: 0;
-  max-width: 460px;
-  font-size: 0.9rem;
-}
-
-/* Grid de Cards do Catálogo */
-.catalog-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.25rem;
-}
-
-.catalog-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 1.35rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.catalog-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-  border-color: rgba(242, 101, 34, 0.45);
-}
-
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.carga-id {
-  font-family: monospace;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--vis-brand-orange, #f26522);
-  background: rgba(242, 101, 34, 0.1);
+/* Badges de Status do Catálogo */
+.status-badge {
   padding: 0.2rem 0.55rem;
   border-radius: 4px;
-}
-
-.card-badges {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.badge-vigente {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background-color: var(--badge-success-bg);
-  color: var(--badge-success-text);
-  border: 1px solid var(--badge-success-border);
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.status-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  text-transform: uppercase;
-  background: var(--badge-neutral-bg);
-  color: var(--badge-neutral-text);
-  border: 1px solid var(--badge-neutral-border);
-}
-
 .status-concluida {
-  background: var(--badge-info-bg);
-  color: var(--badge-info-text);
-  border: 1px solid var(--badge-info-border);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .status-andamento {
@@ -1229,122 +942,14 @@ const getStatusBadgeClass = (status: string) => {
 }
 
 .status-validacao {
-  background: var(--badge-primary-bg);
-  color: var(--badge-primary-text);
-  border: 1px solid var(--badge-primary-border);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .status-falhou {
   background: var(--badge-danger-bg);
   color: var(--badge-danger-text);
   border: 1px solid var(--badge-danger-border);
-}
-
-.card-dataset {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin: 0 0 0.25rem;
-  line-height: 1.35;
-}
-
-.card-stage {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  margin: 0 0 1rem;
-}
-
-.card-metadata {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0.85rem;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.meta-item dt {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-
-.meta-item dd {
-  margin: 0;
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--color-heading);
-  display: flex;
-  align-items: center;
-}
-
-.card-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn-card-map,
-.btn-card-audit {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-card-map {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
-  border: 1px solid var(--vis-brand-orange, #f26522);
-}
-
-.btn-card-map:hover {
-  opacity: 0.92;
-}
-
-.btn-card-audit {
-  background: transparent;
-  color: var(--vis-brand-orange, #f26522);
-  border: 1px solid var(--vis-brand-orange, #f26522);
-}
-
-.btn-card-audit:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
-}
-
-.page-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin: 24px 0 8px;
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
-}
-
-.page-controls button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

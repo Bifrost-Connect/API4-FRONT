@@ -1,12 +1,15 @@
 <script setup lang="ts">
+/**
+ * Barra de navegação superior (Navbar) com breadcrumbs,
+ * atalhos rápidos de mapa/upload e alternância de tema.
+ */
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeButton from './ThemeButton.vue'
-import { userService } from '../services/user'
 
 const route = useRoute()
-const currentUser = computed(() => userService.getCurrentUser())
 
+// Mapeamento de títulos de tela para o breadcrumb superior
 const pageTitles: Record<string, string> = {
   dashboard: 'Visão geral das cargas',
   upload: 'Nova carga de dados',
@@ -14,6 +17,7 @@ const pageTitles: Record<string, string> = {
   styleguide: 'Guia de estilos',
   'process-log': 'Acompanhar processamento de cargas',
   'analise-territorial': 'Análise territorial',
+  catalogo: 'Catálogo de bases geoespaciais',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')
@@ -21,18 +25,20 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
 
 <template>
   <nav class="navbar" aria-label="Navegação contextual">
+    <!-- Breadcrumb da tela atual -->
     <div class="breadcrumb">
       <span class="breadcrumb-root">API4</span>
       <span class="breadcrumb-separator" aria-hidden="true">/</span>
       <strong>{{ currentPageTitle }}</strong>
     </div>
 
+    <!-- Atalhos rápidos da barra superior -->
     <div class="navbar-actions">
       <RouterLink to="/mapa" class="navbar-link" active-class="navbar-link-active">
         <span aria-hidden="true">⌖</span>
         <span>Mapa</span>
       </RouterLink>
-      <RouterLink v-if="currentUser.role === 'Operador'" to="/upload" class="navbar-link" active-class="navbar-link-active">
+      <RouterLink to="/upload" class="navbar-link" active-class="navbar-link-active">
         <span aria-hidden="true">＋</span>
         <span>Nova carga</span>
       </RouterLink>

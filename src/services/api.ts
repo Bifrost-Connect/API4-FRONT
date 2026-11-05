@@ -2,7 +2,6 @@
  * Configuração de cliente HTTP (Axios) para comunicação com a API REST.
  */
 import axios from 'axios'
-import { userService } from './user'
 
 // Flag legada mantida como false para compatibilidade com asserções de testes existentes.
 export const mockactive = false
@@ -29,26 +28,14 @@ const api = axios.create({
   },
 })
 
-// Adiciona credenciais Basic Auth de acordo com o perfil autenticado no sistema
+// Interceptor para manter a URL atualizada e anexar tokens/headers quando o login real for conectado
 api.interceptors.request.use((config) => {
   try {
     const currentBase = getApiBaseUrl().replace(/\/+$/, '')
     config.baseURL = currentBase + '/api'
     api.defaults.baseURL = currentBase + '/api'
-
-    const user = userService.getCurrentUser()
-    const roleCredentials: Record<string, string> = {
-      Operador: 'operador:Troca123',
-      Auditor: 'auditor:Troca123',
-      Analista: 'analista:Troca123',
-      Administrador: 'admin:Troca123',
-    }
-    const cred = roleCredentials[user?.role] || 'admin:Troca123'
-    if (typeof btoa === 'function') {
-      config.headers.Authorization = `Basic ${btoa(cred)}`
-    }
   } catch {
-    // Fallback silencioso caso userService não esteja disponível
+    // Fallback silencioso
   }
   return config
 })

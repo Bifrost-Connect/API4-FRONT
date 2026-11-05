@@ -7,7 +7,7 @@ import {
   type ProcessLogDetails,
   type ProcessTraceability,
 } from '../services/process'
-import { userService } from '../services/user'
+import { PROCESS_STEPS, getStepIndex, getProgressStep, getWarningStep } from '../utils/processUtils'
 import { dashboardService } from '../services/dashboard'
 import { uploadService } from '../services/upload'
 import Stepper from '../components/Stepper.vue'
@@ -72,7 +72,6 @@ const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
 const currentCargaLinhagem = computed(() => currentCarga.value?.linhagemCompleta || null)
 const quarentenaStageRef = ref<any>(null)
-const currentUser = computed(() => userService.getCurrentUser())
 
 // Rastreabilidade e Exportação (US05 e US07)
 const traceability = ref<ProcessTraceability | null>(null)
@@ -92,9 +91,9 @@ const isBackendProcess = computed(
     /^\d+$/.test(String(details.value.id)),
 )
 
+// Modo somente leitura ativado se a versão histórica estiver fechada
 const isClosed = computed(() => details.value?.status?.toLowerCase().includes('fechad') ?? false)
-const isAuditor = computed(() => userService.getCurrentUser().role === 'Auditor')
-const isReadOnly = computed(() => isClosed.value || isAuditor.value)
+const isReadOnly = computed(() => isClosed.value)
 
 const loadTraceability = async (id: string, backendProcess: boolean) => {
   const requestId = ++traceabilityRequestId
@@ -142,28 +141,16 @@ const exportIndicator = async (format: IndicatorExportFormat) => {
   }
 }
 
-const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
+const processSteps = PROCESS_STEPS
 
 const progressStepIndex = computed(() => {
   if (!details.value) return 1
-  if (details.value.status === 'Concluída') return 5 // Todas concluídas
-  const stage = details.value.stage === 'Cálculo analítico' ? 'Publicação' : details.value.stage
-  const index = processSteps.indexOf(stage)
-  return index >= 0 ? index + 1 : 1
+  return getProgressStep(details.value as any)
 })
 
 const warningStepIndex = computed(() => {
   if (!details.value) return undefined
-  const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
-  const isErrorStatus =
-    details.value.status === 'Falhou' ||
-    details.value.status === 'Em quarentena' ||
-    (details.value.quarantineRecords?.length ?? 0) > 0 ||
-    (details.value.validationChecks?.some((c) => c.status === 'error') ?? false)
-  if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
-    return processSteps.indexOf(details.value.stage) + 1
-  }
-  return undefined
+  return getWarningStep(details.value as any)
 })
 
 const activeStepIndex = ref(1)
@@ -495,7 +482,6 @@ const currentComponent = computed(() => {
         :layerName="details?.layerName"
         :canClose="true"
         :linhagemCompleta="currentCargaLinhagem"
-        :userRole="currentUser.role"
         @select-version="handleVersionChange"
         @close="closeAuditPanel"
         @notificar-operador="handleNotificarOperadorAuditoria"

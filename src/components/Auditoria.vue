@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   layerName: '',
   canClose: true,
   linhagemCompleta: null,
-  userRole: 'Auditor',
+  userRole: '',
 })
 
 const emit = defineEmits<{
