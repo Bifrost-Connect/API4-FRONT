@@ -11,6 +11,7 @@ const props = defineProps<{
   data: any[]
   rowKey?: string
   rowTestIdKey?: string
+  disableExpand?: boolean
 }>()
 
 const emit = defineEmits(['row-click'])
@@ -45,7 +46,9 @@ const getRowTestId = (item: any) => {
 const handleRowClick = (item: any, event: Event) => {
   if ((event.target as HTMLElement).closest('.table-actions')) return
   emit('row-click', item)
-  toggleRow(getKey(item, 0))
+  if (!props.disableExpand) {
+    toggleRow(getKey(item, 0))
+  }
 }
 </script>
 
@@ -63,7 +66,7 @@ const handleRowClick = (item: any, event: Event) => {
         <template v-for="(item, index) in data" :key="getKey(item, index)">
           <tr
             @click="handleRowClick(item, $event)"
-            class="clickable-row"
+            :class="{ 'clickable-row': !disableExpand }"
             :data-testid="getRowTestId(item)"
           >
             <td v-for="col in columns" :key="col.key">

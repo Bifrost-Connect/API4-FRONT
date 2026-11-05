@@ -7,6 +7,8 @@ import ProcessLogView from '../views/ProcessLogView.vue'
 import MapView from '../views/MapView.vue'
 import CargaListView from '../views/CargaListView.vue'
 import TerritorialAnalysisView from '../views/TerritorialAnalysisView.vue'
+import ProfileView from '../views/ProfileView.vue'
+import UserView from '../views/UserView.vue'
 
 /**
  * Definição centralizada de rotas da aplicação.
@@ -58,10 +60,15 @@ const router = createRouter({
       component: LoginView,
       meta: { hideMenu: true },
     },
-    // Redirecionamento de compatibilidade da antiga rota de auditor para o dashboard principal
     {
-      path: '/auditor',
-      redirect: '/',
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: UserView,
     },
   ],
 })

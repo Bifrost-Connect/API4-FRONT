@@ -11,6 +11,8 @@ import {
   FiMap,
   FiPieChart,
   FiRotateCcw,
+  FiUser,
+  FiUsers,
 } from 'vue-icons-plus/fi'
 
 // Lista completa de navegação acessível em todo o sistema
@@ -20,6 +22,8 @@ const navigationItems = [
   { label: 'Catálogo de Bases', to: '/catalogo', icon: FiDatabase },
   { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
   { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
+  { label: 'Perfil do usuário', to: '/profile', icon: FiUser },
+  { label: 'Gerenciamento de usuários', to: '/users', icon: FiUsers },
 ]
 </script>
 

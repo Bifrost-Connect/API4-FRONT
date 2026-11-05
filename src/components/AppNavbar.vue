@@ -18,6 +18,8 @@ const pageTitles: Record<string, string> = {
   'process-log': 'Acompanhar processamento de cargas',
   'analise-territorial': 'Análise territorial',
   catalogo: 'Catálogo de bases geoespaciais',
+  profile: 'Meu perfil',
+  users: 'Gerenciamento de usuários',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')
