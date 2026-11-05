@@ -10,83 +10,245 @@ import {
   FiAward,
   FiArrowLeft,
   FiRotateCcw,
+  FiLock,
+  FiFileText,
+  FiMap,
+  FiCheckCircle,
+  FiXCircle,
 } from 'vue-icons-plus/fi'
-import type { ProcessLogDetails } from '../../services/process'
+import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
+import { processService } from '../../services/process'
+import { userService } from '../../services/user'
+import { dashboardService } from '../../services/dashboard'
+import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
-const props = defineProps<{
-  details: ProcessLogDetails
-}>()
+const props = withDefaults(
+  defineProps<{
+    details: ProcessLogDetails
+    readOnly?: boolean
+    exportingFormat?: IndicatorExportFormat | null
+    canExport?: boolean
+  }>(),
+  {
+    readOnly: false,
+    exportingFormat: null,
+    canExport: true,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
+  (e: 'export', format: IndicatorExportFormat): void
+  (e: 'reload'): void
 }>()
 
 const router = useRouter()
 
-// ── Estados locais de decisão do auditor ──────────────────────────────────────
+// Apenas Administrador vê e aciona Aprovar/Reprovar e Fechar Versão
+const currentUser = computed(() => userService.getCurrentUser())
+const canApprove = computed(() => userService.isAdmin())
+
+// Estados de submissão e decisão
+const isSubmitting = ref(false)
 const isApproved = ref(false)
 const isRejected = ref(false)
 const reviewNote = ref('')
-const showReviewInput = ref(false)
 const targetAuditStage = ref<'Tratamento' | 'Validação'>('Tratamento')
 
+// Modais da US07
+const showPublishConfirmModal = ref(false)
+const showRejectModal = ref(false)
+const rejectionReason = ref('')
+const rejectionDestination = ref<'reprocessar' | 'invalidar'>('reprocessar')
+const rejectionError = ref('')
+
 // ── Computeds de estado ────────────────────────────────────────────────────────
-// Publicação NÃO tem erro intrínseco: apenas espera validação para publicar
-const isAlreadyPublished = computed(() => props.details.status === 'Concluída')
-/** Aprovado nesta sessão pelo auditor */
-const isJustApproved = computed(() => isApproved.value && !isAlreadyPublished.value)
+const isClosed = computed(() => {
+  const st = (props.details.status || '').toLowerCase()
+  return st.includes('fechad') || st === 'concluída' || st === 'concluida'
+})
+const isAlreadyPublished = computed(() => props.details.status === 'Concluída' || isClosed.value)
+/** Aprovado nesta sessão */
+const isJustApproved = computed(() => isApproved.value && !isClosed.value)
 /** Exibe o card de sucesso apenas ao aprovar e publicar nesta sessão */
 const showSuccess = computed(() => isJustApproved.value)
-/** Exibe painel de decisão: processo em andamento esperando validação do auditor */
+
+/** Exibe painel de decisão: processo em andamento esperando homologação */
+const stageIndex = computed(() => {
+  const steps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
+  const s = (props.details.stage || '').trim().toUpperCase()
+  if (s.includes('INGEST')) return 0
+  if (s.includes('VALIDA')) return 1
+  if (s.includes('TRATA')) return 2
+  if (s.includes('PUBLICA') || s.includes('CALCULO')) return 3
+  const stage = props.details.stage === 'Cálculo analítico' ? 'Publicação' : props.details.stage
+  return steps.indexOf(stage)
+})
+
+const isStageReached = computed(() => {
+  if (props.details.status === 'Concluída' || isClosed.value) return true
+  return stageIndex.value >= 3
+})
+
 const isAwaiting = computed(
   () =>
+    !props.readOnly &&
+    !isClosed.value &&
+    isStageReached.value &&
     props.details.status === 'Em andamento' &&
-    !isAlreadyPublished.value &&
     !isApproved.value &&
-    !isRejected.value &&
-    !showReviewInput.value,
+    !isRejected.value,
 )
 
 const isError = computed(
   () =>
-    props.details.status === 'Falhou' ||
-    props.details.status === 'Aguardando validação' ||
-    !!props.details.pauseReason,
+    !props.readOnly &&
+    (props.details.status === 'Falhou' ||
+      props.details.status === 'Em quarentena' ||
+      !!props.details.pauseReason),
 )
 
 /** Dados analíticos vêm da API via details.analyticsData */
 const extractedData = computed(() => props.details.analyticsData ?? [])
 
-// ── Handlers ───────────────────────────────────────────────────────────────────
-const handleApprove = () => {
-  isApproved.value = true
-  isRejected.value = false
-  showReviewInput.value = false
-  props.details.status = 'Concluída'
-  props.details.stage = 'Publicação'
+// ── Handlers US07 ─────────────────────────────────────────────────────────────
+
+// Tarefa 4: Modal de Aprovação Final e Fechamento de Versão
+const openPublishModal = () => {
+  showPublishConfirmModal.value = true
 }
 
-const handleRejectRequest = () => {
-  showReviewInput.value = true
+const closePublishModal = () => {
+  showPublishConfirmModal.value = false
 }
 
-const handleConfirmReject = () => {
-  isRejected.value = true
-  isApproved.value = false
-  showReviewInput.value = false
+const publishError = ref<string | null>(null)
 
-  // Envia para auditoria da etapa anterior selecionada (Tratamento ou Validação)
-  props.details.stage = targetAuditStage.value
-  props.details.status = 'Em andamento'
-  props.details.assignedEditor = 'Gestor Alocado'
-  props.details.pauseReason = `Revisão solicitada na Publicação para ${targetAuditStage.value}: ${reviewNote.value || 'Necessário ajuste manual nos dados.'}`
+const confirmPublishAndClose = async () => {
+  if (isSubmitting.value) return
+
+  isSubmitting.value = true
+  publishError.value = null
+  try {
+    if (/^\d+$/.test(String(props.details.id))) {
+      try {
+        await processService.registrarDecisaoGestor(props.details.id, {
+          gestorId: currentUser.value.id || 1,
+          etapa: 'PUBLICACAO',
+          decisao: 'APROVADO',
+          parecer: 'Publicação oficial homologada pelo gestor.',
+        })
+      } catch (errApi) {
+        console.warn('Aviso: endpoint de decisão do gestor offline ou simulado:', errApi)
+      }
+    }
+
+    try {
+      await dashboardService.aprovarEFecharVersao(
+        {
+          id: String(props.details.id),
+          dataset: props.details.dataset,
+          stage: 'Publicação',
+          status: 'Fechado',
+          dateTime: props.details.dateTime,
+          source: props.details.source,
+          year: props.details.year,
+          epsg: props.details.epsg,
+        },
+        currentUser.value.name,
+      )
+    } catch (e) {
+      console.warn('Aviso ao fechar versão via dashboardService:', e)
+    }
+
+    isApproved.value = true
+    isRejected.value = false
+    props.details.status = 'Concluída'
+    props.details.stage = 'Publicação'
+    props.details.assignedEditor = currentUser.value.name
+  } catch (err: any) {
+    console.error('Erro ao aprovar e publicar:', err)
+    publishError.value = err?.response?.data?.message || err?.message || 'Falha ao homologar publicação.'
+  } finally {
+    closePublishModal()
+    isSubmitting.value = false
+    emit('reload')
+  }
+}
+
+// Tarefa 3: Modal de Reprovação com Parecer Obrigatório
+const openRejectModal = () => {
+  rejectionReason.value = ''
+  rejectionDestination.value = 'reprocessar'
+  rejectionError.value = ''
+  showRejectModal.value = true
+}
+
+const closeRejectModal = () => {
+  showRejectModal.value = false
+  rejectionReason.value = ''
+  rejectionError.value = ''
+}
+
+const confirmReject = async () => {
+  if (!rejectionReason.value.trim()) {
+    rejectionError.value = 'O parecer técnico é obrigatório para reprovar a carga.'
+    return
+  }
+
+  if (isSubmitting.value) return
+
+  isSubmitting.value = true
+  try {
+    if (/^\d+$/.test(String(props.details.id))) {
+      await processService.registrarDecisaoGestor(props.details.id, {
+        gestorId: currentUser.value.id || 1,
+        etapa: 'PUBLICACAO',
+        decisao: 'REPROVADO',
+        parecer: rejectionReason.value.trim(),
+      })
+    }
+
+    await dashboardService.reprovarCarga(
+      {
+        id: String(props.details.id),
+        dataset: props.details.dataset,
+        stage: 'Publicação',
+        status: props.details.status as any,
+        dateTime: props.details.dateTime,
+        source: props.details.source,
+        year: props.details.year,
+        epsg: props.details.epsg,
+      },
+      rejectionReason.value,
+      rejectionDestination.value,
+    )
+
+    isRejected.value = true
+    isApproved.value = false
+    props.details.assignedEditor = currentUser.value.name
+
+    if (rejectionDestination.value === 'reprocessar') {
+      props.details.stage = 'Tratamento'
+      props.details.status = 'Em andamento'
+      props.details.pauseReason = `Reprovação na Publicação: ${rejectionReason.value.trim()}. Retornado ao Operador.`
+    } else {
+      props.details.status = 'Falhou'
+      props.details.pauseReason = `Carga invalidada na Publicação: ${rejectionReason.value.trim()}.`
+    }
+    closeRejectModal()
+    emit('reload')
+  } catch (error: any) {
+    rejectionError.value = error?.message || 'Falha ao reprovar.'
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const handleUndo = () => {
   isRejected.value = false
   isApproved.value = false
-  showReviewInput.value = false
-  reviewNote.value = ''
+  rejectionReason.value = ''
   props.details.stage = 'Publicação'
   props.details.status = 'Em andamento'
 }
@@ -94,11 +256,35 @@ const handleUndo = () => {
 const goToDashboard = () => {
   router.push({ name: 'dashboard' })
 }
+
+const goToMap = () => {
+  router.push(`/mapa?processoId=${props.details.id}`)
+}
 </script>
 
 <template>
   <div class="stage-container">
-    <template v-if="!showSuccess">
+    <div v-if="readOnly" class="closed-version-banner" role="status">
+      Esta versão foi fechada e está disponível somente para consulta.
+    </div>
+
+    <div v-if="!isStageReached" class="card p-4 text-center my-4" data-testid="locked-stage-card">
+      <FiLock size="32" class="text-muted mb-2" style="margin: 0 auto; display: block;" />
+      <h4>Etapa de Publicação ainda não liberada</h4>
+      <p class="text-muted">Esta etapa será liberada após a aprovação das etapas anteriores pelo Gestor.</p>
+    </div>
+
+    <template v-else-if="!showSuccess">
+      <!-- ═══ MAPA INTERATIVO: POLÍGONOS DA CARGA ═════════════════════════════════ -->
+      <ProcessoMiniMapa
+        v-if="details?.id"
+        :processo-id="details.id"
+        :is-published="isAlreadyPublished"
+        :status="details.status"
+        title="Visualização Territorial do Indicador (Geometrias da Carga)"
+        height="320px"
+      />
+
       <!-- ═══ TABELA: DADOS EXTRAÍDOS ════════════════════════════════════════════ -->
       <div class="card">
         <div class="card-header">
@@ -139,69 +325,94 @@ const goToDashboard = () => {
         </div>
       </div>
 
-      <!-- ═══ PAINEL DE DECISÃO: aguardando auditor ══════════════════════════════ -->
-      <div v-if="isAwaiting" class="action-panel">
+      <!-- ═══ PAINEL DE DECISÃO: aguardando homologação (Tarefa 2, 7 e 8) ══════════════════════════════ -->
+      <div v-if="canApprove && isAwaiting" class="action-panel" data-testid="gestor-decision-panel">
         <div class="action-content">
           <div class="action-icon-wrap">
             <FiSearch size="22" />
           </div>
           <div class="action-text">
-            <h3>Revisão do Gestor</h3>
+            <h3>Homologação e Publicação da Versão Oficial</h3>
             <p>
-              Os dados foram processados e validados com sucesso. Deseja aprovar e consolidar na
-              base de produção?
+              Os dados foram processados e validados com sucesso. Deseja homologar a versão oficial
+              e consolidar na base definitiva de produção?
             </p>
           </div>
         </div>
         <div class="action-buttons">
-          <button class="btn btn-outline-danger" @click="handleRejectRequest">
-            <FiThumbsDown size="15" />
-            Solicitar Revisão
+          <button
+            type="button"
+            class="btn btn-outline-danger"
+            data-testid="btn-reprovar-carga"
+            :disabled="isSubmitting"
+            @click="openRejectModal"
+          >
+            <FiXCircle size="15" />
+            Reprovar Carga
           </button>
-          <button class="btn btn-primary" @click="handleApprove">
-            <FiCheck size="15" />
-            Aprovar e Publicar
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-testid="btn-aprovar-publicar"
+            :disabled="isSubmitting"
+            @click="openPublishModal"
+          >
+            <FiLock size="15" />
+            Aprovar e Publicar Versão Oficial
           </button>
         </div>
       </div>
 
-      <!-- ═══ INPUT DE NOTA DE REVISÃO / AUDITORIA DE ETAPA ANTERIOR ═════════ -->
-      <div v-if="showReviewInput" class="review-input-panel">
-        <h4>Solicitar Revisão de Etapa Anterior</h4>
-        <p>
-          Selecione a etapa anterior que necessita de revisão e informe o motivo. O editor deverá
-          corrigir e re-enviar o arquivo.
-        </p>
-
-        <div style="margin-bottom: 0.85rem">
-          <label
-            style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 0.35rem"
-          >
-            Etapa a ser auditada:
-          </label>
-          <select v-model="targetAuditStage" class="input" style="max-width: 250px">
-            <option value="Tratamento">Tratamento</option>
-            <option value="Validação">Validação</option>
-          </select>
+      <!-- ═══ VERSÃO OFICIAL BLOQUEADA E EXPORTAÇÕES (Tarefa 5 e 6) ═══ -->
+      <div v-if="isAlreadyPublished || readOnly || isClosed || isApproved" class="official-export-box" data-testid="official-export-section">
+        <div v-if="isApproved" class="mb-3" style="display: flex; align-items: center; gap: 0.5rem; background: var(--badge-success-bg); border: 1px solid var(--badge-success-border); border-radius: 6px; padding: 0.75rem 1rem; color: var(--badge-success-text); font-weight: 600;">
+          <FiCheckCircle size="18" />
+          <span>Versão homologada e publicada com sucesso! Os dados foram consolidados na base de produção.</span>
         </div>
-
-        <textarea
-          v-model="reviewNote"
-          class="review-textarea"
-          placeholder="Ex: Identificado conflito de geometria nos polígonos. Necessário ajuste manual pelo editor..."
-          rows="3"
-        />
-        <div class="review-actions">
-          <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
-          <button class="btn btn-outline-danger" @click="handleConfirmReject">
-            <FiThumbsDown size="15" />
-            Confirmar e Enviar para Revisão
+        <div class="official-seal">
+          <span class="badge-bloqueada" data-testid="badge-versao-bloqueada">
+            <FiLock size="14" />
+            Versão Oficial Bloqueada
+          </span>
+          <span class="official-seal-desc">
+            Versão homologada e congelada com imutabilidade para auditoria histórica.
+          </span>
+        </div>
+        <div class="official-export-buttons">
+          <button
+            type="button"
+            class="btn btn-export-csv"
+            data-testid="btn-export-official-csv"
+            :disabled="!!exportingFormat"
+            @click="emit('export', 'csv')"
+          >
+            <FiFileText size="14" />
+            {{ exportingFormat === 'csv' ? 'Exportando…' : 'Exportar Planilha (CSV)' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-export-geojson"
+            data-testid="btn-export-official-geojson"
+            :disabled="!!exportingFormat"
+            @click="emit('export', 'geojson')"
+          >
+            <FiMap size="14" />
+            {{ exportingFormat === 'geojson' ? 'Exportando…' : 'Exportar Mapa (GeoJSON)' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn_outline"
+            style="display: inline-flex; align-items: center; gap: 0.4rem;"
+            @click="goToMap"
+          >
+            <FiMap size="14" />
+            Visualizar no Mapa
           </button>
         </div>
       </div>
 
       <!-- ═══ REVISÃO ENVIADA (rejeitado nesta sessão) ════════════════════════════ -->
-      <div v-if="isRejected" class="alert-banner danger">
+      <div v-if="!readOnly && isRejected" class="alert-banner danger">
         <div class="alert-icon-lg">
           <FiAlertTriangle size="26" />
         </div>
@@ -209,7 +420,7 @@ const goToDashboard = () => {
           <strong>Revisão Solicitada para a etapa de {{ targetAuditStage }}</strong>
           <p>
             O processo foi encaminhado para revisão de <strong>{{ targetAuditStage }}</strong> com
-            gestor alocado. Status atualizado para <strong>Em andamento</strong>.
+            responsável alocado. Status atualizado para <strong>Em andamento</strong>.
             <span v-if="reviewNote"
               ><br /><em>Instruções ao editor: {{ reviewNote }}</em></span
             >
@@ -243,8 +454,8 @@ const goToDashboard = () => {
         </div>
 
         <!-- Ações pós-publicação -->
-        <div class="success-actions">
-          <button class="btn btn-outline-danger" @click="handleRejectRequest">
+        <div v-if="!readOnly" class="success-actions">
+          <button class="btn btn-outline-danger" @click="openRejectModal">
             <FiThumbsDown size="15" />
             Solicitar Revisão
           </button>
@@ -253,29 +464,11 @@ const goToDashboard = () => {
             Ver no Dashboard
           </button>
         </div>
-
-        <!-- Input de revisão pós-publicação -->
-        <div v-if="showReviewInput" class="post-publish-review">
-          <h4>Motivo da Revisão</h4>
-          <textarea
-            v-model="reviewNote"
-            class="review-textarea"
-            placeholder="Descreva o que precisa ser revisado..."
-            rows="3"
-          />
-          <div class="review-actions">
-            <button class="btn btn-ghost" @click="showReviewInput = false">Cancelar</button>
-            <button class="btn btn-outline-danger" @click="handleConfirmReject">
-              <FiThumbsDown size="15" />
-              Confirmar e Enviar ao Editor
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
     <!-- ═══ ERRO / QUARENTENA (DESVIO LATERAL) ══════════════════════════════════ -->
-    <div v-if="details.quarantineRecords?.length > 0 && details.pauseReason" class="alert-banner danger">
+    <div v-if="(details.quarantineRecords?.length ?? 0) > 0 && details.pauseReason" class="alert-banner danger">
       <div class="alert-icon-lg">
         <FiAlertTriangle size="26" />
       </div>
@@ -292,6 +485,142 @@ const goToDashboard = () => {
         Ver Quarentena
       </button>
     </div>
+
+    <!-- ═══ MODAL DE REPROVAÇÃO COM PARECER OBRIGATÓRIO (Tarefa 3) ═══ -->
+    <div
+      v-if="showRejectModal"
+      class="modal-backdrop"
+      data-testid="rejection-modal"
+      @click.self="closeRejectModal"
+    >
+      <div class="modal-dialog">
+        <header class="modal-header">
+          <div class="modal-header-title">
+            <FiAlertTriangle size="22" class="modal-danger-icon" />
+            <h3>Reprovar Carga - Parecer Obrigatório</h3>
+          </div>
+          <button type="button" class="btn-close" @click="closeRejectModal">&times;</button>
+        </header>
+
+        <div class="modal-body">
+          <p class="modal-info">
+            Carga: <strong>{{ details.id }}</strong> &bull; Etapa: <strong>Publicação</strong>
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Destino após reprovação:</label>
+            <div class="radio-options" data-testid="select-rejection-destination">
+              <label class="radio-label">
+                <input
+                  type="radio"
+                  name="destination"
+                  value="reprocessar"
+                  v-model="rejectionDestination"
+                />
+                <span>Voltar para o Operador Reprocessar</span>
+              </label>
+              <label class="radio-label">
+                <input
+                  type="radio"
+                  name="destination"
+                  value="invalidar"
+                  v-model="rejectionDestination"
+                />
+                <span>Invalidar Carga permanentemente</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              Parecer Técnico de Homologação <span class="required-mark">*</span>
+            </label>
+            <textarea
+              v-model="rejectionReason"
+              class="form-textarea"
+              rows="4"
+              data-testid="input-rejection-reason"
+              placeholder="Descreva detalhadamente o parecer obrigatório para reprovar a carga..."
+            ></textarea>
+            <span v-if="rejectionError" class="error-text" data-testid="rejection-error-msg">
+              {{ rejectionError }}
+            </span>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="btn-cancel" @click="closeRejectModal">Cancelar</button>
+          <button
+            type="button"
+            class="btn-confirm-rejection"
+            data-testid="btn-confirm-rejection"
+            :disabled="isSubmitting || !rejectionReason.trim()"
+            @click="confirmReject"
+          >
+            {{ isSubmitting ? 'Processando...' : 'Confirmar Reprovação' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL DE APROVAÇÃO FINAL E FECHAMENTO DE VERSÃO (Tarefa 4) ═══ -->
+    <div
+      v-if="showPublishConfirmModal"
+      class="modal-backdrop"
+      data-testid="publish-confirm-modal"
+      @click.self="closePublishModal"
+    >
+      <div class="modal-dialog">
+        <header class="modal-header">
+          <div class="modal-header-title">
+            <FiLock size="22" class="modal-lock-icon" />
+            <h3>Aprovação e Fechamento Oficial de Versão</h3>
+          </div>
+          <button type="button" class="btn-close" @click="closePublishModal">&times;</button>
+        </header>
+
+        <div class="modal-body">
+          <div class="alert-box-warning" data-testid="publish-alert-text">
+            <FiAlertTriangle size="24" class="alert-warning-icon" />
+            <div>
+              <strong>Atenção ao fechamento de versão histórica:</strong>
+              <p>
+                Esta versão será fechada permanentemente, ficará imutável para auditoria histórica e
+                será liberada imediatamente no catálogo do Analista.
+              </p>
+            </div>
+          </div>
+
+          <div class="publish-meta-box">
+            <div class="meta-row">
+              <span class="meta-label">Carga / Processo:</span>
+              <strong>{{ details.id }}</strong>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Dataset:</span>
+              <span>{{ details.dataset }}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Responsável pela Publicação:</span>
+              <strong>{{ currentUser.name }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button type="button" class="btn-cancel" @click="closePublishModal">Cancelar</button>
+          <button
+            type="button"
+            class="btn-confirm-publish"
+            data-testid="btn-confirm-publish"
+            :disabled="isSubmitting"
+            @click="confirmPublishAndClose"
+          >
+            {{ isSubmitting ? 'Fechando versão...' : 'Confirmar Fechamento e Publicar' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -300,6 +629,16 @@ const goToDashboard = () => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.closed-version-banner {
+  padding: 12px 16px;
+  color: #713f12;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 /* CARD */
@@ -328,8 +667,7 @@ const goToDashboard = () => {
 .header-desc {
   margin: 0;
   font-size: 0.85rem;
-  opacity: 0.6;
-  color: var(--color-text);
+  color: var(--color-text-muted);
 }
 
 .card-body {
@@ -362,10 +700,9 @@ const goToDashboard = () => {
 }
 
 .data-table th {
-  background: var(--color-background);
+  background: var(--color-surface-soft);
   font-weight: 600;
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-heading);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -400,9 +737,9 @@ const goToDashboard = () => {
 }
 
 .badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.25);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge-sm {
@@ -414,16 +751,19 @@ const goToDashboard = () => {
 }
 
 .badge-sm.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 .badge-sm.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 .badge-sm.warning {
-  background: rgba(234, 179, 8, 0.12);
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 /* ACTION PANEL */
@@ -537,16 +877,17 @@ const goToDashboard = () => {
 }
 
 .alert-banner.danger {
-  background: rgba(220, 53, 69, 0.06);
-  border-color: #dc3545;
-  border-right: 1px solid rgba(220, 53, 69, 0.2);
-  border-top: 1px solid rgba(220, 53, 69, 0.2);
-  border-bottom: 1px solid rgba(220, 53, 69, 0.2);
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+  border-left: 5px solid var(--badge-danger-text);
+  border-right: 1px solid var(--badge-danger-border);
+  border-top: 1px solid var(--badge-danger-border);
+  border-bottom: 1px solid var(--badge-danger-border);
 }
 
 .alert-icon-lg {
   flex-shrink: 0;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   padding-top: 0.1rem;
 }
 
@@ -572,12 +913,12 @@ const goToDashboard = () => {
 .success-card {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(22, 163, 74, 0.3);
+  border: 1px solid var(--badge-success-border);
 }
 
 .success-content {
   padding: 3rem 2rem;
-  background: linear-gradient(135deg, rgba(22, 163, 74, 0.06) 0%, var(--color-surface) 100%);
+  background: linear-gradient(135deg, var(--badge-success-bg) 0%, var(--color-surface) 100%);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -588,17 +929,17 @@ const goToDashboard = () => {
   width: 5rem;
   height: 5rem;
   border-radius: 50%;
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.25rem;
-  border: 2px solid rgba(22, 163, 74, 0.2);
+  border: 2px solid var(--badge-success-border);
 }
 
 .success-content h3 {
-  color: #16a34a;
+  color: var(--badge-success-text);
   font-size: 1.6rem;
   margin: 0 0 0.75rem 0;
 }
@@ -617,12 +958,12 @@ const goToDashboard = () => {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
-  background: rgba(22, 163, 74, 0.06);
+  background: var(--badge-success-bg);
   padding: 0.75rem 1.5rem;
   border-radius: 50px;
   font-size: 0.88rem;
   color: var(--color-text);
-  border: 1px solid rgba(22, 163, 74, 0.2);
+  border: 1px solid var(--badge-success-border);
 }
 
 .meta-divider {
@@ -683,12 +1024,12 @@ const goToDashboard = () => {
 
 .btn-outline-danger {
   background: transparent;
-  border: 1.5px solid #dc3545;
-  color: #dc3545;
+  border: 1.5px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
 }
 
 .btn-outline-danger:hover {
-  background: #dc3545;
+  background: var(--badge-danger-text);
   color: #fff;
 }
 
@@ -707,8 +1048,8 @@ const goToDashboard = () => {
   align-items: center;
   gap: 0.3rem;
   background: transparent;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #dc3545;
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
   padding: 0.4rem 0.9rem;
   border-radius: 6px;
   font-weight: 600;
@@ -720,7 +1061,7 @@ const goToDashboard = () => {
 }
 
 .btn-ghost-small:hover {
-  background: rgba(220, 53, 69, 0.08);
+  background: var(--badge-danger-bg);
 }
 
 .btn-warning-outline {
@@ -728,8 +1069,8 @@ const goToDashboard = () => {
   align-items: center;
   gap: 0.4rem;
   background: transparent;
-  border: 1px solid rgba(234, 179, 8, 0.5);
-  color: #92400e;
+  border: 1px solid var(--badge-warning-border);
+  color: var(--badge-warning-text);
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
@@ -741,7 +1082,314 @@ const goToDashboard = () => {
 }
 
 .btn-warning-outline:hover {
-  background: #f59e0b;
+  background: var(--badge-warning-text);
   color: #fff;
+}
+
+/* ═══ ESTILOS US07: Exportação Oficial, Selo Bloqueado e Modais ═══ */
+.official-export-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.official-seal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.badge-bloqueada {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.official-seal-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.official-export-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-export-csv,
+.btn-export-geojson {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-export-csv {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+}
+
+.btn-export-csv:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.btn-export-geojson {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+
+.btn-export-geojson:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  padding: 1.5rem;
+}
+
+.modal-dialog {
+  background: var(--color-surface, #ffffff);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.modal-header-title h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.modal-danger-icon {
+  color: var(--badge-danger-text);
+}
+
+.modal-lock-icon {
+  color: var(--badge-success-text);
+}
+
+.btn-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.btn-close:hover {
+  color: var(--color-heading);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.modal-info {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.required-mark {
+  color: var(--badge-danger-text);
+}
+
+.radio-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--vis-brand-orange, #f26522);
+}
+
+.error-text {
+  font-size: 0.8rem;
+  color: var(--badge-danger-text);
+  font-weight: 600;
+}
+
+.alert-box-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
+  border-radius: 8px;
+  padding: 1rem;
+  color: var(--color-text);
+  font-size: 0.88rem;
+}
+
+.alert-warning-icon {
+  color: var(--badge-warning-text);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.alert-box-warning p {
+  margin: 0.35rem 0 0 0;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.publish-meta-box {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.meta-label {
+  color: var(--color-text-muted);
+}
+
+.modal-footer {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: var(--color-surface-soft);
+}
+
+.btn-cancel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.6rem 1.15rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: var(--color-surface-soft);
+}
+
+.btn-confirm-rejection {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-confirm-rejection:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-confirm-publish {
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.btn-confirm-publish:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

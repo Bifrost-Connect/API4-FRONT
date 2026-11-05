@@ -1,6 +1,6 @@
-import api, { mockactive } from './api'
-import { mockProcessosPage, mockMetricasResponse } from './mocks/dashboard.mock'
-import { mockFilterOptions, mockAvailableEditors } from './mocks/filter.mock'
+import api from './api'
+import { userService } from './user'
+import { processService } from './process'
 
 export interface Page<T> {
   content: T[]
@@ -8,6 +8,7 @@ export interface Page<T> {
   totalPages: number
   size: number
   number: number
+  source?: 'API' | 'DEMONSTRACAO'
 }
 
 export interface ProcessoMetricasResponse {
@@ -36,6 +37,7 @@ export interface ProcessLog {
     | 'Em validação'
     | 'Falhou'
     | 'Em quarentena'
+    | 'Fechado'
   source?: string
   year?: string
   epsg?: string
@@ -58,6 +60,8 @@ export interface DashboardFilters {
   conjunto?: string
   etapa?: string
   situacao?: string
+  page?: number
+  size?: number
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -83,17 +87,18 @@ export function mapStatus(backendStatus: string): string {
   if (!backendStatus) return 'Em andamento'
   switch (backendStatus) {
     case 'CONCLUIDA':
-    case 'COM_RESSALVA':
       return 'Concluída'
-    case 'EM_ANDAMENTO':
-      return 'Em andamento'
+    case 'COM_RESSALVA':
+      return 'Com ressalva'
     case 'EM_VALIDACAO':
-    case 'VALIDACAO':
-      return 'Aguardando validação'
-    case 'FALHOU':
-      return 'Falhou'
     case 'EM_QUARENTENA':
       return 'Em quarentena'
+    case 'EM_ANDAMENTO':
+      return 'Em andamento'
+    case 'FALHOU':
+      return 'Falhou'
+    case 'FECHADO':
+      return 'Fechado'
     default:
       return backendStatus
   }
@@ -136,80 +141,31 @@ export function mapMetricasToSummary(metricas: ProcessoMetricasResponse): Dashbo
 
 export const dashboardService = {
   async getDashboardSummary(): Promise<DashboardSummary[]> {
-    try {
-      const res = await api.get('/processos/metricas')
-      return mapMetricasToSummary(res.data)
-    } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
-      console.warn('API indisponível (ou rota 404), usando mock para métricas')
-      await delay(400)
-      return mapMetricasToSummary(mockMetricasResponse)
-    }
+    const res = await api.get('/processos/metricas')
+    return mapMetricasToSummary(res.data)
   },
 
   async getDashboardProcesses(filters?: DashboardFilters): Promise<Page<ProcessLog>> {
-    try {
-      const params: any = {}
-      if (filters) {
-        if (filters.dateBegin) params.dataInicio = filters.dateBegin
-        if (filters.dateEnd) params.dataFim = filters.dateEnd
-        if (filters.conjunto) params.conjuntoId = filters.conjunto
-        if (filters.etapa) params.etapaId = filters.etapa
-        if (filters.situacao) params.situacaoId = filters.situacao
-      }
-
-      const res = await api.get('/processos', { params })
-      if (res.data && res.data.content) {
-        res.data.content.forEach((item: any) => {
-          item.stage = mapStage(item.stage)
-          item.status = mapStatus(item.status)
-        })
-      }
-
-      return res.data
-    } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
-      console.warn('API indisponível (ou rota 404), usando mock para processos do dashboard')
-      await delay(600)
-
-      let filteredProcesses = [...mockProcessosPage.content]
-
-      if (filters) {
-        if (filters.conjunto) {
-          const option = mockFilterOptions.conjuntos.find(
-            (o) => String(o.id) === String(filters.conjunto),
-          )
-          if (option)
-            filteredProcesses = filteredProcesses.filter((p) => p.dataset === option.label)
-        }
-        if (filters.etapa) {
-          const option = mockFilterOptions.etapas.find(
-            (o) => String(o.id) === String(filters.etapa),
-          )
-          if (option) filteredProcesses = filteredProcesses.filter((p) => p.stage === option.label)
-        }
-        if (filters.situacao) {
-          const option = mockFilterOptions.situacoes.find(
-            (o) => String(o.id) === String(filters.situacao),
-          )
-          if (option) filteredProcesses = filteredProcesses.filter((p) => p.status === option.label)
-        }
-      }
-
-      return {
-        content: filteredProcesses,
-        totalElements: filteredProcesses.length,
-        totalPages: 1,
-        size: mockProcessosPage.size,
-        number: mockProcessosPage.number,
-      }
+    const params: any = {}
+    if (filters) {
+      if (filters.dateBegin) params.dataInicio = filters.dateBegin
+      if (filters.dateEnd) params.dataFim = filters.dateEnd
+      if (filters.conjunto) params.conjuntoId = filters.conjunto
+      if (filters.etapa) params.etapaId = filters.etapa
+      if (filters.situacao) params.situacaoId = filters.situacao
+      if (filters.page !== undefined) params.page = filters.page
+      if (filters.size !== undefined) params.size = filters.size
     }
+
+    const res = await api.get('/processos', { params })
+    if (res.data && res.data.content) {
+      res.data.content.forEach((item: any) => {
+        item.stage = mapStage(item.stage)
+        item.status = mapStatus(item.status)
+      })
+    }
+
+    return { ...res.data, source: 'API' }
   },
 
   async requestAuditor(processId: string): Promise<void> {
@@ -224,10 +180,8 @@ export const dashboardService = {
     try {
       const res = await api.get('/dominios/filtros')
       return res.data
-    } catch (err) {
-      console.warn('Endpoint /dominios/filtros não encontrado, usando mockFilterOptions')
-      await delay(400)
-      return mockFilterOptions
+    } catch {
+      return { conjuntos: [], etapas: [], situacoes: [] }
     }
   },
 
@@ -240,47 +194,88 @@ export const dashboardService = {
           name: u.nome || u.name || 'Auditor Sem Nome',
         }))
       }
-      // Fallback pois o backend pode estar retornando List.of() vazio
-      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
-    } catch (err: any) {
-      if (mockactive) throw err
-      console.warn('API indisponível, usando mock para auditores')
-      await delay(400)
-      return mockAvailableEditors.map((name, idx) => ({ id: idx + 1, name }))
+      return []
+    } catch {
+      return []
     }
   },
 
   async assignEditor(
     processId: string,
     editorId: number,
-    editorName: string,
+    editorName?: string,
   ): Promise<ProcessLog | null> {
-    try {
-      const res = await api.put(`/processos/${processId}/editor`, { editorId })
-      return res.data
-    } catch (err: any) {
-      if (mockactive) throw err
-      if (err.response && err.response.status !== 404) {
-        throw err.response.data || err
-      }
-      console.warn('API indisponível (ou rota 404), usando mock para alocação de editor')
-      await delay(400)
-      const process = mockProcessosPage.content.find((p) => p.id === processId)
-      if (process) {
-        process.assignedEditor = editorName
-        process.status = 'Em andamento'
-        process.pauseReason = `Editor ${editorName} alocado para correção do erro na etapa de ${process.stage}.`
+    const res = await api.put(`/processos/${processId}/editor`, { editorId })
+    return res.data
+  },
 
-        if (mockMetricasResponse.porSituacao) {
-          mockMetricasResponse.porSituacao['Em andamento'] =
-            (mockMetricasResponse.porSituacao['Em andamento'] || 0) + 1
-          mockMetricasResponse.porSituacao['Falhou'] = Math.max(
-            0,
-            (mockMetricasResponse.porSituacao['Falhou'] || 0) - 1,
-          )
-        }
-      }
-      return process || null
+  /**
+   * Aprova e fecha a versão oficial permanentemente na Publicação.
+   */
+  async aprovarEFecharVersao(
+    item: any,
+    responsavelNome = userService.getCurrentUser().name,
+  ): Promise<{ success: boolean }> {
+    const usuarioId = userService.getCurrentUser().id
+
+    if (/^\d+$/.test(String(item.id))) {
+      await api.patch(`/indicadores/${item.id}/fechar`, null, {
+        headers: { 'X-Gestor-ID': String(usuarioId) },
+      })
     }
+
+    item.decided = true
+    item.decision = 'aprovado'
+    item.isClosed = true
+    item.status = 'Fechado'
+    item.versaoOficial = item.versaoOficial || 'v1.0 Oficial'
+    item.aprovador = responsavelNome
+    item.dataPublicacao = new Date().toLocaleString('pt-BR')
+    item.pauseReason = 'Versão oficial bloqueada e publicada no catálogo.'
+
+    return { success: true }
+  },
+
+  /**
+   * Reprova a carga exigindo parecer obrigatório e selecionando destino
+   * ('reprocessar' ou 'invalidar').
+   */
+  async reprovarCarga(
+    item: any,
+    parecer: string,
+    destino: 'reprocessar' | 'invalidar',
+  ): Promise<{ success: boolean }> {
+    if (!parecer || !parecer.trim()) {
+      throw new Error('O parecer técnico é obrigatório para reprovar a carga.')
+    }
+
+    if (/^\d+$/.test(String(item.id))) {
+      await api.put(`/processos/${item.id}/editor`, {
+        editorId: userService.getCurrentUser().id,
+      })
+    }
+
+    item.decided = true
+    item.decision = 'reprovado'
+    item.rejectionReason = parecer.trim()
+    item.rejectionDestino = destino
+
+    if (destino === 'reprocessar') {
+      item.status = 'Em andamento'
+      item.pauseReason = `Reprovado (${item.stage || 'Publicação'}): ${parecer.trim()}. Retornado ao Operador.`
+    } else {
+      item.status = 'Falhou'
+      item.pauseReason = `Carga invalidada permanentemente: ${parecer.trim()}.`
+    }
+
+    return { success: true }
+  },
+
+  /**
+   * Exporta a versão consolidada em formato CSV ou GeoJSON.
+   */
+  async exportarVersao(itemOrId: any, formato: 'csv' | 'geojson'): Promise<Blob> {
+    const id = typeof itemOrId === 'object' ? itemOrId.id : String(itemOrId)
+    return await processService.exportIndicator(id, formato)
   },
 }

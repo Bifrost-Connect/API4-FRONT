@@ -1,3 +1,7 @@
+/**
+ * @file Fixtures para testes automatizados.
+ */
+
 export const mockFilterOptions = {
   conjuntos: [
     { id: 1, label: 'Imóveis rurais' },

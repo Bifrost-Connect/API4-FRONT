@@ -2,8 +2,10 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeButton from './ThemeButton.vue'
+import { userService } from '../services/user'
 
 const route = useRoute()
+const currentUser = computed(() => userService.getCurrentUser())
 
 const pageTitles: Record<string, string> = {
   dashboard: 'Visão geral das cargas',
@@ -11,6 +13,7 @@ const pageTitles: Record<string, string> = {
   mapa: 'Mapa operacional',
   styleguide: 'Guia de estilos',
   'process-log': 'Acompanhar processamento de cargas',
+  'analise-territorial': 'Análise territorial',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')
@@ -29,7 +32,7 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
         <span aria-hidden="true">⌖</span>
         <span>Mapa</span>
       </RouterLink>
-      <RouterLink to="/upload" class="navbar-link" active-class="navbar-link-active">
+      <RouterLink v-if="currentUser.role === 'Operador'" to="/upload" class="navbar-link" active-class="navbar-link-active">
         <span aria-hidden="true">＋</span>
         <span>Nova carga</span>
       </RouterLink>

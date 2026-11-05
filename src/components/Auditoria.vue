@@ -1,6 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { ProcessVersion } from '@/services/auditoria'
+import { ref, computed } from 'vue'
+import {
+  FiFileText,
+  FiCopy,
+  FiCheck,
+  FiClock,
+  FiShield,
+  FiDownload,
+  FiAlertTriangle,
+  FiBell,
+  FiRefreshCw,
+  FiXCircle,
+  FiCheckCircle,
+} from 'vue-icons-plus/fi'
+import type { ProcessVersion, LinhagemCompletaCarga } from '@/services/auditoria'
+import { uploadService } from '@/services/upload'
 
 interface Props {
   versions: ProcessVersion[]
@@ -9,6 +23,8 @@ interface Props {
   cargaDataset?: string
   layerName?: string
   canClose?: boolean
+  linhagemCompleta?: LinhagemCompletaCarga | null
+  userRole?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -17,181 +33,901 @@ const props = withDefaults(defineProps<Props>(), {
   cargaDataset: '',
   layerName: '',
   canClose: true,
+  linhagemCompleta: null,
+  userRole: 'Auditor',
 })
 
 const emit = defineEmits<{
   (e: 'select-version', version: ProcessVersion): void
   (e: 'close'): void
+  (e: 'notificar-operador', id: string): void
+  (e: 'reprocessar', id: string): void
+  (e: 'cancelar', id: string): void
 }>()
+
+const activeTab = ref<'arquivos' | 'timeline' | 'quarentena' | 'decisoes'>('arquivos')
+const copiedHash = ref<string | null>(null)
+const isExportingCsv = ref(false)
+const toastMessage = ref<string | null>(null)
+
+const showToast = (msg: string) => {
+  toastMessage.value = msg
+  setTimeout(() => {
+    if (toastMessage.value === msg) {
+      toastMessage.value = null
+    }
+  }, 3000)
+}
+
+const formatShortHash = (hash?: string): string => {
+  if (!hash) return 'Não calculado'
+  const clean = hash.trim().replace(/^sha256:/i, '')
+  if (clean.length <= 16) return clean
+  return `${clean.slice(0, 8)}...${clean.slice(-6)}`
+}
 
 const selectedVersion = computed(() => {
   return props.versions.find((v) => v.id === props.selectedVersionId) || props.versions[0] || null
 })
 
-const getStatusClass = (status: string) => {
-  const normalized = (status || '').toLowerCase().replace(/\s+/g, '-')
-  if (normalized.includes('conclu')) return 'status-concluida'
-  if (normalized.includes('andamento')) return 'status-em-andamento'
-  if (normalized.includes('aguardando') || normalized.includes('valida'))
-    return 'status-aguardando-validacao'
-  if (normalized.includes('falh')) return 'status-falhou'
-  return ''
+const copyHash = async (hash?: string) => {
+  if (!hash) return
+  try {
+    await navigator.clipboard.writeText(hash)
+    copiedHash.value = hash
+    showToast('Hash SHA-256 copiado para a área de transferência!')
+    setTimeout(() => {
+      if (copiedHash.value === hash) copiedHash.value = null
+    }, 2500)
+  } catch {
+    showToast('Não foi possível copiar o hash.')
+  }
+}
+
+const exportarRejeicoes = async () => {
+  const numericId = Number(String(props.cargaId).replace(/\D/g, ''))
+  if (!numericId) return
+  isExportingCsv.value = true
+  try {
+    const blob = await uploadService.exportarRejeicoesCsv(numericId)
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `rejeicoes_carga_${numericId}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    showToast('Relatório de rejeições (CSV) exportado com sucesso!')
+  } catch (err: any) {
+    showToast('Sem rejeições de quarentena para exportar nesta carga.')
+  } finally {
+    isExportingCsv.value = false
+  }
+}
+
+const getStatusBadgeClass = (status?: string) => {
+  const s = (status || '').toLowerCase()
+  if (s.includes('conclu')) return 'badge-success'
+  if (s.includes('andamento')) return 'badge-warning'
+  if (s.includes('falh') || s.includes('cancel')) return 'badge-danger'
+  if (s.includes('quarentena') || s.includes('valida')) return 'badge-info'
+  return 'badge-neutral'
+}
+
+const formatDateTime = (dt?: string) => {
+  if (!dt) return '—'
+  const parsed = new Date(dt)
+  return Number.isNaN(parsed.getTime()) ? dt : parsed.toLocaleString('pt-BR')
 }
 </script>
 
 <template>
-  <aside class="locations-panel" aria-label="Versões da carga">
+  <aside class="audit-drawer-panel" aria-label="Painel de Auditoria e Linhagem">
     <!-- Cabeçalho do Painel -->
-    <div class="panel-heading">
-      <div>
-        <h2 class="eyebrow">Versões da Carga</h2>
+    <div class="panel-header">
+      <div class="header-titles">
+        <span class="eyebrow"><FiShield class="icon-inline" /> US05 &bull; Auditoria e Linhagem</span>
+        <h2>Rastreabilidade da Carga</h2>
       </div>
-      <div class="heading-actions">
-        <button
-          v-if="canClose"
-          type="button"
-          class="btn-close-panel"
-          title="Fechar painel de versões"
-          aria-label="Fechar painel de versões"
-          @click="emit('close')"
-        >
-          &times;
-        </button>
-      </div>
-    </div>
-
-    <!-- Card de Versão Selecionada no rodapé (coordinates-card) -->
-    <div v-if="selectedVersion" class="coordinates-card">
-      <span>Versão em exibição</span>
-      <strong>{{ selectedVersion.versionTag }}</strong>
-      <small>{{ selectedVersion.stage }} &bull; {{ selectedVersion.dateTime }}</small>
-      <small v-if="selectedVersion.assignedEditor">
-        Autor: {{ selectedVersion.assignedEditor }}
-      </small>
-
-    </div>
-
-    <!-- Informações de resumo da carga no topo do painel -->
-    <div v-if="cargaId || cargaDataset || layerName" class="panel-summary-box">
-      <div v-if="cargaId" class="summary-row">
-        <span class="summary-label">Carga:</span>
-        <strong class="summary-val">{{ cargaId }}</strong>
-      </div>
-      <div v-if="cargaDataset" class="summary-row">
-        <span class="summary-label">Dataset:</span>
-        <span class="summary-val text-truncate" :title="cargaDataset">{{ cargaDataset }}</span>
-      </div>
-      <div v-if="layerName" class="summary-row">
-        <span class="summary-label">Camada:</span>
-        <span class="summary-val text-truncate" :title="layerName">{{ layerName }}</span>
-      </div>
-    </div>
-
-    <!-- Lista de Versões da Carga -->
-    <div class="location-list">
       <button
-        v-for="version in versions"
-        :key="version.id"
+        v-if="canClose"
         type="button"
-        class="location-item"
-        :class="{ 'location-item-active': selectedVersionId === version.id }"
-        @click="emit('select-version', version)"
+        class="btn-close"
+        title="Fechar painel de auditoria"
+        aria-label="Fechar painel"
+        @click="emit('close')"
       >
-        <span class="location-dot" :class="getStatusClass(version.status)"></span>
-        <span class="location-content">
-          <div class="version-item-header">
-            <strong>{{ version.versionTag }}</strong>
-          </div>
-          <small class="version-date">
-            {{ version.dateTime }} &bull; Etapa: {{ version.stage }}
-          </small>
-          <small class="version-desc">{{ version.changeNote }}</small>
-          <small v-if="version.assignedEditor" class="version-author">
-            Responsável: {{ version.assignedEditor }}
-          </small>
-        </span>
+        &times;
       </button>
     </div>
 
+    <!-- Toast de Feedback -->
+    <div v-if="toastMessage" class="audit-toast" role="status">
+      <span>{{ toastMessage }}</span>
+    </div>
 
+    <!-- Caixa de Metadados Principais da Carga -->
+    <div class="carga-summary-card">
+      <div class="summary-line">
+        <span class="label">ID da Carga:</span>
+        <strong class="value">#{{ cargaId || selectedVersion?.id }}</strong>
+      </div>
+      <div v-if="cargaDataset" class="summary-line">
+        <span class="label">Conjunto:</span>
+        <span class="value text-truncate" :title="cargaDataset">{{ cargaDataset }}</span>
+      </div>
+      <div class="summary-line">
+        <span class="label">Situação Atual:</span>
+        <span class="badge" :class="getStatusBadgeClass(selectedVersion?.status)">
+          {{ selectedVersion?.status || 'Em andamento' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Navegação de Abas do Painel -->
+    <nav class="audit-tabs" aria-label="Seções de Auditoria">
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'arquivos' }"
+        @click="activeTab = 'arquivos'"
+      >
+        <FiFileText size="14" />
+        Arquivos ({{ versions.length }})
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'timeline' }"
+        @click="activeTab = 'timeline'"
+      >
+        <FiClock size="14" />
+        Linhagem
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'quarentena' }"
+        @click="activeTab = 'quarentena'"
+      >
+        <FiAlertTriangle size="14" />
+        Quarentena
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'decisoes' }"
+        @click="activeTab = 'decisoes'"
+      >
+        <FiCheckCircle size="14" />
+        Governança
+      </button>
+    </nav>
+
+    <!-- ABA 1: ARQUIVOS & HASHES (REPROCESSAMENTOS) -->
+    <div v-if="activeTab === 'arquivos'" class="tab-content">
+      <p class="tab-intro">
+        Cada tentativa gera um novo Hash SHA-256 e preserva permanentemente o arquivo anterior no histórico:
+      </p>
+
+      <div class="version-cards-list">
+        <div
+          v-for="(ver, idx) in versions"
+          :key="ver.id + '-' + idx"
+          class="version-card location-item"
+          :class="{ 'version-card-active': selectedVersion?.id === ver.id && selectedVersion?.versionNumber === ver.versionNumber }"
+          @click="emit('select-version', ver)"
+        >
+          <div class="card-top">
+            <span class="attempt-badge" :class="idx === 0 ? 'badge-primary' : 'badge-secondary'">
+              {{ ver.versionTag }}
+            </span>
+            <span class="badge" :class="getStatusBadgeClass(ver.status)">{{ ver.status }}</span>
+          </div>
+
+          <div class="card-body">
+            <div class="file-name-row">
+              <FiFileText class="file-icon" />
+              <strong class="file-name" :title="ver.layerName">{{ ver.layerName }}</strong>
+            </div>
+
+            <div class="hash-box">
+              <span class="hash-label">Hash SHA-256:</span>
+              <div class="hash-row">
+                <code class="hash-code" :title="ver.integrityHash">
+                  {{ formatShortHash(ver.integrityHash) }}
+                </code>
+                <button
+                  type="button"
+                  class="btn-icon"
+                  :title="copiedHash === ver.integrityHash ? 'Hash copiado!' : 'Copiar hash SHA-256 completo'"
+                  @click.stop="copyHash(ver.integrityHash)"
+                >
+                  <FiCheck v-if="copiedHash === ver.integrityHash" class="icon-success" />
+                  <FiCopy v-else />
+                </button>
+              </div>
+            </div>
+
+            <div class="card-footer-info">
+              <span class="date-text">{{ ver.dateTime }}</span>
+              <a
+                v-if="ver.originalFileUrl && ver.originalFileUrl !== '#'"
+                :href="ver.originalFileUrl"
+                class="btn-download"
+                download
+                title="Download do arquivo desta versão"
+                @click.stop
+              >
+                <FiDownload size="12" /> Baixar
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA 2: LINHAGEM TEMPORAL DA ESTEIRA -->
+    <div v-else-if="activeTab === 'timeline'" class="tab-content">
+      <p class="tab-intro">Histórico completo de passagens da carga pelas etapas da esteira:</p>
+
+      <div v-if="linhagemCompleta?.historicoEtapas && linhagemCompleta.historicoEtapas.length > 0" class="timeline-list">
+        <div
+          v-for="(h, idx) in linhagemCompleta.historicoEtapas"
+          :key="idx"
+          class="timeline-item"
+        >
+          <div class="timeline-bullet" :class="getStatusBadgeClass(h.situacao)"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <strong>Etapa {{ h.etapa }}</strong>
+              <span class="badge" :class="getStatusBadgeClass(h.situacao)">{{ h.situacao }}</span>
+            </div>
+            <div class="timeline-dates">
+              <span>Início: {{ formatDateTime(h.dataInicio) }}</span>
+              <span v-if="h.dataFim">&bull; Fim: {{ formatDateTime(h.dataFim) }}</span>
+            </div>
+            <p v-if="h.mensagem" class="timeline-msg">{{ h.mensagem }}</p>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <p>Aguardando registro de etapas para esta carga.</p>
+      </div>
+    </div>
+
+    <!-- ABA 3: QUARENTENA & AÇÕES TÉCNICAS (US05 - TAREFAS 16 A 19) -->
+    <div v-else-if="activeTab === 'quarentena'" class="tab-content">
+      <div class="actions-group">
+        <span class="actions-title">Ações Operacionais e Técnicas:</span>
+
+        <button
+          type="button"
+          class="btn-action btn-outline"
+          :disabled="isExportingCsv"
+          @click="exportarRejeicoes"
+        >
+          <FiDownload />
+          <span>{{ isExportingCsv ? 'Gerando CSV...' : 'Exportar Rejeições (CSV)' }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-action btn-notify"
+          @click="emit('notificar-operador', String(cargaId))"
+        >
+          <FiBell />
+          <span>Notificar Operador para Reprocessar</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-action btn-reprocess"
+          @click="emit('reprocessar', String(cargaId))"
+        >
+          <FiRefreshCw />
+          <span>Reprocessar com Arquivo Corrigido</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-action btn-cancel"
+          @click="emit('cancelar', String(cargaId))"
+        >
+          <FiXCircle />
+          <span>Cancelar / Invalidar Carga</span>
+        </button>
+      </div>
+
+      <div class="quarantine-logs-box">
+        <h4>Logs de Inconsistência e Quarentena</h4>
+        <div v-if="linhagemCompleta?.logsQuarentena && linhagemCompleta.logsQuarentena.length > 0" class="quarantine-logs-list">
+          <div
+            v-for="(log, idx) in linhagemCompleta.logsQuarentena"
+            :key="idx"
+            class="quarantine-log-entry"
+          >
+            <div class="log-meta">
+              <span class="badge-severidade">{{ log.severidade || 'CRÍTICO' }}</span>
+              <span class="log-stage">Origem: {{ log.etapaFalha }}</span>
+              <span class="log-time">{{ formatDateTime(log.dataDeteccao) }}</span>
+            </div>
+            <p class="log-error-text">{{ log.mensagemErro }}</p>
+          </div>
+        </div>
+        <p v-else class="text-muted">Nenhuma ocorrência crítica de quarentena pendente para esta carga.</p>
+      </div>
+    </div>
+
+    <!-- ABA 4: GOVERNANÇA & DECISÕES DO GESTOR -->
+    <div v-else-if="activeTab === 'decisoes'" class="tab-content">
+      <div v-if="linhagemCompleta?.decisoesGestor && linhagemCompleta.decisoesGestor.length > 0" class="decisoes-list">
+        <div
+          v-for="d in linhagemCompleta.decisoesGestor"
+          :key="d.id"
+          class="decisao-card"
+        >
+          <div class="decisao-header">
+            <strong>Portão: {{ d.etapa }}</strong>
+            <span class="badge" :class="d.decisao === 'APROVADO' ? 'badge-success' : 'badge-danger'">
+              {{ d.decisao }}
+            </span>
+          </div>
+          <div class="decisao-meta">
+            <span>Avaliador: {{ d.gestorNome || 'Gestor' }}</span> &bull;
+            <span>Data: {{ formatDateTime(d.dataDecisao) }}</span>
+          </div>
+          <p v-if="d.parecer" class="decisao-parecer">"{{ d.parecer }}"</p>
+        </div>
+      </div>
+      <div v-else class="empty-state">
+        <p>Nenhuma decisão de portão registrada até o momento.</p>
+      </div>
+    </div>
   </aside>
 </template>
 
 <style scoped>
-/* Painel Lateral de Versões (Fiel ao locations-panel do Mapa) */
-.locations-panel {
+.audit-drawer-panel {
   display: flex;
   flex-direction: column;
-  padding: 22px 18px;
-  border-left: 1px solid var(--color-border);
+  padding: 20px 16px;
   background: var(--color-surface);
   height: 100%;
   min-height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
+  width: 100%;
 }
 
-.panel-heading {
+.panel-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.panel-heading h2 {
-  font-size: 1.05rem;
+.header-titles .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-brand);
+  margin-bottom: 4px;
+}
+
+.header-titles h2 {
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--color-heading);
   margin: 0;
 }
 
-.eyebrow {
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--vis-brand-orange);
-  margin: 0 0 4px 0;
-}
-
-.heading-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.location-count {
-  min-width: 28px;
-  min-height: 28px;
-  display: grid;
-  place-items: center;
-  color: white;
-  background: var(--vis-brand-orange);
-  border-radius: 50%;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.btn-close-panel {
+.btn-close {
   background: transparent;
   border: none;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   line-height: 1;
-  color: var(--vis-c-text-dark-2);
+  color: var(--color-text-muted);
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   border-radius: 4px;
-  transition: color 0.15s, background-color 0.15s;
+  transition: all 0.15s;
 }
 
-.btn-close-panel:hover {
+.btn-close:hover {
   color: var(--color-heading);
   background: var(--color-surface-soft);
 }
 
-.panel-summary-box {
+.audit-toast {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
+  color: var(--badge-success-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.carga-summary-card {
   margin-top: 14px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  gap: 8px;
+}
+
+.summary-line .label {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.summary-line .value {
+  color: var(--color-heading);
+  font-weight: 600;
+}
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.audit-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 14px;
+  margin-bottom: 12px;
+  background: var(--color-background);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--color-heading);
+}
+
+.tab-btn.active {
+  background: var(--color-surface);
+  color: var(--color-heading);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tab-intro {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.version-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.version-card {
+  padding: 12px 14px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.version-card:hover {
+  border-color: var(--color-brand);
+}
+
+.version-card-active {
+  border-color: var(--color-brand);
+  background: var(--badge-primary-bg);
+  box-shadow: 0 0 0 1px var(--color-brand);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.attempt-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.card-top .badge {
+  flex-shrink: 0;
+}
+
+.badge-primary {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+
+.badge-secondary {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.file-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.file-icon {
+  color: var(--color-brand);
+  flex-shrink: 0;
+}
+
+.file-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.hash-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hash-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+}
+
+.hash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.hash-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover {
+  color: var(--color-heading);
+  background: var(--color-surface-soft);
+}
+
+.icon-success {
+  color: var(--vis-c-success);
+}
+
+.card-footer-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  padding-top: 6px;
+  border-top: 1px dashed var(--color-border);
+  min-width: 0;
+  width: 100%;
+}
+
+.date-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vis-c-info);
+  font-weight: 600;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.btn-download:hover {
+  text-decoration: underline;
+}
+
+/* Timeline */
+.timeline-list {
+  display: grid;
+  gap: 14px;
+  position: relative;
+  padding-left: 16px;
+  border-left: 2px solid var(--color-border);
+  margin-left: 6px;
+}
+
+.timeline-item {
+  position: relative;
+}
+
+.timeline-bullet {
+  position: absolute;
+  left: -23px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+
+.timeline-bullet.badge-success {
+  background: var(--vis-c-success);
+}
+.timeline-bullet.badge-danger {
+  background: var(--vis-c-danger);
+}
+.timeline-bullet.badge-warning {
+  background: var(--vis-c-warning);
+}
+
+.timeline-content {
+  display: grid;
+  gap: 3px;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.timeline-dates {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.timeline-msg {
+  font-size: 0.74rem;
+  color: var(--color-heading);
+  margin: 2px 0 0 0;
+  line-height: 1.35;
+}
+
+/* Quarentena e Ações */
+.actions-group {
+  display: grid;
+  gap: 8px;
+}
+
+.actions-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-outline {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+.btn-outline:hover {
+  background: var(--color-surface-soft);
+  border-color: var(--color-border-hover);
+}
+
+.btn-notify {
+  background: var(--badge-warning-bg);
+  border-color: var(--badge-warning-border);
+  color: var(--badge-warning-text);
+}
+.btn-notify:hover {
+  opacity: 0.9;
+}
+
+.btn-reprocess {
+  background: var(--badge-info-bg);
+  border-color: var(--badge-info-border);
+  color: var(--badge-info-text);
+}
+.btn-reprocess:hover {
+  opacity: 0.9;
+}
+
+.btn-cancel {
+  background: var(--badge-danger-bg);
+  border-color: var(--badge-danger-border);
+  color: var(--badge-danger-text);
+}
+.btn-cancel:hover {
+  opacity: 0.9;
+}
+
+.quarantine-logs-box {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.quarantine-logs-box h4 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-heading);
+}
+
+.quarantine-logs-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quarantine-log-entry {
+  padding: 8px 10px;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+}
+
+.badge-severidade {
+  background: var(--vis-c-danger);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+}
+
+.log-stage,
+.log-time {
+  color: var(--badge-danger-text);
+}
+
+.log-error-text {
+  font-size: 0.75rem;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Governança */
+.decisoes-list {
+  display: grid;
+  gap: 10px;
+}
+
+.decisao-card {
+  padding: 10px;
   background: var(--color-surface-soft);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -199,181 +935,65 @@ const getStatusClass = (status: string) => {
   gap: 4px;
 }
 
-.summary-row {
+.decisao-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
-  gap: 8px;
+  font-size: 0.82rem;
 }
 
-.summary-label {
-  color: var(--vis-c-text-dark-2);
-  flex-shrink: 0;
-}
-
-.summary-val {
-  color: var(--color-heading);
-  font-weight: 600;
-  text-align: right;
-}
-
-.text-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 180px;
-}
-
-.location-list {
-  display: grid;
-  gap: 6px;
-  margin-top: 16px;
-  margin-bottom: 16px;
-  flex: 1 1 auto;
-  overflow-y: auto;
-}
-
-.location-item {
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 10px;
-  color: var(--color-text);
-  text-align: left;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-  box-sizing: border-box;
-}
-
-.location-item:hover,
-.location-item-active {
-  background: var(--color-surface-soft);
-  border-color: var(--color-border);
-}
-
-.location-item-active {
-  border-left: 3px solid var(--vis-brand-orange);
-}
-
-.location-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 5px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--vis-c-success);
-}
-
-.status-concluida {
-  background: var(--vis-c-success);
-}
-
-.status-em-andamento {
-  background: var(--vis-c-warning);
-}
-
-.status-aguardando-validacao {
-  background: var(--vis-c-info);
-}
-
-.status-falhou {
-  background: var(--vis-c-danger);
-}
-
-.location-content {
-  display: grid;
-  gap: 3px;
-  width: 100%;
-  min-width: 0;
-}
-
-.version-item-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.location-content strong {
-  color: var(--color-heading);
-  font-size: 0.88rem;
-}
-
-.version-status-pill {
+.decisao-meta {
   font-size: 0.7rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: white;
-  white-space: nowrap;
+  color: var(--color-text-muted);
 }
 
-.version-status-pill.status-concluida {
-  background: #16a34a;
-}
-.version-status-pill.status-em-andamento {
-  background: #d97706;
-}
-.version-status-pill.status-aguardando-validacao {
-  background: #0284c7;
-}
-.version-status-pill.status-falhou {
-  background: #dc2626;
-}
-
-.version-date {
-  font-size: 0.74rem;
-  color: var(--vis-c-text-dark-2);
-}
-
-.version-desc {
+.decisao-parecer {
   font-size: 0.75rem;
-  color: var(--color-text);
+  color: var(--color-heading);
+  font-style: italic;
+  margin: 2px 0 0 0;
   line-height: 1.35;
 }
 
-.version-author {
-  font-size: 0.72rem;
-  color: var(--vis-brand-primary);
-  font-weight: 500;
-}
-
-.coordinates-card {
-  display: grid;
-  gap: 4px;
-  margin-top: auto;
-  padding: 14px;
-  background: var(--color-surface-soft);
-  border-left: 3px solid var(--vis-brand-orange);
+/* Badges de Status */
+.badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
   border-radius: 4px;
-  box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.coordinates-card span {
-  font-size: 0.74rem;
-  color: var(--vis-c-text-dark-2);
-  text-transform: uppercase;
-  font-weight: 600;
+.badge-success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+}
+.badge-warning {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
+}
+.badge-danger {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
+}
+.badge-info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+.badge-neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
-.coordinates-card strong {
-  color: var(--color-heading);
-  font-size: 0.88rem;
-}
-
-.coordinates-card small {
-  color: var(--color-text);
-  font-size: 0.74rem;
-}
-
-.hash-text {
-  font-family: monospace;
-  font-size: 0.7rem !important;
-  color: var(--vis-c-text-dark-2) !important;
+.empty-state {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
 }
 </style>

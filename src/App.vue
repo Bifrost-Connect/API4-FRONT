@@ -1,7 +1,20 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import Sidebar from './components/AppSidebar.vue'
 import Navbar from './components/AppNavbar.vue'
+
+const route = useRoute()
+
+watch(
+  () => route.path,
+  () => {
+    const container = document.querySelector('.content-scroll-container')
+    if (container) {
+      container.scrollTop = 0
+    }
+  },
+)
 </script>
 
 <template>

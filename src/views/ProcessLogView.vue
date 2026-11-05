@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { processService, type ProcessLogDetails } from '../services/process.ts'
+import {
+  processService,
+  type IndicatorExportFormat,
+  type ProcessLogDetails,
+  type ProcessTraceability,
+} from '../services/process'
+import { userService } from '../services/user'
+import { dashboardService } from '../services/dashboard'
+import { uploadService } from '../services/upload'
 import Stepper from '../components/Stepper.vue'
 import Auditoria from '../components/Auditoria.vue'
 import ProcessStageIngestao from '../components/process-stages/ProcessStageIngestao.vue'
@@ -14,7 +22,6 @@ import {
   type ProcessVersion,
   type AuditProcessCarga,
 } from '@/services/auditoria'
-import { mockAuditCargas } from '@/services/mocks/auditoria.mock'
 
 interface Props {
   processId?: string
@@ -37,6 +44,8 @@ const getInitialAuditOpenState = (): boolean => {
   }
 }
 
+const isAuditOpen = ref<boolean>(getInitialAuditOpenState())
+
 const saveAuditOpenState = (open: boolean) => {
   isAuditOpen.value = open
   try {
@@ -58,14 +67,80 @@ const processId = computed(() => props.processId || (route?.params?.id as string
 const isLoading = ref(!props.detailsData)
 const details = ref<ProcessLogDetails | null>(props.detailsData || null)
 
-// Controle do componente Auditoria (salvo e aberto por padrão)
+// Controle do componente Auditoria
 const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
-const isAuditOpen = ref<boolean>(getInitialAuditOpenState())
+const currentCargaLinhagem = computed(() => currentCarga.value?.linhagemCompleta || null)
+const quarentenaStageRef = ref<any>(null)
+const currentUser = computed(() => userService.getCurrentUser())
+
+// Rastreabilidade e Exportação (US05 e US07)
+const traceability = ref<ProcessTraceability | null>(null)
+const isTraceabilityLoading = ref(false)
+const traceabilityError = ref('')
+const exportError = ref('')
+const exportingFormat = ref<IndicatorExportFormat | null>(null)
+let traceabilityRequestId = 0
 
 const currentCargaId = computed(() => {
   return details.value?.id || currentCarga.value?.id || processId.value
 })
+
+const isBackendProcess = computed(
+  () =>
+    details.value?.dataSource === 'API' &&
+    /^\d+$/.test(String(details.value.id)),
+)
+
+const isClosed = computed(() => details.value?.status?.toLowerCase().includes('fechad') ?? false)
+const isAuditor = computed(() => userService.getCurrentUser().role === 'Auditor')
+const isReadOnly = computed(() => isClosed.value || isAuditor.value)
+
+const loadTraceability = async (id: string, backendProcess: boolean) => {
+  const requestId = ++traceabilityRequestId
+  traceability.value = null
+  traceabilityError.value = ''
+  if (!backendProcess) {
+    isTraceabilityLoading.value = false
+    return
+  }
+
+  isTraceabilityLoading.value = true
+  try {
+    const result = await processService.getTraceability(id)
+    if (requestId === traceabilityRequestId) traceability.value = result
+  } catch (error: any) {
+    if (requestId === traceabilityRequestId) {
+      traceabilityError.value =
+        error?.response?.status === 404
+          ? 'A linhagem deste processo ainda não está disponível.'
+          : 'Não foi possível carregar a linhagem do arquivo.'
+    }
+  } finally {
+    if (requestId === traceabilityRequestId) isTraceabilityLoading.value = false
+  }
+}
+
+const exportIndicator = async (format: IndicatorExportFormat) => {
+  if (!details.value) return
+  exportingFormat.value = format
+  exportError.value = ''
+  try {
+    const file = await dashboardService.exportarVersao(details.value as any, format)
+    const objectUrl = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = `indicador_${details.value.id}.${format}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    exportError.value = 'Não foi possível exportar esta versão. Tente novamente mais tarde.'
+  } finally {
+    exportingFormat.value = null
+  }
+}
 
 const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
 
@@ -81,7 +156,10 @@ const warningStepIndex = computed(() => {
   if (!details.value) return undefined
   const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
   const isErrorStatus =
-    details.value.status === 'Falhou' || details.value.status === 'Aguardando validação'
+    details.value.status === 'Falhou' ||
+    details.value.status === 'Em quarentena' ||
+    (details.value.quarantineRecords?.length ?? 0) > 0 ||
+    (details.value.validationChecks?.some((c) => c.status === 'error') ?? false)
   if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
     return processSteps.indexOf(details.value.stage) + 1
   }
@@ -95,30 +173,7 @@ const selectedQuarantineStage = ref('')
 const loadData = async (idToLoad: string) => {
   isLoading.value = true
   try {
-    // 1. Verifica se o ID corresponde diretamente a uma carga do mock de auditoria
-    const foundMockCarga = mockAuditCargas.find(
-      (c) =>
-        c.id.toLowerCase() === idToLoad.toLowerCase() ||
-        c.versions.some((v) => v.id.toLowerCase() === idToLoad.toLowerCase()),
-    )
-
-    if (foundMockCarga) {
-      currentCarga.value = foundMockCarga
-      auditVersions.value = foundMockCarga.versions
-
-      const targetVersion =
-        foundMockCarga.versions.find((v) => v.id.toLowerCase() === idToLoad.toLowerCase()) ||
-        foundMockCarga.versions[0]
-
-      if (targetVersion) {
-        details.value = targetVersion
-        activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
-        selectedQuarantineStage.value = targetVersion.stage
-      }
-      return
-    }
-
-    // 2. Carrega detalhes do processo via processService e sintetiza versões pelo dataset
+    // Carrega detalhes do processo via processService e sintetiza versões pela linhagem/dataset
     const loadedDetails = await processService.getProcessDetails(idToLoad)
     details.value = loadedDetails
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
@@ -132,12 +187,51 @@ const loadData = async (idToLoad: string) => {
     )
     currentCarga.value = carga
     auditVersions.value = versions
+
+    await loadTraceability(idToLoad, details.value?.dataSource === 'API')
+    startPollingIfNeeded()
   } catch (e) {
     console.error('Erro ao carregar detalhes do processo:', e)
   } finally {
     isLoading.value = false
   }
 }
+
+let pollingTimer: any = null
+
+const startPollingIfNeeded = () => {
+  stopPolling()
+  if (details.value?.status === 'Em andamento') {
+    pollingTimer = setInterval(async () => {
+      if (processId.value) {
+        try {
+          const updated = await processService.getProcessDetails(processId.value)
+          if (updated) {
+            details.value = updated
+            activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
+            if (updated.status !== 'Em andamento') {
+              stopPolling()
+              loadData(processId.value)
+            }
+          }
+        } catch {
+          // Ignore transient poll errors
+        }
+      }
+    }, 2500)
+  }
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 
 watch(
   () => props.detailsData,
@@ -152,6 +246,8 @@ watch(
       const { carga, versions } = await auditoriaService.getVersionsForProcess(newVal.id, newVal)
       currentCarga.value = carga
       auditVersions.value = versions
+
+      await loadTraceability(newVal.id, newVal.dataSource === 'API')
     }
   },
   { immediate: true },
@@ -176,6 +272,7 @@ onMounted(async () => {
     isLoading.value = false
     activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
     selectedQuarantineStage.value = props.detailsData.stage
+    await loadTraceability(props.detailsData.id, props.detailsData.dataSource === 'API')
     return
   }
 
@@ -196,30 +293,55 @@ const openQuarantine = () => {
 }
 
 const handleVersionChange = async (newVersion: ProcessVersion) => {
-  const isMockVersion = mockAuditCargas.some((c) =>
-    c.versions.some((v) => v.id === newVersion.id),
-  )
-
-  if (!isMockVersion) {
-    try {
-      const fullDetails = await processService.getProcessDetails(newVersion.id)
-      details.value = {
-        ...fullDetails,
-        id: newVersion.id,
-      }
-      if (!props.processId && route?.params?.id !== newVersion.id) {
-        router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
-      }
-    } catch {
-      details.value = newVersion
+  try {
+    const fullDetails = await processService.getProcessDetails(newVersion.id)
+    details.value = {
+      ...fullDetails,
+      id: newVersion.id,
     }
-  } else {
+    if (!props.processId && route?.params?.id !== newVersion.id) {
+      router.replace(`/processo/${encodeURIComponent(newVersion.id)}`)
+    }
+  } catch {
     details.value = newVersion
   }
 
   activeStepIndex.value = progressStepIndex.value > 4 ? 4 : progressStepIndex.value
   selectedQuarantineStage.value = details.value.stage
   isQuarantineMode.value = false
+
+  await loadTraceability(newVersion.id, details.value?.dataSource === 'API')
+}
+
+const handleNotificarOperadorAuditoria = async (cargaIdStr: string) => {
+  const numericId = Number(String(cargaIdStr || details.value?.id).replace(/\D/g, ''))
+  if (numericId) {
+    try {
+      await uploadService.notificarOperadorQuarentena(numericId)
+      await loadData(processId.value)
+    } catch (e) {
+      console.error('Erro ao notificar operador:', e)
+    }
+  }
+}
+
+const handleAbrirReprocessamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openReprocessModal?.()
+  })
+}
+
+const handleAbrirCancelamentoAuditoria = () => {
+  isQuarantineMode.value = true
+  nextTick(() => {
+    quarentenaStageRef.value?.openCancelModal?.()
+  })
+}
+
+const handleQuarantineReload = () => {
+  isQuarantineMode.value = false
+  loadData(processId.value)
 }
 
 const goBack = () => {
@@ -264,7 +386,7 @@ const currentComponent = computed(() => {
             </h2>
           </div>
 
-          <!-- Botão para alternar a exibição da Auditoria (salvo por padrão) -->
+          <!-- Botão para alternar a exibição da Auditoria -->
           <div v-if="auditVersions.length > 0" class="process-nav-right">
             <button
               class="btn btn_outline btn-sm audit-toggle-btn"
@@ -293,6 +415,25 @@ const currentComponent = computed(() => {
       </div>
 
       <main class="page-content">
+        <div
+          v-if="exportError"
+          class="traceability-error"
+          role="alert"
+          data-testid="export-error-toast"
+        >
+          {{ exportError }}
+        </div>
+        <div
+          v-if="traceabilityError"
+          class="traceability-error"
+          role="alert"
+          data-testid="traceability-error-toast"
+        >
+          {{ traceabilityError }}
+        </div>
+        <div v-if="isClosed" class="closed-version-banner" role="status">
+          Versão histórica fechada. O conteúdo está disponível somente para consulta.
+        </div>
         <div v-if="isLoading" class="loading-state">
           <div class="spinner"></div>
           <p>Carregando informações da carga...</p>
@@ -310,14 +451,31 @@ const currentComponent = computed(() => {
               </div>
 
               <div class="quarantine-body">
-                <ProcessStageQuarentena v-if="details" :details="details" />
+                <ProcessStageQuarentena
+                  v-if="details"
+                  ref="quarentenaStageRef"
+                  :details="details"
+                  :read-only="isReadOnly"
+                  @reload="handleQuarantineReload"
+                />
               </div>
             </div>
           </div>
 
           <!-- Visão Normal -->
           <div v-else class="tab-content">
-            <component :is="currentComponent" :details="details" @open-quarantine="openQuarantine" />
+            <component
+              :is="currentComponent"
+              :details="details"
+              :read-only="isReadOnly"
+              :traceability="traceability"
+              :exporting-format="exportingFormat"
+              :can-export="isBackendProcess"
+              :versions="auditVersions"
+              @open-quarantine="openQuarantine"
+              @export="exportIndicator"
+              @reload="loadData(processId)"
+            />
           </div>
         </div>
 
@@ -327,7 +485,7 @@ const currentComponent = computed(() => {
       </main>
     </div>
 
-    <!-- Componente Auditoria (Usado como painel lateral salvo por padrão) -->
+    <!-- Componente Auditoria (Painel lateral integrado) -->
     <div v-if="isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
       <Auditoria
         :versions="auditVersions"
@@ -336,8 +494,13 @@ const currentComponent = computed(() => {
         :cargaDataset="details?.dataset"
         :layerName="details?.layerName"
         :canClose="true"
+        :linhagemCompleta="currentCargaLinhagem"
+        :userRole="currentUser.role"
         @select-version="handleVersionChange"
         @close="closeAuditPanel"
+        @notificar-operador="handleNotificarOperadorAuditoria"
+        @reprocessar="handleAbrirReprocessamentoAuditoria"
+        @cancelar="handleAbrirCancelamentoAuditoria"
       />
     </div>
   </div>
@@ -359,23 +522,29 @@ const currentComponent = computed(() => {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .audit-side-wrapper {
-  width: clamp(300px, 28vw, 380px);
+  width: clamp(380px, 32vw, 480px);
+  min-width: 350px;
   flex-shrink: 0;
   background: var(--color-surface);
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.04);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.05);
+  border-left: 1px solid var(--color-border);
   animation: slideIn 0.25s ease;
+  z-index: 10;
 }
 
-.audit-side-wrapper > :deep(.locations-panel) {
+.audit-side-wrapper > :deep(.audit-drawer-panel) {
   flex: 1;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @keyframes slideIn {
@@ -416,6 +585,13 @@ const currentComponent = computed(() => {
   margin-left: auto;
 }
 
+.process-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .btn-back {
   white-space: nowrap;
   flex-shrink: 0;
@@ -454,24 +630,35 @@ const currentComponent = computed(() => {
 
 .status-badge.concluída,
 .status-badge.concluida {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.3);
+  color: var(--badge-success-text);
+  border-color: var(--badge-success-border);
+  background-color: var(--badge-success-bg);
 }
 
 .status-badge.em-andamento {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.3);
+  color: var(--badge-warning-text);
+  border-color: var(--badge-warning-border);
+  background-color: var(--badge-warning-bg);
 }
 
 .status-badge.aguardando-validação,
 .status-badge.aguardando-validacao {
-  color: #0284c7;
-  border-color: rgba(2, 132, 199, 0.3);
+  color: var(--badge-info-text);
+  border-color: var(--badge-info-border);
+  background-color: var(--badge-info-bg);
 }
 
 .status-badge.falhou {
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.3);
+  color: var(--badge-danger-text);
+  border-color: var(--badge-danger-border);
+  background-color: var(--badge-danger-bg);
+}
+
+.status-badge.fechado,
+.status-badge.fechada {
+  color: var(--badge-neutral-text);
+  border-color: var(--badge-neutral-border);
+  background-color: var(--badge-neutral-bg);
 }
 
 .audit-toggle-btn {
@@ -511,6 +698,102 @@ const currentComponent = computed(() => {
 .audit-toggle-btn.btn-active .audit-count-badge {
   background: #fff;
   color: var(--vis-brand-orange);
+}
+
+.closed-version-banner {
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 6px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.traceability-card {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.traceability-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.traceability-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.traceability-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vis-brand-orange);
+  font-weight: 700;
+}
+
+.traceability-heading h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.05rem;
+  color: var(--color-heading);
+}
+
+.traceability-id {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.traceability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.traceability-grid dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.traceability-grid dd {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.traceability-hash {
+  grid-column: 1 / -1;
+}
+
+.traceability-hash dd {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.traceability-state {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.traceability-error {
+  color: var(--badge-danger-text);
 }
 
 .page-content {

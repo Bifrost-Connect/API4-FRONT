@@ -1,3 +1,7 @@
+/**
+ * @file Fixtures para testes automatizados.
+ */
+
 import type {
   ProcessLogDetails,
   ProcessStageCheck,

@@ -2,12 +2,40 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AiOutlineEye, AiOutlineEyeInvisible } from 'vue-icons-plus/ai'
+import { userService, type UserRole } from '../services/user'
+
+const router = useRouter()
 const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
-const fillLogin = (role: string) => {
-  email.value = `${role}@georural.com.br`
+const selectedRole = ref<UserRole>(userService.getCurrentUser().role)
+
+const fillLogin = (role: UserRole) => {
+  selectedRole.value = role
+  email.value = `${role.toLowerCase()}@georural.com.br`
   senha.value = 'Troca123'
+}
+
+const handleLogin = () => {
+  const emailLower = email.value.trim().toLowerCase()
+  if (emailLower.includes('operador') || emailLower.includes('tecnico')) {
+    selectedRole.value = 'Operador'
+  } else if (emailLower.includes('analista')) {
+    selectedRole.value = 'Analista'
+  } else if (emailLower.includes('auditor')) {
+    selectedRole.value = 'Auditor'
+  } else if (emailLower.includes('admin')) {
+    selectedRole.value = 'Administrador'
+  }
+
+  userService.setCurrentUserRole(selectedRole.value)
+  const destination =
+    selectedRole.value === 'Auditor'
+      ? '/auditor'
+      : selectedRole.value === 'Analista'
+        ? '/analise-territorial'
+        : '/'
+  router.replace(destination)
 }
 </script>
 
@@ -38,18 +66,40 @@ const fillLogin = (role: string) => {
           </button>
         </div>
       </div>
-      <router-link to="/" class="btn btn_primary">Entrar</router-link>
+      <button type="button" class="btn btn_primary" @click="handleLogin">Entrar</button>
     </div>
 
     <div class="notice-card">
       <h3 class="aviso">Sistema em fase de testes</h3>
-      <p>Use uma das opções abaixo para entrar</p>
+      <p>Escolha um perfil de demonstração para abrir a área correspondente.</p>
       <div class="roles-container">
-        <button class="btn btn_outline" @click="fillLogin('operador')">Entrar Operador</button>
-        <button class="btn btn_outline" @click="fillLogin('analista')">Entrar Analista</button>
-        <button class="btn btn_outline" @click="fillLogin('auditor')">Entrar Auditor</button>
-        <button class="btn btn_outline" @click="fillLogin('administrador')">
-          Entrar Administrador
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Operador' }"
+          @click="fillLogin('Operador')"
+        >
+          Entrar Operador
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Analista' }"
+          @click="fillLogin('Analista')"
+        >
+          Entrar Analista
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Auditor' }"
+          @click="fillLogin('Auditor')"
+        >
+          Entrar Auditor
+        </button>
+        <button
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Administrador' }"
+          @click="fillLogin('Administrador')"
+        >
+          Entrar Gestor
         </button>
       </div>
     </div>
@@ -75,7 +125,7 @@ const fillLogin = (role: string) => {
   padding: 2.5rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background-color: var(--color-background-soft);
+  background-color: var(--color-surface);
   width: 100%;
   max-width: 400px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -100,6 +150,7 @@ const fillLogin = (role: string) => {
 .form-group .label {
   margin-bottom: 0.5rem;
   font-weight: 500;
+  color: var(--color-heading);
 }
 
 .password-input-wrapper {
@@ -123,13 +174,14 @@ const fillLogin = (role: string) => {
   align-items: center;
   justify-content: center;
   padding: 0.25rem;
-  color: var(--color-text);
-  opacity: 0.6;
+  color: var(--color-text-muted);
+  opacity: 0.7;
   transition: opacity 0.2s;
 }
 
 .btn-visualizar:hover {
   opacity: 1;
+  color: var(--color-brand);
 }
 
 .login-card .btn {
@@ -148,8 +200,7 @@ const fillLogin = (role: string) => {
 
 .notice-card p {
   margin-bottom: 2rem;
-  color: var(--color-text);
-  opacity: 0.8;
+  color: var(--color-text-muted);
 }
 
 .roles-container {
@@ -161,5 +212,33 @@ const fillLogin = (role: string) => {
 
 .roles-container .btn {
   width: 100%;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: all 0.2s ease;
+}
+
+.roles-container .btn::before {
+  display: none;
+}
+
+.roles-container .btn:hover:not(:disabled),
+.roles-container .btn:focus-visible {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: var(--color-surface-soft);
+}
+
+.roles-container .btn:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-background),
+    0 0 0 4px var(--color-brand);
+}
+
+.roles-container .role-selected {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: var(--badge-primary-bg);
+  font-weight: 800;
 }
 </style>

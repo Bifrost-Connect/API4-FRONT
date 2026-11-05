@@ -86,7 +86,7 @@ const variableName = computed(() => {
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: var(--color-text);
+  color: var(--color-text-muted);
   letter-spacing: 0.05em;
 }
 
@@ -111,12 +111,12 @@ const variableName = computed(() => {
 .stat-variable-badge {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  background-color: var(--color-background-mute);
+  background-color: var(--color-surface-soft);
   color: var(--color-text);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.75rem;
-  opacity: 0.7;
 }
 
 /* Specific Variant Styles - Top Border and Icon Colors */
@@ -133,14 +133,14 @@ const variableName = computed(() => {
   border-top-color: var(--vis-c-info);
 }
 .border-primary {
-  border-top-color: var(--vis-c-primary, #3b82f6);
+  border-top-color: var(--vis-c-info);
 }
 .border-orange {
   border-top-color: var(--vis-brand-orange);
 }
 
 .icon-down {
-  stroke: var(--vis-c-info, #8b9bb4);
+  stroke: var(--vis-c-info);
 } /* Muted blue for download/down */
 .icon-check {
   stroke: var(--vis-c-success);

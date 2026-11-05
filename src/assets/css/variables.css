@@ -1,9 +1,12 @@
 /* Color palette adapted for Visiona (Aerospace Orange Theme) */
 :root {
+  color-scheme: light;
+
   /* Cor Principal da Marca (O Laranja Visiona) */
   --vis-brand-orange: #f26522;
   --vis-brand-orange-hover: #d9541a;
   --vis-brand-orange-light: #ff8547;
+  --vis-brand-primary: var(--vis-brand-orange);
 
   /* Light Palette (Brancos e cinzas bem claros) */
   --vis-c-light: #ffffff;
@@ -35,6 +38,9 @@
   --color-brand-hover: var(--vis-brand-orange-hover);
 
   --color-background: var(--vis-c-light-mute); /* Grey background for the app #f1f3f5 */
+  --color-background-soft: var(--vis-c-light-soft);
+  --color-background-mute: var(--vis-c-light-mute);
+
   --color-surface: var(--vis-c-light); /* White background for cards #ffffff */
   --color-surface-soft: var(--vis-c-light-soft); /* Slightly off-white for internal card elements #f8f9fa */
   
@@ -43,6 +49,7 @@
 
   --color-heading: var(--vis-c-text-dark-1);
   --color-text: var(--vis-c-text-dark-1);
+  --color-text-muted: var(--vis-c-text-dark-2);
 
   --section-gap: 160px;
 }
@@ -59,14 +66,49 @@
   --btn-radius: 0;
   --btn-shadow: none;
   --btn-transform: none;
+
+  /* Semantic Status Tokens (Light Theme) */
+  --badge-success-bg: rgba(16, 185, 129, 0.15);
+  --badge-success-text: #15803d;
+  --badge-success-border: rgba(16, 185, 129, 0.3);
+
+  --badge-danger-bg: rgba(239, 68, 68, 0.12);
+  --badge-danger-text: #b91c1c;
+  --badge-danger-border: rgba(239, 68, 68, 0.3);
+
+  --badge-warning-bg: rgba(245, 158, 11, 0.15);
+  --badge-warning-text: #b45309;
+  --badge-warning-border: rgba(245, 158, 11, 0.3);
+
+  --badge-info-bg: rgba(59, 130, 246, 0.12);
+  --badge-info-text: #0369a1;
+  --badge-info-border: rgba(59, 130, 246, 0.3);
+
+  --badge-primary-bg: rgba(242, 101, 34, 0.12);
+  --badge-primary-text: var(--vis-brand-orange);
+  --badge-primary-border: rgba(242, 101, 34, 0.3);
+
+  --badge-neutral-bg: rgba(100, 116, 139, 0.12);
+  --badge-neutral-text: #475569;
+  --badge-neutral-border: rgba(100, 116, 139, 0.25);
+
+  --badge-editor-bg: rgba(124, 58, 237, 0.12);
+  --badge-editor-text: #6d28d9;
+  --badge-editor-border: rgba(124, 58, 237, 0.25);
 }
 
 /* Override para o Dark Mode (Controlado pelo Vue via atributo no HTML) */
 :root[data-theme='dark'] {
+  color-scheme: dark;
+
   --color-brand: var(--vis-brand-orange-light);
   --color-brand-hover: var(--vis-brand-orange);
+  --vis-brand-primary: var(--vis-brand-orange-light);
 
   --color-background: var(--vis-c-dark);
+  --color-background-soft: var(--vis-c-dark-soft);
+  --color-background-mute: var(--vis-c-dark-mute);
+
   --color-surface: var(--vis-c-dark-soft);
   --color-surface-soft: var(--vis-c-dark-mute);
 
@@ -74,5 +116,35 @@
   --color-border-hover: var(--vis-c-divider-dark-1);
 
   --color-heading: var(--vis-c-text-light-1);
-  --color-text: var(--vis-c-text-light-2);
+  --color-text: var(--vis-c-text-light-1);
+  --color-text-muted: var(--vis-c-text-light-2);
+
+  /* Semantic Status Tokens (Dark Theme - Harmonizado e Acessível) */
+  --badge-success-bg: rgba(16, 185, 129, 0.2);
+  --badge-success-text: #34d399;
+  --badge-success-border: rgba(16, 185, 129, 0.45);
+
+  --badge-danger-bg: rgba(239, 68, 68, 0.2);
+  --badge-danger-text: #f87171;
+  --badge-danger-border: rgba(239, 68, 68, 0.45);
+
+  --badge-warning-bg: rgba(245, 158, 11, 0.2);
+  --badge-warning-text: #fbbf24;
+  --badge-warning-border: rgba(245, 158, 11, 0.45);
+
+  --badge-info-bg: rgba(59, 130, 246, 0.2);
+  --badge-info-text: #60a5fa;
+  --badge-info-border: rgba(59, 130, 246, 0.45);
+
+  --badge-primary-bg: rgba(255, 133, 71, 0.2);
+  --badge-primary-text: var(--vis-brand-orange-light);
+  --badge-primary-border: rgba(255, 133, 71, 0.45);
+
+  --badge-neutral-bg: rgba(148, 163, 184, 0.15);
+  --badge-neutral-text: #cbd5e1;
+  --badge-neutral-border: rgba(148, 163, 184, 0.35);
+
+  --badge-editor-bg: rgba(167, 139, 250, 0.2);
+  --badge-editor-text: #c4b5fd;
+  --badge-editor-border: rgba(167, 139, 250, 0.45);
 }

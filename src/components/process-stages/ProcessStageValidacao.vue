@@ -2,42 +2,64 @@
 import { computed } from 'vue'
 import { FiCheckCircle, FiXCircle, FiClock, FiAlertTriangle } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
+import GateDecisaoGestor from '../GateDecisaoGestor.vue'
 
 const props = defineProps<{
   details: ProcessLogDetails
+  readOnly?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'open-quarantine'): void
+  (e: 'reload'): void
 }>()
 
-/** Erro na validação ocorre quando o status é Falhou/Aguardando validação ou algum check falhou */
+/** Erro ou quarentena na validação ocorre quando o status é de erro/quarentena, há registros de quarentena ou checks falharam */
+const isQuarantine = computed(
+  () =>
+    props.details.status === 'Em quarentena' ||
+    (props.details.quarantineRecords?.length ?? 0) > 0 ||
+    checks.value.some((c) => c.status === 'error'),
+)
+
 const isError = computed(
   () =>
     props.details.status === 'Falhou' ||
-    props.details.status === 'Aguardando validação' ||
-    checks.value.some((c) => c.status === 'error'),
+    isQuarantine.value,
 )
 
 const isUnderCorrection = computed(
   () => props.details.status === 'Em andamento' && !!props.details.assignedEditor,
 )
 
-/** Checks vêm da API via details.validationChecks (ver process.mock.ts / GET /api/processes/{id}) */
+/** Checks vêm da API via details.validationChecks (GET /api/processos/{id}) */
 const checks = computed(() => props.details.validationChecks ?? [])
 
 const overallStatus = computed(() => {
   if (isUnderCorrection.value) return { label: 'Em Correção (Editor Alocado)', cls: 'warning' }
   const errorCount = checks.value.filter((c) => c.status === 'error').length
-  if (errorCount === 0) return { label: 'Concluído (Sem Erros)', cls: 'success' }
-  if (errorCount < checks.value.length)
-    return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
-  return { label: 'Falhou', cls: 'error' }
+  if (errorCount > 0) return { label: `${errorCount} Erro(s) Detectado(s)`, cls: 'error' }
+  if (props.details.status === 'Falhou') return { label: 'Falhou', cls: 'error' }
+  if (isQuarantine.value) return { label: 'Em Quarentena', cls: 'error' }
+  if (props.details.stage === 'Validação' && props.details.status === 'Em andamento') {
+    return { label: 'Em Validação', cls: 'warning' }
+  }
+  return { label: 'Concluído (Sem Erros)', cls: 'success' }
 })
 </script>
 
 <template>
   <div class="stage-container">
+    <!-- Gate de Decisão do Gestor na Validação -->
+    <GateDecisaoGestor
+      :processo-id="details.id"
+      etapa="VALIDACAO"
+      :read-only="readOnly"
+      :current-status="details.status"
+      :current-stage="details.stage"
+      @decisao-registrada="emit('reload')"
+    />
+
     <div class="card">
       <div class="card-header">
         <div class="header-left">
@@ -48,7 +70,7 @@ const overallStatus = computed(() => {
         </div>
         <div class="header-right">
           <span class="badge" :class="overallStatus.cls">{{ overallStatus.label }}</span>
-          <button v-if="isError || details.quarantineRecords?.length > 0" class="btn btn-warning" @click="emit('open-quarantine')">
+          <button v-if="isQuarantine" class="btn btn-warning" @click="emit('open-quarantine')">
             <FiAlertTriangle size="14" />
             Ver Quarentena
           </button>
@@ -76,7 +98,7 @@ const overallStatus = computed(() => {
           </li>
         </ul>
 
-        <div v-if="(isError || details.quarantineRecords?.length > 0) && details.pauseReason" class="error-alert">
+        <div v-if="isQuarantine && details.pauseReason" class="error-alert">
           <div class="alert-icon">
             <FiAlertTriangle size="22" />
           </div>
@@ -165,13 +187,13 @@ const overallStatus = computed(() => {
 }
 
 .checklist-item.success {
-  border-color: rgba(22, 163, 74, 0.25);
-  background: rgba(22, 163, 74, 0.04);
+  border-color: var(--badge-success-border);
+  background: var(--badge-success-bg);
 }
 
 .checklist-item.error {
-  border-color: rgba(220, 53, 69, 0.25);
-  background: rgba(220, 53, 69, 0.04);
+  border-color: var(--badge-danger-border);
+  background: var(--badge-danger-bg);
 }
 
 .check-icon {
@@ -185,18 +207,18 @@ const overallStatus = computed(() => {
 }
 
 .check-icon.success {
-  color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
+  color: var(--badge-success-text);
+  background: var(--badge-success-bg);
 }
 
 .check-icon.error {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.1);
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
 }
 
 .check-icon.pending {
-  color: #a16207;
-  background: rgba(234, 179, 8, 0.1);
+  color: var(--badge-warning-text);
+  background: var(--badge-warning-bg);
 }
 
 .check-body {
@@ -213,8 +235,7 @@ const overallStatus = computed(() => {
 
 .check-desc {
   font-size: 0.82rem;
-  color: var(--color-text);
-  opacity: 0.6;
+  color: var(--color-text-muted);
 }
 
 .check-detail {
@@ -224,10 +245,10 @@ const overallStatus = computed(() => {
 }
 
 .check-detail.success {
-  color: #16a34a;
+  color: var(--badge-success-text);
 }
 .check-detail.error {
-  color: #dc3545;
+  color: var(--badge-danger-text);
 }
 
 /* BADGES */
@@ -240,15 +261,15 @@ const overallStatus = computed(() => {
 }
 
 .badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.25);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  border: 1px solid rgba(220, 53, 69, 0.2);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .check-badge {
@@ -260,12 +281,14 @@ const overallStatus = computed(() => {
 }
 
 .check-badge.success {
-  background: rgba(22, 163, 74, 0.12);
-  color: #16a34a;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 .check-badge.error {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 /* ERROR ALERT */
@@ -275,20 +298,20 @@ const overallStatus = computed(() => {
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: 8px;
-  background: rgba(220, 53, 69, 0.06);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  border-left: 4px solid #dc3545;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  border-left: 4px solid var(--badge-danger-text);
 }
 
 .alert-icon {
   flex-shrink: 0;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   padding-top: 0.1rem;
 }
 
 .alert-content strong {
   display: block;
-  color: #dc3545;
+  color: var(--badge-danger-text);
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
 }
@@ -315,13 +338,13 @@ const overallStatus = computed(() => {
 }
 
 .btn-warning {
-  background-color: rgba(234, 179, 8, 0.15);
-  color: #92400e;
-  border: 1px solid rgba(234, 179, 8, 0.4);
+  background-color: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .btn-warning:hover {
-  background-color: #f59e0b;
+  background-color: var(--badge-warning-text);
   color: #fff;
 }
 </style>

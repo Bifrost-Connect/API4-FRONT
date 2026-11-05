@@ -17,6 +17,10 @@
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(242, 101, 34, 0.15);
 }
+.input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.8;
+}
 .input:disabled {
   background-color: var(--color-background-mute);
   cursor: not-allowed;

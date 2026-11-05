@@ -1,20 +1,113 @@
+/**
+ * Serviço de Camadas e Delimitações Territoriais do Mapa.
+ * Todas as requisições utilizam a API REST do backend (/mapa/*, /publicacao/*).
+ */
 import api from './api'
-import { mockLocations, mockTerritories } from './mocks/map.mock'
+
+export interface MapFilters {
+  conjuntoId?: number | string
+  anoSafra?: string
+  bbox?: string
+  page?: number
+  size?: number
+  busca?: string
+  processoId?: number | string
+}
+
+export interface PaginatedGeoJson {
+  type: 'FeatureCollection'
+  features: any[]
+  page?: number
+  size?: number
+  totalElements?: number
+  totalPages?: number
+}
 
 export const mapService = {
+  /**
+   * Obtém as localizações das bases publicadas via API.
+   */
   async getPublishedLocations() {
     try {
-      const response = await api.get('/mapa/monitoramento')
-      return response.data
-    } catch (error: any) {
-      if (error.response && error.response.status !== 404) {
-        throw error.response.data || error
+      const response = await api.get('/mapa/camadas-legado')
+      if (Array.isArray(response.data)) {
+        return response.data
       }
-      console.warn('Failed to fetch map locations. Using mocked data instead.', error)
-      return mockLocations
+      return []
+    } catch (error: any) {
+      console.warn('Falha ao buscar locais do mapa via API:', error)
+      return []
     }
   },
-  async getTerritories() {
-    return mockTerritories
+
+  /**
+   * Obtém as feições vetoriais (GeoJSON) das camadas publicadas ou filtradas.
+   */
+  async getTerritories(filters?: MapFilters): Promise<PaginatedGeoJson> {
+    try {
+      const response = await api.get('/mapa/camadas', { params: filters })
+      if (response.data && response.data.type === 'FeatureCollection') {
+        if (response.data.features && response.data.features.length > 0) {
+          return response.data
+        }
+      }
+
+      // Se filtrou por processoId específico e ainda não constou em /mapa/camadas, tenta a revisão da carga
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Continua
+        }
+      }
+
+      if (response.data && response.data.type === 'FeatureCollection') {
+        return response.data
+      }
+
+      return { type: 'FeatureCollection', features: [] }
+    } catch (error: any) {
+      if (filters?.processoId) {
+        try {
+          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
+            return rev.data.feicoesGeoJson
+          }
+        } catch {
+          // Continua
+        }
+      }
+      throw error
+    }
+  },
+
+  async getFeatureDetails(idPoligono: number | string) {
+    const response = await api.get(`/mapa/feicoes/${idPoligono}`)
+    return response.data
+  },
+
+  async getRevisaoPublicacao(idCarga: number | string) {
+    try {
+      const response = await api.get(`/publicacao/${idCarga}/revisao`)
+      return response.data
+    } catch {
+      const fallback = await api.get(`/mapa/publicacao/${idCarga}/revisao`)
+      return fallback.data
+    }
+  },
+
+  async aprovarTratamento(
+    idCarga: number | string,
+    gestorId: number = 1,
+    parecer: string = '',
+  ) {
+    const response = await api.post(`/publicacao/${idCarga}/aprovar-tratamento`, {
+      gestorId,
+      parecer,
+    })
+    return response.data
   },
 }

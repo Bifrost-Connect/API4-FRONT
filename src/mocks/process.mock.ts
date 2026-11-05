@@ -1,3 +1,7 @@
+/**
+ * @file Fixtures para testes automatizados.
+ */
+
 // ==========================================
 // TIPOS — espelho exato do contrato da API
 // ==========================================
@@ -68,9 +72,10 @@ export interface QuarantineRecord {
 
 export interface ProcessLogDetails {
   id: string
+  dataSource?: 'API' | 'DEMONSTRACAO'
   dataset: string
   stage: string
-  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou'
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou' | 'Fechado'
   dateTime: string
   layerName: string
   source: string
@@ -78,6 +83,13 @@ export interface ProcessLogDetails {
   epsg: string
   epsgDetected?: string
   description: string
+  /** Metadados expandidos (US05) */
+  competencia?: string
+  formato?: string
+  classificacaoAcesso?: string
+  coberturaEspacial?: string
+  coberturaTemporalInicio?: string
+  coberturaTemporalFim?: string
   /** Hash do arquivo original — exibido apenas na tela de Ingestão, NÃO no dashboard */
   integrityHash?: string
   originalFileUrl: string

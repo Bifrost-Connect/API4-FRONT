@@ -14,18 +14,26 @@ dist-ssr
 coverage
 *.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor & IDE directories and files
+.vscode/
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.sublime-project
+*.sublime-workspace
+.settings/
+.project/
+.classpath/
 
 *.tsbuildinfo
-
 .eslintcache
 
 # Cypress
