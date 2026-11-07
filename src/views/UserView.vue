@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
  * View de gerenciamento e administração de usuários do sistema.
- * Permite associar uma role aos usuários e customizar permissões/subpermissões
- * adicionais ou revogadas através de um modal dedicado com módulos, subpermissões
- * e alternância simples de atribuição (Check / X).
+ * Atua estritamente na camada de apresentação visual, delegando toda
+ * a busca de dados, mutações e regras de permissão ao userService.
  */
 import { ref, computed } from 'vue'
 import {
@@ -21,177 +20,12 @@ import {
   FiKey,
 } from 'vue-icons-plus/fi'
 import DataTable, { type Column } from '../components/DataTable.vue'
-
-type SystemRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR'
-
-interface PermissionDefinition {
-  modulo: string
-  subpermissao: string
-}
-
-// Catálogo completo de módulos e subpermissões do GeoRural
-const ALL_PERMISSIONS: PermissionDefinition[] = [
-  // USUARIOS
-  { modulo: 'USUARIOS', subpermissao: 'VISUALIZAR' },
-  { modulo: 'USUARIOS', subpermissao: 'CRIAR' },
-  { modulo: 'USUARIOS', subpermissao: 'EDITAR' },
-  { modulo: 'USUARIOS', subpermissao: 'DESATIVAR' },
-  { modulo: 'USUARIOS', subpermissao: 'ATRIBUIR_ROLE' },
-  { modulo: 'USUARIOS', subpermissao: 'ATRIBUIR_PERMISSAO' },
-  // ROLES
-  { modulo: 'ROLES', subpermissao: 'VISUALIZAR' },
-  { modulo: 'ROLES', subpermissao: 'CRIAR' },
-  { modulo: 'ROLES', subpermissao: 'EDITAR' },
-  { modulo: 'ROLES', subpermissao: 'EXCLUIR' },
-  { modulo: 'ROLES', subpermissao: 'GERENCIAR_PERMISSOES' },
-  // BASES
-  { modulo: 'BASES', subpermissao: 'VISUALIZAR' },
-  { modulo: 'BASES', subpermissao: 'EDITAR_METADADOS' },
-  { modulo: 'BASES', subpermissao: 'CONSULTAR_CATALOGO' },
-  { modulo: 'BASES', subpermissao: 'HOMOLOGAR' },
-  // INGESTAO
-  { modulo: 'INGESTAO', subpermissao: 'UPLOAD' },
-  { modulo: 'INGESTAO', subpermissao: 'VISUALIZAR_PROCESSAMENTO' },
-  { modulo: 'INGESTAO', subpermissao: 'REPROCESSAR' },
-  { modulo: 'INGESTAO', subpermissao: 'CANCELAR' },
-  // QUARENTENA
-  { modulo: 'QUARENTENA', subpermissao: 'VISUALIZAR' },
-  { modulo: 'QUARENTENA', subpermissao: 'ENVIAR' },
-  { modulo: 'QUARENTENA', subpermissao: 'CORRIGIR' },
-  { modulo: 'QUARENTENA', subpermissao: 'REPROCESSAR' },
-  { modulo: 'QUARENTENA', subpermissao: 'DESCARTAR' },
-  // MAPA
-  { modulo: 'MAPA', subpermissao: 'VISUALIZAR' },
-  { modulo: 'MAPA', subpermissao: 'VISUALIZAR_CAMADAS' },
-  { modulo: 'MAPA', subpermissao: 'VISUALIZAR_SOBREPOSICOES' },
-  { modulo: 'MAPA', subpermissao: 'COMPARAR_SAFRAS' },
-  // ANALISE_TERRITORIAL
-  { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'EXECUTAR' },
-  { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'CALCULAR_SOBREPOSICAO' },
-  { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'CONSULTAR_RESULTADO' },
-  { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'SALVAR_RESULTADO' },
-  // INDICADORES
-  { modulo: 'INDICADORES', subpermissao: 'VISUALIZAR' },
-  { modulo: 'INDICADORES', subpermissao: 'CALCULAR' },
-  { modulo: 'INDICADORES', subpermissao: 'HOMOLOGAR' },
-  { modulo: 'INDICADORES', subpermissao: 'BLOQUEAR_VERSAO' },
-  { modulo: 'INDICADORES', subpermissao: 'DESBLOQUEAR_VERSAO' },
-  // AUDITORIA
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR' },
-  { modulo: 'AUDITORIA', subpermissao: 'RASTREAR_ORIGEM' },
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR_VERSOES' },
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR_HASH' },
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR_LOGS' },
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR_PROCESSAMENTOS' },
-  { modulo: 'AUDITORIA', subpermissao: 'VISUALIZAR_ALTERACOES' },
-  // EXPORTACAO
-  { modulo: 'EXPORTACAO', subpermissao: 'CSV' },
-  { modulo: 'EXPORTACAO', subpermissao: 'GEOJSON' },
-  // API
-  { modulo: 'API', subpermissao: 'VISUALIZAR_CHAVES' },
-  { modulo: 'API', subpermissao: 'GERAR_CHAVE' },
-  { modulo: 'API', subpermissao: 'REVOGAR_CHAVE' },
-]
-
-// Permissões padrão associadas a cada role
-const ROLE_DEFAULT_PERMISSIONS: Record<SystemRole, string[]> = {
-  ADMIN: [
-    'USUARIOS:VISUALIZAR',
-    'USUARIOS:CRIAR',
-    'USUARIOS:EDITAR',
-    'USUARIOS:DESATIVAR',
-    'USUARIOS:ATRIBUIR_ROLE',
-    'USUARIOS:ATRIBUIR_PERMISSAO',
-    'ROLES:VISUALIZAR',
-    'ROLES:CRIAR',
-    'ROLES:EDITAR',
-    'ROLES:EXCLUIR',
-    'ROLES:GERENCIAR_PERMISSOES',
-    'API:VISUALIZAR_CHAVES',
-    'API:GERAR_CHAVE',
-    'API:REVOGAR_CHAVE',
-  ],
-  OPERADOR_DADOS: [
-    'BASES:VISUALIZAR',
-    'BASES:EDITAR_METADADOS',
-    'BASES:CONSULTAR_CATALOGO',
-    'INGESTAO:UPLOAD',
-    'INGESTAO:VISUALIZAR_PROCESSAMENTO',
-    'INGESTAO:REPROCESSAR',
-    'INGESTAO:CANCELAR',
-    'QUARENTENA:VISUALIZAR',
-    'QUARENTENA:ENVIAR',
-    'QUARENTENA:CORRIGIR',
-    'QUARENTENA:REPROCESSAR',
-    'QUARENTENA:DESCARTAR',
-  ],
-  ANALISTA: [
-    'BASES:VISUALIZAR',
-    'BASES:CONSULTAR_CATALOGO',
-    'MAPA:VISUALIZAR',
-    'MAPA:VISUALIZAR_CAMADAS',
-    'MAPA:VISUALIZAR_SOBREPOSICOES',
-    'MAPA:COMPARAR_SAFRAS',
-    'ANALISE_TERRITORIAL:EXECUTAR',
-    'ANALISE_TERRITORIAL:CALCULAR_SOBREPOSICAO',
-    'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
-    'ANALISE_TERRITORIAL:SALVAR_RESULTADO',
-    'INDICADORES:VISUALIZAR',
-    'INDICADORES:CALCULAR',
-    'AUDITORIA:VISUALIZAR',
-  ],
-  AUDITOR: [
-    'BASES:VISUALIZAR',
-    'BASES:CONSULTAR_CATALOGO',
-    'MAPA:VISUALIZAR',
-    'MAPA:VISUALIZAR_CAMADAS',
-    'MAPA:VISUALIZAR_SOBREPOSICOES',
-    'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
-    'INDICADORES:VISUALIZAR',
-    'AUDITORIA:VISUALIZAR',
-    'AUDITORIA:RASTREAR_ORIGEM',
-    'AUDITORIA:VISUALIZAR_VERSOES',
-    'AUDITORIA:VISUALIZAR_HASH',
-    'AUDITORIA:VISUALIZAR_LOGS',
-    'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
-    'AUDITORIA:VISUALIZAR_ALTERACOES',
-  ],
-  GESTOR: [
-    'BASES:VISUALIZAR',
-    'BASES:CONSULTAR_CATALOGO',
-    'BASES:HOMOLOGAR',
-    'MAPA:VISUALIZAR',
-    'MAPA:VISUALIZAR_CAMADAS',
-    'MAPA:VISUALIZAR_SOBREPOSICOES',
-    'MAPA:COMPARAR_SAFRAS',
-    'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
-    'INDICADORES:VISUALIZAR',
-    'INDICADORES:CALCULAR',
-    'INDICADORES:HOMOLOGAR',
-    'INDICADORES:BLOQUEAR_VERSAO',
-    'INDICADORES:DESBLOQUEAR_VERSAO',
-    'AUDITORIA:VISUALIZAR',
-    'AUDITORIA:RASTREAR_ORIGEM',
-    'AUDITORIA:VISUALIZAR_VERSOES',
-    'AUDITORIA:VISUALIZAR_HASH',
-    'AUDITORIA:VISUALIZAR_LOGS',
-    'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
-    'AUDITORIA:VISUALIZAR_ALTERACOES',
-    'EXPORTACAO:CSV',
-    'EXPORTACAO:GEOJSON',
-  ],
-}
-
-interface UserItem {
-  id: number
-  name: string
-  email: string
-  role: SystemRole
-  permissions: string[] // Ex: ['USUARIOS:VISUALIZAR', 'BASES:VISUALIZAR']
-  department: string
-  status: 'Ativo' | 'Inativo'
-  lastLogin: string
-}
+import {
+  userService,
+  type UserItem,
+  type SystemRole,
+  type PermissionDefinition,
+} from '../services/user'
 
 // Colunas para a DataTable
 const columns: Column[] = [
@@ -203,83 +37,9 @@ const columns: Column[] = [
   { key: 'actions', label: 'Ações' },
 ]
 
-const availableRoles: { value: SystemRole; label: string; desc: string }[] = [
-  { value: 'ADMIN', label: 'ADMIN', desc: 'Gerenciamento de usuários, roles e permissões.' },
-  {
-    value: 'OPERADOR_DADOS',
-    label: 'OPERADOR_DADOS',
-    desc: 'Entrada, processamento e controle de qualidade dos dados.',
-  },
-  {
-    value: 'ANALISTA',
-    label: 'ANALISTA',
-    desc: 'Consulta, análise territorial, mapas e indicadores.',
-  },
-  {
-    value: 'AUDITOR',
-    label: 'AUDITOR',
-    desc: 'Auditoria, histórico e rastreabilidade dos dados.',
-  },
-  {
-    value: 'GESTOR',
-    label: 'GESTOR',
-    desc: 'Governança, homologação, exportação e integrações.',
-  },
-]
-
-// Lista de usuários simulados
-const usersList = ref<UserItem[]>([
-  {
-    id: 1,
-    name: 'Carlos Mendes',
-    email: 'carlos.mendes@georural.com.br',
-    role: 'ADMIN',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ADMIN],
-    department: 'Gestão Territorial',
-    status: 'Ativo',
-    lastLogin: '05/11/2026 14:32',
-  },
-  {
-    id: 2,
-    name: 'Mariana Duarte',
-    email: 'mariana.duarte@georural.com.br',
-    role: 'ANALISTA',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ANALISTA, 'EXPORTACAO:CSV'], // Permissão extra além da role
-    department: 'Inteligência Espacial',
-    status: 'Ativo',
-    lastLogin: '05/11/2026 11:15',
-  },
-  {
-    id: 3,
-    name: 'Lucas Silveira',
-    email: 'lucas.silveira@georural.com.br',
-    role: 'OPERADOR_DADOS',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS],
-    department: 'Operações de Ingestão',
-    status: 'Ativo',
-    lastLogin: '04/11/2026 18:20',
-  },
-  {
-    id: 4,
-    name: 'Patrícia Souza',
-    email: 'patricia.souza@georural.com.br',
-    role: 'AUDITOR',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.AUDITOR],
-    department: 'Compliance e Qualidade',
-    status: 'Ativo',
-    lastLogin: '03/11/2026 09:45',
-  },
-  {
-    id: 5,
-    name: 'Fernando Rocha',
-    email: 'fernando.rocha@georural.com.br',
-    role: 'GESTOR',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
-    department: 'Diretoria de Governança',
-    status: 'Inativo',
-    lastLogin: '20/10/2026 16:10',
-  },
-])
+// Dados e catálogo providos pelo serviço
+const availableRoles = userService.getAvailableRoles()
+const allPermissions = userService.getAllPermissions()
 
 // Filtros
 const searchQuery = ref('')
@@ -304,9 +64,9 @@ const selectedPermissions = ref<Set<string>>(new Set())
 const permModuleFilter = ref('')
 const permSearchFilter = ref('')
 
-// Usuários filtrados
+// Usuários obtidos do serviço com filtro reativo
 const filteredUsers = computed(() => {
-  return usersList.value.filter((user) => {
+  return userService.getUsers().filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -322,13 +82,13 @@ const filteredUsers = computed(() => {
 // Módulos únicos para filtro do modal de permissões
 const uniqueModules = computed(() => {
   const set = new Set<string>()
-  ALL_PERMISSIONS.forEach((p) => set.add(p.modulo))
+  allPermissions.forEach((p) => set.add(p.modulo))
   return Array.from(set)
 })
 
 // Subpermissões filtradas no modal
 const filteredPermissionDefs = computed(() => {
-  return ALL_PERMISSIONS.filter((p) => {
+  return allPermissions.filter((p) => {
     const matchesMod = !permModuleFilter.value || p.modulo === permModuleFilter.value
     const matchesQuery =
       !permSearchFilter.value ||
@@ -372,46 +132,31 @@ const saveUser = () => {
   }
 
   if (isEditing.value && modalUserId.value !== null) {
-    const idx = usersList.value.findIndex((u) => u.id === modalUserId.value)
-    if (idx !== -1) {
-      const existing = usersList.value[idx]!
-      const roleChanged = existing.role !== modalRole.value
-      // Se a role mudou, reseta para os padrões da nova role; senão mantém as permissões atuais
-      const newPerms = roleChanged
-        ? [...ROLE_DEFAULT_PERMISSIONS[modalRole.value]]
-        : [...existing.permissions]
-
-      usersList.value[idx] = {
-        id: existing.id,
-        lastLogin: existing.lastLogin,
-        name: modalName.value,
-        email: modalEmail.value,
-        role: modalRole.value,
-        permissions: newPerms,
-        department: modalDepartment.value || 'Geral',
-        status: modalStatus.value,
-      }
-      showFeedback('Usuário atualizado com sucesso!')
-    }
-  } else {
-    const newUser: UserItem = {
-      id: Date.now(),
+    const updated = userService.updateUser(modalUserId.value, {
       name: modalName.value,
       email: modalEmail.value,
       role: modalRole.value,
-      permissions: [...ROLE_DEFAULT_PERMISSIONS[modalRole.value]],
       department: modalDepartment.value || 'Geral',
       status: modalStatus.value,
-      lastLogin: 'Nunca',
+    })
+    if (updated) {
+      showFeedback('Usuário atualizado com sucesso!')
     }
-    usersList.value.unshift(newUser)
+  } else {
+    userService.createUser({
+      name: modalName.value,
+      email: modalEmail.value,
+      role: modalRole.value,
+      department: modalDepartment.value || 'Geral',
+      status: modalStatus.value,
+    })
     showFeedback('Novo usuário cadastrado com sucesso!')
   }
 
   closeModal()
 }
 
-// Abrir modal de permissões para um usuário específico
+// Modal de Permissões
 const openPermissionsModal = (user: UserItem) => {
   permUser.value = user
   selectedPermissions.value = new Set(user.permissions)
@@ -437,24 +182,23 @@ const togglePermission = (key: string) => {
 
 const resetToRoleDefaults = () => {
   if (!permUser.value) return
-  const defaults = ROLE_DEFAULT_PERMISSIONS[permUser.value.role] || []
+  const defaults = userService.resetPermissionsToRole(permUser.value.id)
   selectedPermissions.value = new Set(defaults)
   showFeedback(`Permissões restauradas para os padrões da role ${permUser.value.role}.`)
 }
 
 const savePermissions = () => {
   if (!permUser.value) return
-  const idx = usersList.value.findIndex((u) => u.id === permUser.value!.id)
-  if (idx !== -1) {
-    usersList.value[idx]!.permissions = Array.from(selectedPermissions.value)
-    showFeedback(`Permissões de ${permUser.value.name} atualizadas com sucesso!`)
-  }
+  userService.updateUserPermissions(permUser.value.id, Array.from(selectedPermissions.value))
+  showFeedback(`Permissões de ${permUser.value.name} atualizadas com sucesso!`)
   closePermissionsModal()
 }
 
 const toggleUserStatus = (user: UserItem) => {
-  user.status = user.status === 'Ativo' ? 'Inativo' : 'Ativo'
-  showFeedback(`Status de ${user.name} alterado para ${user.status}.`)
+  const updated = userService.toggleUserStatus(user.id)
+  if (updated) {
+    showFeedback(`Status de ${updated.name} alterado para ${updated.status}.`)
+  }
 }
 
 const showFeedback = (msg: string) => {
@@ -599,7 +343,7 @@ const showFeedback = (msg: string) => {
       </div>
     </section>
 
-    <!-- MODAL 1: Criação / Edição do Usuário e Associação da Role -->
+    <!-- Modal 1: Criação / Edição do Usuário -->
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <div class="modal-dialog">
         <div class="modal-header">
@@ -679,11 +423,11 @@ const showFeedback = (msg: string) => {
       </div>
     </div>
 
-    <!-- MODAL 2: Modal Dedicado de Permissões (Módulo, Subpermissão, Check/X) -->
+    <!-- Modal 2: Modal Dedicado de Permissões -->
     <div v-if="isPermModalOpen" class="modal-backdrop" @click.self="closePermissionsModal">
       <div class="modal-dialog modal-permissions-dialog">
         <div class="modal-header">
-          <div>
+          <div class="modal-header-titles">
             <h3>Gerenciamento de Subpermissões</h3>
             <p class="modal-subtitle">
               Usuário: <strong>{{ permUser?.name }}</strong> &bull; Role Associada:
@@ -692,8 +436,8 @@ const showFeedback = (msg: string) => {
               }}</span>
             </p>
           </div>
-          <button type="button" class="btn-close" @click="closePermissionsModal">
-            <FiX size="18" />
+          <button type="button" class="btn-close" aria-label="Fechar" @click="closePermissionsModal">
+            <FiX size="20" />
           </button>
         </div>
 
@@ -701,7 +445,7 @@ const showFeedback = (msg: string) => {
           <!-- Barra de Ações Rápidas e Filtro -->
           <div class="perm-toolbar">
             <div class="perm-search-box">
-              <FiSearch class="search-icon" size="14" />
+              <FiSearch class="search-icon" size="15" />
               <input
                 v-model="permSearchFilter"
                 type="text"
@@ -710,21 +454,23 @@ const showFeedback = (msg: string) => {
               />
             </div>
 
-            <div class="perm-module-select">
-              <select v-model="permModuleFilter" class="select">
-                <option value="">Todos os Módulos ({{ uniqueModules.length }})</option>
-                <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </div>
+            <div class="perm-filter-actions">
+              <div class="perm-module-select">
+                <select v-model="permModuleFilter" class="select select-compact">
+                  <option value="">Todos os Módulos ({{ uniqueModules.length }})</option>
+                  <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
+                </select>
+              </div>
 
-            <button
-              type="button"
-              class="btn btn_outline btn-sm"
-              title="Restaurar para as permissões originais da role"
-              @click="resetToRoleDefaults"
-            >
-              Restaurar Padrão da Role
-            </button>
+              <button
+                type="button"
+                class="btn btn_outline btn-sm btn-reset-role"
+                title="Restaurar para as permissões originais da role"
+                @click="resetToRoleDefaults"
+              >
+                Restaurar Padrão da Role
+              </button>
+            </div>
           </div>
 
           <!-- Tabela de Subpermissões com Check / X -->
@@ -732,9 +478,9 @@ const showFeedback = (msg: string) => {
             <table class="perm-table">
               <thead>
                 <tr>
-                  <th style="width: 25%">Módulo</th>
-                  <th style="width: 45%">Subpermissão</th>
-                  <th style="width: 30%; text-align: center">Atribuição / Status</th>
+                  <th class="th-module">Módulo</th>
+                  <th class="th-subperm">Subpermissão</th>
+                  <th class="th-status">Atribuição / Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -748,9 +494,9 @@ const showFeedback = (msg: string) => {
                     <span class="module-tag">{{ p.modulo }}</span>
                   </td>
                   <td class="cell-subperm">
-                    <strong>{{ p.subpermissao }}</strong>
+                    <code>{{ p.subpermissao }}</code>
                   </td>
-                  <td class="cell-toggle" style="text-align: center">
+                  <td class="cell-toggle">
                     <button
                       type="button"
                       class="toggle-perm-btn"
@@ -758,11 +504,11 @@ const showFeedback = (msg: string) => {
                       @click.stop="togglePermission(getPermKey(p))"
                     >
                       <template v-if="selectedPermissions.has(getPermKey(p))">
-                        <FiCheck size="16" />
+                        <FiCheck size="15" />
                         <span>Permitido (Check)</span>
                       </template>
                       <template v-else>
-                        <FiX size="16" />
+                        <FiX size="15" />
                         <span>Sem Acesso (X)</span>
                       </template>
                     </button>
@@ -770,75 +516,32 @@ const showFeedback = (msg: string) => {
                 </tr>
 
                 <tr v-if="filteredPermissionDefs.length === 0">
-                  <td colspan="3" class="text-center p-4">
-                    Nenhuma subpermissão encontrada com o filtro informado.
+                  <td colspan="3" class="text-center empty-perms-cell">
+                    Nenhuma subpermissão encontrada com os filtros informados.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div class="perm-summary-footer">
+          <!-- Rodapé do Modal -->
+          <div class="modal-footer-wrapper">
             <span class="summary-text">
               Total concedido: <strong>{{ selectedPermissions.size }}</strong> de
-              {{ ALL_PERMISSIONS.length }} subpermissões do sistema.
+              {{ allPermissions.length }} subpermissões do sistema.
             </span>
-          </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn_outline" @click="closePermissionsModal">
-              Cancelar
-            </button>
-            <button type="button" class="btn btn_primary" @click="savePermissions">
-              <FiSave size="16" />
-              Salvar Permissões
-            </button>
+            <div class="modal-footer-btns">
+              <button type="button" class="btn btn_outline" @click="closePermissionsModal">
+                Cancelar
+              </button>
+              <button type="button" class="btn btn_primary" @click="savePermissions">
+                <FiSave size="16" />
+                <span>Salvar Permissões</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="matrix-expanded-container">
-      <header class="matrix-header">
-        <h4>Matriz Referencial de Roles</h4>
-        <p>
-          Mapeamento padrão das roles no GeoRural. Você pode anexar permissões personalizadas pelo
-          botão <strong>Editar Acessos</strong>.
-        </p>
-      </header>
-
-      <div class="matrix-table-wrapper">
-        <h5 class="matrix-subtitle">Finalidade das Roles</h5>
-        <table class="matrix-table">
-          <thead>
-            <tr>
-              <th style="width: 220px">Role</th>
-              <th>Finalidade</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><span class="role-badge admin">ADMIN</span></td>
-              <td>Gerenciamento de usuarios, roles e permissoes.</td>
-            </tr>
-            <tr>
-              <td><span class="role-badge operador_dados">OPERADOR_DADOS</span></td>
-              <td>Entrada, processamento e controle de qualidade dos dados.</td>
-            </tr>
-            <tr>
-              <td><span class="role-badge analista">ANALISTA</span></td>
-              <td>Consulta, analise territorial, mapas e indicadores.</td>
-            </tr>
-            <tr>
-              <td><span class="role-badge auditor">AUDITOR</span></td>
-              <td>Auditoria, historico e rastreabilidade dos dados.</td>
-            </tr>
-            <tr>
-              <td><span class="role-badge gestor">GESTOR</span></td>
-              <td>Governanca, homologacao, exportacao e integracoes.</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   </main>
@@ -985,38 +688,6 @@ const showFeedback = (msg: string) => {
   color: var(--color-text-muted, #718096);
 }
 
-.perms-count-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.badge-count {
-  font-size: 0.78rem;
-  background: var(--color-background-soft, #edf2f7);
-  padding: 2px 8px;
-  border-radius: 4px;
-  color: var(--color-heading);
-  font-weight: 600;
-}
-
-.btn-perm-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: var(--vis-brand-orange, #e67e22);
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.btn-perm-link:hover {
-  opacity: 0.85;
-}
-
 .dept-text,
 .date-text {
   font-size: 0.88rem;
@@ -1157,55 +828,93 @@ const showFeedback = (msg: string) => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
+  overflow-y: auto;
 }
 
 .modal-dialog {
   background: var(--color-surface, #ffffff);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   width: 100%;
   max-width: 520px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalFadeIn 0.2s ease-out;
 }
 
 .modal-permissions-dialog {
-  max-width: 760px;
+  max-width: 820px;
+  max-height: 90vh;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-header {
   padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.modal-header-titles {
+  flex: 1;
+  min-width: 0;
 }
 
 .modal-header h3 {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--color-heading);
+  margin: 0;
 }
 
 .modal-subtitle {
-  font-size: 0.84rem;
-  color: var(--color-text-muted, #718096);
-  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-top: 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn-close {
   background: transparent;
   border: 0;
-  color: var(--color-text-muted, #a0aec0);
+  color: var(--color-text-muted);
   cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  color: var(--color-heading);
+  background: var(--color-background-soft);
 }
 
 .modal-body {
@@ -1213,6 +922,7 @@ const showFeedback = (msg: string) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
 }
 
 .modal-body-permissions {
@@ -1220,43 +930,64 @@ const showFeedback = (msg: string) => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: hidden;
+  flex: 1;
 }
 
 .perm-toolbar {
   display: flex;
   gap: 12px;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
 }
 
 .perm-search-box {
   position: relative;
   flex: 1;
-  min-width: 200px;
+  min-width: 240px;
   display: flex;
   align-items: center;
 }
 
 .perm-input {
-  padding-left: 32px !important;
-  font-size: 0.85rem;
+  padding-left: 36px !important;
+  font-size: 0.88rem;
+  width: 100%;
 }
 
-.perm-module-select select {
-  font-size: 0.85rem;
-  padding: 6px 12px;
+.perm-filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.select-compact {
+  font-size: 0.86rem;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-width: 190px;
+}
+
+.btn-reset-role {
+  white-space: nowrap;
 }
 
 .btn-sm {
-  font-size: 0.8rem;
-  padding: 6px 12px;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  font-weight: 600;
 }
 
 .permissions-table-wrapper {
-  max-height: 420px;
+  flex: 1;
+  max-height: 440px;
+  min-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
 }
 
 .perm-table {
@@ -1267,80 +998,144 @@ const showFeedback = (msg: string) => {
 
 .perm-table th,
 .perm-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
 }
 
 .perm-table th {
   position: sticky;
   top: 0;
-  background: var(--color-background-soft, #edf2f7);
+  background: var(--color-background-soft);
   z-index: 2;
   font-weight: 700;
+  font-size: 0.8rem;
   color: var(--color-heading);
-  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.perm-table .th-module {
+  width: 25%;
+}
+
+.perm-table .th-subperm {
+  width: 45%;
+}
+
+.perm-table .th-status {
+  width: 30%;
+  text-align: right;
 }
 
 .perm-table tbody tr {
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .perm-table tbody tr:hover {
-  background: var(--color-background-soft, #f7fafc);
+  background: var(--color-background-soft);
 }
 
 .perm-table tbody tr.row-active {
-  background: rgba(230, 126, 34, 0.04);
+  background: rgba(242, 101, 34, 0.06);
 }
 
 .module-tag {
-  background: #edf2f7;
-  color: #4a5568;
-  font-size: 0.75rem;
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  font-size: 0.74rem;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 4px;
+  display: inline-block;
+  letter-spacing: 0.03em;
+}
+
+.cell-subperm code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.84rem;
+  color: var(--color-heading);
+  background: transparent;
+  font-weight: 600;
+}
+
+.cell-toggle {
+  text-align: right;
 }
 
 .toggle-perm-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   font-size: 0.8rem;
   font-weight: 600;
   border-radius: 999px;
   cursor: pointer;
   border: 1px solid transparent;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .toggle-perm-btn.is-granted {
-  background: #c6f6d5;
-  color: #22543d;
-  border-color: #9ae6b4;
+  background: var(--badge-success-bg, rgba(16, 185, 129, 0.15));
+  color: var(--badge-success-text, #15803d);
+  border-color: var(--badge-success-border, rgba(16, 185, 129, 0.35));
 }
 
 .toggle-perm-btn.is-revoked {
-  background: #fed7d7;
-  color: #9b2c2c;
-  border-color: #feb2b2;
+  background: var(--badge-danger-bg, rgba(239, 68, 68, 0.12));
+  color: var(--badge-danger-text, #b91c1c);
+  border-color: var(--badge-danger-border, rgba(239, 68, 68, 0.35));
 }
 
-.perm-summary-footer {
-  font-size: 0.84rem;
-  color: var(--color-text-muted, #718096);
-  padding: 4px 0;
+.toggle-perm-btn:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+
+.empty-perms-cell {
+  padding: 36px 16px !important;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.modal-footer-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.summary-text {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.summary-text strong {
+  color: var(--color-heading);
+}
+
+.modal-footer-btns {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
 }
 
 .modal-role-tip {
   font-size: 0.82rem;
-  color: var(--color-text-muted, #718096);
-  background: var(--color-background-soft, #f8fafc);
+  color: var(--color-text-muted);
+  background: var(--color-background-soft);
   padding: 10px 14px;
   border-radius: 6px;
-  border-left: 3px solid var(--vis-brand-orange, #e67e22);
+  border-left: 3px solid var(--vis-brand-orange, #f26522);
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -1371,66 +1166,79 @@ const showFeedback = (msg: string) => {
   gap: 12px;
   margin-top: 12px;
   padding-top: 16px;
-  border-top: 1px solid var(--color-border, #e2e8f0);
+  border-top: 1px solid var(--color-border);
 }
 
-/* Matriz no Expanded Container */
-.matrix-expanded-container {
-  padding: 24px;
-  background: var(--color-background-soft, #f8fafc);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+/* Responsividade Mobile e Tablet */
+@media (max-width: 768px) {
+  .modal-permissions-dialog {
+    max-height: 96vh;
+    margin: 8px;
+  }
 
-.matrix-header h4 {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin-bottom: 4px;
-}
+  .modal-header {
+    padding: 14px 18px;
+  }
 
-.matrix-header p {
-  font-size: 0.86rem;
-  color: var(--color-text-muted, #718096);
-}
+  .modal-body-permissions {
+    padding: 14px 18px;
+    gap: 12px;
+  }
 
-.matrix-table-wrapper {
-  background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 6px;
-  padding: 16px;
-  overflow-x: auto;
-}
+  .perm-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-.matrix-subtitle {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin-bottom: 12px;
-}
+  .perm-search-box {
+    min-width: 100%;
+  }
 
-.matrix-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.84rem;
-}
+  .perm-filter-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-.matrix-table th,
-.matrix-table td {
-  padding: 9px 12px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  text-align: left;
-}
+  .select-compact {
+    min-width: 100%;
+  }
 
-.matrix-table th {
-  background: var(--color-background-soft, #edf2f7);
-  color: var(--color-heading);
-  font-weight: 700;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  .btn-reset-role {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .permissions-table-wrapper {
+    max-height: 350px;
+  }
+
+  .perm-table th,
+  .perm-table td {
+    padding: 10px 10px;
+    font-size: 0.82rem;
+  }
+
+  .toggle-perm-btn {
+    padding: 4px 10px;
+    font-size: 0.76rem;
+  }
+
+  .modal-footer-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .modal-footer-btns {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .modal-footer-btns button {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 .text-center {

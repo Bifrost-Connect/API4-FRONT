@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { mapService } from '../services/map'
+import { mapService, DEFAULT_MAP_PALETTE } from '../services/map'
 
 interface MapLocation {
   id: string
@@ -49,18 +49,7 @@ interface BaseLayerItem {
 
 const baseLayers = ref<BaseLayerItem[]>([])
 
-const DEFAULT_PALETTE = [
-  '#10b981', // Verde Esmeralda
-  '#3b82f6', // Azul Royal
-  '#8b5cf6', // Roxo Violeta
-  '#f59e0b', // Âmbar / Laranja
-  '#ec4899', // Rosa
-  '#06b6d4', // Ciano
-  '#ef4444', // Vermelho
-  '#14b8a6', // Verde Água
-  '#84cc16', // Lima
-  '#6366f1', // Índigo
-]
+const DEFAULT_PALETTE = DEFAULT_MAP_PALETTE
 
 let map: L.Map | null = null
 let markers: L.LayerGroup | null = null

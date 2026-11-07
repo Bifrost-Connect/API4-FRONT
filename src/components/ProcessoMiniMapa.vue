@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import api from '../services/api'
+import { mapService } from '../services/map'
 import { useRouter } from 'vue-router'
 
 const props = withDefaults(
@@ -42,47 +42,15 @@ const carregarGeometrias = async () => {
   errorMsg.value = ''
 
   try {
-    // 1. Tenta carregar da revisão de publicação
-    try {
-      const res = await api.get(`/publicacao/${props.processoId}/revisao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Tenta rota alternativa
-    }
-
-    // 2. Tenta carregar via /carga/{id}/revisao-publicacao
-    try {
-      const res = await api.get(`/carga/${props.processoId}/revisao-publicacao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Segue para fallback
-    }
-
-    // 3. Fallback para /mapa/camadas?processoId=
-    const fallbackRes = await api.get('/mapa/camadas', {
-      params: { processoId: props.processoId },
-    })
-    if (fallbackRes.data && fallbackRes.data.features && fallbackRes.data.features.length > 0) {
-      isLoading.value = false
-      renderizarMapa(fallbackRes.data)
-      totalFeicoes.value = fallbackRes.data.features.length
+    const geojson = await mapService.getProcessPreviewGeometry(props.processoId)
+    if (geojson && geojson.features && geojson.features.length > 0) {
+      renderizarMapa(geojson)
+      totalFeicoes.value = geojson.features.length
       return
     }
 
     errorMsg.value = 'Nenhuma geometria encontrada para esta carga.'
-  } catch (err: any) {
+  } catch {
     errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
   } finally {
     isLoading.value = false

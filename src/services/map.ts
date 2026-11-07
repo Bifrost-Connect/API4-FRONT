@@ -23,6 +23,19 @@ export interface PaginatedGeoJson {
   totalPages?: number
 }
 
+export const DEFAULT_MAP_PALETTE = [
+  '#10b981', // Verde Esmeralda
+  '#3b82f6', // Azul Royal
+  '#8b5cf6', // Roxo Violeta
+  '#f59e0b', // Âmbar / Laranja
+  '#ec4899', // Rosa
+  '#06b6d4', // Ciano
+  '#ef4444', // Vermelho
+  '#14b8a6', // Verde Água
+  '#84cc16', // Lima
+  '#6366f1', // Índigo
+]
+
 export const mapService = {
   /**
    * Obtém as localizações das bases publicadas via API.
@@ -109,5 +122,49 @@ export const mapService = {
       parecer,
     })
     return response.data
+  },
+
+  /**
+   * Obtém a geometria de pré-visualização de um processo de carga.
+   * Tenta rota de revisão de publicação, rota de carga e fallback para /mapa/camadas.
+   */
+  async getProcessPreviewGeometry(processoId: string | number): Promise<any | null> {
+    if (!processoId) return null
+
+    // 1. Tenta carregar da revisão de publicação
+    try {
+      const res = await api.get(`/publicacao/${processoId}/revisao`)
+      const geojson = res.data?.feicoesGeoJson
+      if (geojson && geojson.features && geojson.features.length > 0) {
+        return geojson
+      }
+    } catch {
+      // Tenta rota alternativa
+    }
+
+    // 2. Tenta carregar via /carga/{id}/revisao-publicacao
+    try {
+      const res = await api.get(`/carga/${processoId}/revisao-publicacao`)
+      const geojson = res.data?.feicoesGeoJson
+      if (geojson && geojson.features && geojson.features.length > 0) {
+        return geojson
+      }
+    } catch {
+      // Segue para fallback
+    }
+
+    // 3. Fallback para /mapa/camadas?processoId=
+    try {
+      const fallbackRes = await api.get('/mapa/camadas', {
+        params: { processoId },
+      })
+      if (fallbackRes.data && fallbackRes.data.features && fallbackRes.data.features.length > 0) {
+        return fallbackRes.data
+      }
+    } catch {
+      // Não foi possível carregar do backend
+    }
+
+    return null
   },
 }

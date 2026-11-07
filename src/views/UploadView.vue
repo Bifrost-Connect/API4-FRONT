@@ -2,7 +2,13 @@
 import { ref, shallowRef, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle } from 'vue-icons-plus/fi'
-import { uploadService } from '@/services/upload'
+import {
+  uploadService,
+  UPLOAD_FORMATO_OPTIONS,
+  UPLOAD_CLASSIFICACAO_OPTIONS,
+  UPLOAD_FORMATO_CONFIG_MAP,
+  type FormatoConfig,
+} from '@/services/upload'
 import { processService } from '@/services/process'
 import Stepper from '@/components/Stepper.vue'
 
@@ -38,42 +44,9 @@ const coberturaEspacial = ref('')
 const coberturaTemporalInicio = ref('')
 const coberturaTemporalFim = ref('')
 
-const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
-const classificacaoOptions = ['Público', 'Restrito', 'Confidencial']
-
-interface FormatoConfig {
-  extensions: string[]
-  label: string
-  tag: string
-}
-
-const formatoConfigMap: Record<string, FormatoConfig> = {
-  GeoJSON: {
-    extensions: ['.geojson', '.json'],
-    label: 'GeoJSON (.geojson, .json)',
-    tag: '.geojson / .json',
-  },
-  'Shapefile (ZIP)': {
-    extensions: ['.zip'],
-    label: 'Shapefile compactado (.zip)',
-    tag: '.zip (Shapefile)',
-  },
-  CSV: {
-    extensions: ['.csv'],
-    label: 'Tabela delimitada (.csv)',
-    tag: '.csv',
-  },
-  GeoPackage: {
-    extensions: ['.gpkg'],
-    label: 'GeoPackage (.gpkg)',
-    tag: '.gpkg',
-  },
-  KML: {
-    extensions: ['.kml', '.kmz'],
-    label: 'Keyhole Markup Language (.kml, .kmz)',
-    tag: '.kml / .kmz',
-  },
-}
+const formatoOptions = UPLOAD_FORMATO_OPTIONS
+const classificacaoOptions = UPLOAD_CLASSIFICACAO_OPTIONS
+const formatoConfigMap = UPLOAD_FORMATO_CONFIG_MAP
 
 const formatoConfigAtual = computed<FormatoConfig | null>(() => {
   if (!formato.value) return null

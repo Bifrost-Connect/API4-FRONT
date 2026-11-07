@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
  * View de visualização e gerenciamento do perfil do usuário logado.
- * Permite visualizar informações cadastrais, alterar senha e dados da conta.
+ * Atua puramente na camada de apresentação visual, delegando toda a
+ * lógica de dados, persistência e validação ao profileService.
  */
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import {
   FiUser,
   FiMail,
@@ -14,65 +15,76 @@ import {
   FiClock,
   FiSave,
 } from 'vue-icons-plus/fi'
-import { userService } from '../services/user'
+import { profileService, type UserProfile } from '../services/profile'
 
-const currentUser = ref(userService.getCurrentUser())
+const profile = ref<UserProfile>(profileService.getProfile())
 
-// Formulário de dados básicos
-const formName = ref(currentUser.value.name || 'Usuário do Sistema')
-const formEmail = ref(currentUser.value.email || 'usuario@georural.com.br')
-const formCargo = ref('Analista Geoespacial Sênior')
-const formDepartamento = ref('Diretoria de Inteligência Territorial')
+// Formulário de dados cadastrais
+const formName = ref('')
+const formEmail = ref('')
+const formCargo = ref('')
+const formDepartamento = ref('')
 
 // Formulário de alteração de senha
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 
-// Notificações locais de feedback
+// Feedbacks visuais
 const profileSuccessMsg = ref('')
 const passwordSuccessMsg = ref('')
 const passwordErrorMsg = ref('')
 
+const syncFormWithProfile = () => {
+  profile.value = profileService.getProfile()
+  formName.value = profile.value.name
+  formEmail.value = profile.value.email
+  formCargo.value = profile.value.cargo
+  formDepartamento.value = profile.value.departamento
+}
+
+onMounted(() => {
+  syncFormWithProfile()
+})
+
 const handleSaveProfile = () => {
-  userService.setCurrentUser({
-    ...currentUser.value,
+  const result = profileService.updateProfile({
     name: formName.value,
     email: formEmail.value,
+    cargo: formCargo.value,
+    departamento: formDepartamento.value,
   })
-  currentUser.value = userService.getCurrentUser()
-  profileSuccessMsg.value = 'Dados do perfil atualizados com sucesso!'
-  setTimeout(() => {
-    profileSuccessMsg.value = ''
-  }, 4000)
+
+  if (result.success) {
+    profile.value = profileService.getProfile()
+    profileSuccessMsg.value = result.message
+    setTimeout(() => {
+      profileSuccessMsg.value = ''
+    }, 4000)
+  }
 }
 
 const handleChangePassword = () => {
   passwordErrorMsg.value = ''
   passwordSuccessMsg.value = ''
 
-  if (!currentPassword.value || !newPassword.value || !confirmPassword.value) {
-    passwordErrorMsg.value = 'Por favor, preencha todos os campos de senha.'
-    return
-  }
+  const result = profileService.changePassword({
+    currentPassword: currentPassword.value,
+    newPassword: newPassword.value,
+    confirmPassword: confirmPassword.value,
+  })
 
-  if (newPassword.value !== confirmPassword.value) {
-    passwordErrorMsg.value = 'A nova senha e a confirmação não conferem.'
-    return
+  if (result.success) {
+    passwordSuccessMsg.value = result.message
+    currentPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+    setTimeout(() => {
+      passwordSuccessMsg.value = ''
+    }, 4000)
+  } else {
+    passwordErrorMsg.value = result.message
   }
-
-  if (newPassword.value.length < 6) {
-    passwordErrorMsg.value = 'A nova senha deve ter no mínimo 6 caracteres.'
-    return
-  }
-
-  passwordSuccessMsg.value = 'Senha alterada com sucesso!'
-  currentPassword.value = ''
-  newPassword.value = ''
-  confirmPassword.value = ''
-  setTimeout(() => {
-    passwordSuccessMsg.value = ''
-  }, 4000)
 }
 </script>
 
@@ -95,15 +107,15 @@ const handleChangePassword = () => {
           <div class="avatar">
             <FiUser size="48" />
           </div>
-          <span class="role-badge" :class="currentUser.role.toLowerCase()">
+          <span class="role-badge" :class="profile.role.toLowerCase()">
             <FiShield size="14" />
-            {{ currentUser.role }}
+            {{ profile.role }}
           </span>
         </div>
 
         <div class="user-info-brief">
-          <h2 class="user-display-name">{{ currentUser.name }}</h2>
-          <p class="user-display-email">{{ currentUser.email || 'usuario@georural.com.br' }}</p>
+          <h2 class="user-display-name">{{ profile.name }}</h2>
+          <p class="user-display-email">{{ profile.email }}</p>
         </div>
 
         <hr class="card-divider" />
@@ -111,11 +123,11 @@ const handleChangePassword = () => {
         <div class="quick-meta-list">
           <div class="meta-item">
             <span class="meta-label"><FiClock size="14" /> Último login:</span>
-            <span class="meta-val">Hoje, às 14:32</span>
+            <span class="meta-val">{{ profile.lastLogin }}</span>
           </div>
           <div class="meta-item">
             <span class="meta-label"><FiShield size="14" /> Status da Conta:</span>
-            <span class="meta-val status-active">Ativo</span>
+            <span class="meta-val status-active">{{ profile.status }}</span>
           </div>
         </div>
       </section>
@@ -398,7 +410,7 @@ const handleChangePassword = () => {
   flex-direction: column;
   gap: 12px;
   font-size: 0.86rem;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 }
 
 .meta-item {
