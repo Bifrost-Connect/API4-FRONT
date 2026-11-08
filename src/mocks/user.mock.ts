@@ -2,7 +2,26 @@
  * @file Fixtures e dados simulados para gerenciamento de usuários, papéis e permissões.
  */
 
-export type SystemRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR'
+export type StandardRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR'
+export type SystemRole = StandardRole | (string & {})
+
+export interface RoleDef {
+  id: string
+  nome: string
+  descricao: string
+  padrao: boolean
+  permissions: string[]
+}
+
+export interface SecurityEvent {
+  id: number
+  timestamp: string
+  actorEmail: string
+  actorName: string
+  action: string
+  details: string
+  severity: 'INFO' | 'WARNING' | 'DANGER'
+}
 
 export interface PermissionDefinition {
   modulo: string
@@ -14,10 +33,13 @@ export interface UserItem {
   name: string
   email: string
   role: SystemRole
+  roleId?: string
   permissions: string[]
   department: string
   status: 'Ativo' | 'Inativo'
   lastLogin: string
+  sodException?: boolean
+  sodJustification?: string
 }
 
 export interface RoleOption {
@@ -114,7 +136,7 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { modulo: 'API', subpermissao: 'REVOGAR_CHAVE' },
 ]
 
-export const ROLE_DEFAULT_PERMISSIONS: Record<SystemRole, string[]> = {
+export const ROLE_DEFAULT_PERMISSIONS: Record<StandardRole, string[]> = {
   ADMIN: [
     'USUARIOS:VISUALIZAR',
     'USUARIOS:CRIAR',
@@ -252,6 +274,83 @@ export const MOCK_USERS_LIST: UserItem[] = [
     department: 'Diretoria de Governança',
     status: 'Inativo',
     lastLogin: '20/10/2026 16:10',
+  },
+]
+
+export const MOCK_ROLES: RoleDef[] = [
+  {
+    id: 'ADMIN',
+    nome: 'ADMIN',
+    descricao: 'Gerenciamento de usuários, roles e permissões.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.ADMIN],
+  },
+  {
+    id: 'OPERADOR_DADOS',
+    nome: 'OPERADOR_DADOS',
+    descricao: 'Entrada, processamento e controle de qualidade dos dados.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS],
+  },
+  {
+    id: 'ANALISTA',
+    nome: 'ANALISTA',
+    descricao: 'Consulta, análise territorial, mapas e indicadores.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.ANALISTA],
+  },
+  {
+    id: 'AUDITOR',
+    nome: 'AUDITOR',
+    descricao: 'Auditoria, histórico e rastreabilidade dos dados.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.AUDITOR],
+  },
+  {
+    id: 'GESTOR',
+    nome: 'GESTOR',
+    descricao: 'Governança, homologação, exportação e integrações.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
+  },
+]
+
+export const MOCK_SECURITY_EVENTS: SecurityEvent[] = [
+  {
+    id: 1,
+    timestamp: '08/11/2026 14:10',
+    actorEmail: 'carlos.mendes@georural.com.br',
+    actorName: 'Carlos Mendes',
+    action: 'Criação de Conta',
+    details: 'Cadastrou o usuário Patrícia Souza com papel AUDITOR.',
+    severity: 'INFO',
+  },
+  {
+    id: 2,
+    timestamp: '08/11/2026 11:30',
+    actorEmail: 'carlos.mendes@georural.com.br',
+    actorName: 'Carlos Mendes',
+    action: 'Troca de Cargo',
+    details: 'Alterou o papel de Mariana Duarte para ANALISTA.',
+    severity: 'INFO',
+  },
+  {
+    id: 3,
+    timestamp: '07/11/2026 16:45',
+    actorEmail: 'carlos.mendes@georural.com.br',
+    actorName: 'Carlos Mendes',
+    action: 'Inativação de Conta',
+    details: 'Inativou o acesso de Fernando Rocha (Diretoria de Governança).',
+    severity: 'WARNING',
+  },
+  {
+    id: 4,
+    timestamp: '06/11/2026 10:20',
+    actorEmail: 'carlos.mendes@georural.com.br',
+    actorName: 'Carlos Mendes',
+    action: 'Exceção SoD Concedida',
+    details: 'Autorizou acúmulo de Ingestão e Homologação para usuário emergencial. Justificativa: Cobrir plantão de safra.',
+    severity: 'DANGER',
   },
 ]
 

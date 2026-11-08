@@ -19,6 +19,7 @@ import {
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
 import { processService } from '../../services/process'
 import { dashboardService } from '../../services/dashboard'
+import { userService } from '../../services/user'
 import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
 const props = withDefaults(
@@ -44,7 +45,7 @@ const emit = defineEmits<{
 const router = useRouter()
 
 // Permissão de homologação habilitada
-const canApprove = computed(() => !props.readOnly)
+const canApprove = computed(() => !props.readOnly && (userService.can('BASES:HOMOLOGAR') || userService.isAdmin()))
 
 // Estados de submissão e decisão
 const isSubmitting = ref(false)

@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeButton from './ThemeButton.vue'
+import { userService } from '@/services/user'
 
 const route = useRoute()
 
@@ -20,9 +21,12 @@ const pageTitles: Record<string, string> = {
   catalogo: 'Catálogo de bases geoespaciais',
   profile: 'Meu perfil',
   users: 'Gerenciamento de usuários',
+  forbidden: 'Acesso restrito (403)',
 }
 
 const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')
+const canMapa = computed(() => userService.can('MAPA:VISUALIZAR'))
+const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
 </script>
 
 <template>
@@ -34,13 +38,13 @@ const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? '']
       <strong>{{ currentPageTitle }}</strong>
     </div>
 
-    <!-- Atalhos rápidos da barra superior -->
+    <!-- Atalhos rápidos da barra superior filtrados por permissão (Tarefa 6) -->
     <div class="navbar-actions">
-      <RouterLink to="/mapa" class="navbar-link" active-class="navbar-link-active">
+      <RouterLink v-if="canMapa" to="/mapa" class="navbar-link" active-class="navbar-link-active">
         <span aria-hidden="true">⌖</span>
         <span>Mapa</span>
       </RouterLink>
-      <RouterLink to="/upload" class="navbar-link" active-class="navbar-link-active">
+      <RouterLink v-if="canUpload" to="/upload" class="navbar-link" active-class="navbar-link-active">
         <span aria-hidden="true">＋</span>
         <span>Nova carga</span>
       </RouterLink>

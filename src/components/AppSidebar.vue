@@ -1,30 +1,16 @@
 <script setup lang="ts">
 /**
  * Menu lateral principal de navegação da aplicação.
- * Exibe todas as seções e ferramentas do sistema sem restrições de perfil mockado.
+ * Renderiza dinamicamente as seções conforme as permissões da sessão ativa (Tarefa 6).
  */
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import {
-  FiGrid,
-  FiUploadCloud,
-  FiDatabase,
-  FiMap,
-  FiPieChart,
-  FiRotateCcw,
-  FiUser,
-  FiUsers,
-} from 'vue-icons-plus/fi'
+import { FiRotateCcw } from 'vue-icons-plus/fi'
+import { userService } from '@/services/user'
+import { getVisibleMenuItems } from '@/utils/rbac'
 
-// Lista completa de navegação acessível em todo o sistema
-const navigationItems = [
-  { label: 'Dashboard', to: '/', icon: FiGrid },
-  { label: 'Upload de carga', to: '/upload', icon: FiUploadCloud },
-  { label: 'Catálogo de Bases', to: '/catalogo', icon: FiDatabase },
-  { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
-  { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
-  { label: 'Perfil do usuário', to: '/profile', icon: FiUser },
-  { label: 'Gerenciamento de usuários', to: '/users', icon: FiUsers },
-]
+// Lista dinâmica de navegação filtrada por permissão
+const navigationItems = computed(() => getVisibleMenuItems(userService.getCurrentUser()))
 </script>
 
 <template>
@@ -61,7 +47,7 @@ const navigationItems = [
         <span class="navigation-icon" aria-hidden="true">
           <FiRotateCcw size="17" />
         </span>
-        <span>Acessar Login</span>
+        <span>Sair</span>
       </RouterLink>
     </div>
   </aside>

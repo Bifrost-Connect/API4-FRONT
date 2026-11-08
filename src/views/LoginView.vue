@@ -2,15 +2,16 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AiOutlineEye, AiOutlineEyeInvisible } from 'vue-icons-plus/ai'
-import { userService, type UserRole } from '../services/user'
+import { userService } from '../services/user'
+import { homeFor } from '@/utils/rbac'
 
 const router = useRouter()
 const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
-const selectedRole = ref<UserRole>(userService.getCurrentUser().role)
+const selectedRole = ref<string>(userService.getCurrentUser().role)
 
-const fillLogin = (role: UserRole) => {
+const fillLogin = (role: string) => {
   selectedRole.value = role
   email.value = `${role.toLowerCase()}@georural.com.br`
   senha.value = 'Troca123'
@@ -24,17 +25,14 @@ const handleLogin = () => {
     selectedRole.value = 'Analista'
   } else if (emailLower.includes('auditor')) {
     selectedRole.value = 'Auditor'
+  } else if (emailLower.includes('gestor')) {
+    selectedRole.value = 'Gestor'
   } else if (emailLower.includes('admin')) {
     selectedRole.value = 'Administrador'
   }
 
   userService.setCurrentUserRole(selectedRole.value)
-  const destination =
-    selectedRole.value === 'Auditor'
-      ? '/auditor'
-      : selectedRole.value === 'Analista'
-        ? '/analise-territorial'
-        : '/'
+  const destination = homeFor(userService.getCurrentUser())
   router.replace(destination)
 }
 </script>
@@ -96,10 +94,17 @@ const handleLogin = () => {
         </button>
         <button
           class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Gestor' }"
+          @click="fillLogin('Gestor')"
+        >
+          Entrar Gestor
+        </button>
+        <button
+          class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Administrador' }"
           @click="fillLogin('Administrador')"
         >
-          Entrar Gestor
+          Entrar Administrador
         </button>
       </div>
     </div>

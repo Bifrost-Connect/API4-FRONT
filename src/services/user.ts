@@ -2,40 +2,128 @@
  * Serviço de Gerenciamento do Usuário, Sessão e Controle de Acessos (RBAC).
  * Centraliza as regras de negócio de usuários, papéis e permissões do GeoRural.
  */
+
 import { ref } from 'vue'
 import {
-  MOCK_USERS_LIST,
   MOCK_AVAILABLE_ROLES,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
   type UserItem,
   type SystemRole,
+  type StandardRole,
+  type RoleDef,
   type PermissionDefinition,
   type RoleOption,
+  type SecurityEvent,
 } from '../mocks/user.mock'
+import { roleService } from './roles'
+import {
+  can as checkCan,
+  canAny as checkCanAny,
+  normalizeRoleKey,
+  type SessionUser,
+} from '@/utils/rbac'
+import type {
+  CreateUserDto,
+  UpdateUserDto,
+  RecordSecurityEventDto,
+} from './access/AccessRepository'
 
-export type { UserItem, SystemRole, PermissionDefinition, RoleOption }
-export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador'
+export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent }
+export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | string
 
-export type UserSession = {
-  id?: number
-  name: string
-  role: UserRole
+export type UserSession = SessionUser & {
   email?: string
   token?: string
 }
 
-// Sessão base enquanto a autenticação real com o backend está sendo integrada
-const anonymousUser: UserSession = {
-  id: 1,
-  name: 'Usuário do Sistema',
-  role: 'Administrador',
+const DEMO_USERS: Record<string, UserSession> = {
+  Operador: {
+    id: 3,
+    name: 'João Silva',
+    email: 'operador@georural.com.br',
+    role: 'Operador',
+    roleId: 'OPERADOR_DADOS',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS || [])],
+  },
+  OPERADOR_DADOS: {
+    id: 3,
+    name: 'João Silva',
+    email: 'operador@georural.com.br',
+    role: 'Operador',
+    roleId: 'OPERADOR_DADOS',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS || [])],
+  },
+  Auditor: {
+    id: 4,
+    name: 'Daniel Natan',
+    email: 'auditor@georural.com.br',
+    role: 'Auditor',
+    roleId: 'AUDITOR',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.AUDITOR || [])],
+  },
+  AUDITOR: {
+    id: 4,
+    name: 'Daniel Natan',
+    email: 'auditor@georural.com.br',
+    role: 'Auditor',
+    roleId: 'AUDITOR',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.AUDITOR || [])],
+  },
+  Analista: {
+    id: 2,
+    name: 'Mariana Duarte',
+    email: 'analista@georural.com.br',
+    role: 'Analista',
+    roleId: 'ANALISTA',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ANALISTA || [])],
+  },
+  ANALISTA: {
+    id: 2,
+    name: 'Mariana Duarte',
+    email: 'analista@georural.com.br',
+    role: 'Analista',
+    roleId: 'ANALISTA',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ANALISTA || [])],
+  },
+  Administrador: {
+    id: 1,
+    name: 'Carlos Mendes',
+    email: 'admin@georural.com.br',
+    role: 'Administrador',
+    roleId: 'ADMIN',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ADMIN || [])],
+  },
+  ADMIN: {
+    id: 1,
+    name: 'Carlos Mendes',
+    email: 'admin@georural.com.br',
+    role: 'Administrador',
+    roleId: 'ADMIN',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ADMIN || [])],
+  },
+  Gestor: {
+    id: 5,
+    name: 'Fernando Rocha',
+    email: 'gestor@georural.com.br',
+    role: 'Gestor',
+    roleId: 'GESTOR',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.GESTOR || [])],
+  },
+  GESTOR: {
+    id: 5,
+    name: 'Fernando Rocha',
+    email: 'gestor@georural.com.br',
+    role: 'Gestor',
+    roleId: 'GESTOR',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.GESTOR || [])],
+  },
 }
 
-const currentUser = ref<UserSession>({ ...anonymousUser })
+// Sessão padrão inicial
+const defaultSession: UserSession = { ...DEMO_USERS.Operador! }
 
-// Estado interno simulado de usuários cadastrados
-const usersState = ref<UserItem[]>(JSON.parse(JSON.stringify(MOCK_USERS_LIST)))
+const currentUser = ref<UserSession>({ ...defaultSession })
 
 export const userService = {
   /**
@@ -46,89 +134,170 @@ export const userService = {
   },
 
   /**
-   * Define manualmente o perfil de acesso da sessão.
+   * Define manualmente o papel de acesso da sessão com preenchimento
+   * automático de permissões e sincronização em localStorage.
    */
-  setCurrentUserRole(role: UserRole) {
-    currentUser.value = {
-      ...currentUser.value,
-      role,
+  setCurrentUserRole(role: string) {
+    const demo = DEMO_USERS[role]
+    if (demo) {
+      currentUser.value = {
+        ...demo,
+        permissions: [...demo.permissions],
+      }
+    } else {
+      const key = normalizeRoleKey(role)
+      const perms = (ROLE_DEFAULT_PERMISSIONS as Record<string, string[]>)[key] || []
+      currentUser.value = {
+        id: Date.now(),
+        name: `Usuário (${role})`,
+        email: `${role.toLowerCase()}@georural.com.br`,
+        role,
+        roleId: key,
+        permissions: [...perms],
+      }
     }
+
+    try {
+      localStorage.setItem('api4-demo-role', role)
+    } catch {}
   },
 
   /**
    * Atualiza os dados completos da sessão autenticada.
    */
   setCurrentUser(user: UserSession) {
-    currentUser.value = user
+    currentUser.value = {
+      ...user,
+      permissions: Array.isArray(user.permissions) ? [...user.permissions] : [],
+    }
   },
 
   /**
    * Restaura a sessão para o estado padrão neutro.
    */
   clearCurrentUser() {
-    currentUser.value = { ...anonymousUser }
+    currentUser.value = {
+      ...defaultSession,
+      permissions: [...defaultSession.permissions],
+    }
+    try {
+      localStorage.removeItem('api4-demo-role')
+    } catch {}
   },
 
   /**
-   * Verifica se o usuário autenticado possui perfil de Administrador/Gestor.
+   * Verifica se o usuário autenticado possui perfil de Administrador.
    */
   isAdmin(): boolean {
-    return currentUser.value.role === 'Administrador'
+    const r = currentUser.value.role
+    return r === 'Administrador' || r === 'ADMIN'
   },
 
   /**
-   * Valida permissão de acesso.
+   * Verifica se a sessão atual possui uma permissão específica.
    */
-  canAccess(_allowedRoles?: UserRole[] | string[]): boolean {
-    return true
+  can(permission: string): boolean {
+    return checkCan(currentUser.value, permission)
+  },
+
+  /**
+   * Verifica se a sessão atual possui pelo menos uma das permissões informadas.
+   */
+  canAny(permissions: string[]): boolean {
+    return checkCanAny(currentUser.value, permissions)
+  },
+
+  /**
+   * Valida permissão de acesso legada baseada em lista de papéis autorizados.
+   */
+  canAccess(allowedRoles?: UserRole[] | string[]): boolean {
+    if (!allowedRoles || allowedRoles.length === 0) return true
+    if (this.isAdmin()) return true
+
+    const cur = currentUser.value.role
+    const curKey = normalizeRoleKey(cur)
+
+    return allowedRoles.some((r) => {
+      return r === cur || normalizeRoleKey(r) === curKey
+    })
+  },
+
+  /**
+   * Catálogo de usuários padrão de demonstração para testes e login rápido.
+   */
+  getDemoUsers(): Record<string, UserSession> {
+    return {
+      Operador: { ...DEMO_USERS.Operador! },
+      Auditor: { ...DEMO_USERS.Auditor! },
+      Analista: { ...DEMO_USERS.Analista! },
+      Administrador: { ...DEMO_USERS.Administrador! },
+      Gestor: { ...DEMO_USERS.Gestor! },
+    }
   },
 
   // -------------------------------------------------------------
   // Regras de Gestão de Usuários e Permissões (RBAC)
   // -------------------------------------------------------------
 
-  /**
-   * Retorna a lista de usuários cadastrados.
-   */
   getUsers(): UserItem[] {
-    return usersState.value
+    const repo = roleService.getRepo() as any
+    return repo.users
   },
 
-  /**
-   * Busca um usuário pelo ID.
-   */
+  async getUsersAsync(): Promise<UserItem[]> {
+    return roleService.getRepo().listUsers()
+  },
+
   getUserById(id: number): UserItem | undefined {
-    return usersState.value.find((u) => u.id === id)
+    return this.getUsers().find((u) => u.id === id)
   },
 
-  /**
-   * Cadastra um novo usuário vinculando as permissões padrão da role escolhida.
-   */
+  async createUserAsync(dto: CreateUserDto): Promise<UserItem> {
+    return roleService.getRepo().createUser(dto)
+  },
+
   createUser(data: {
     name: string
     email: string
     role: SystemRole
     department?: string
     status?: 'Ativo' | 'Inativo'
+    sodException?: boolean
+    sodJustification?: string
   }): UserItem {
+    const repo = roleService.getRepo() as any
+    const roleDef = repo.roles.find((r: any) => r.id === data.role)
+    const permissions = roleDef ? [...roleDef.permissions] : []
+
     const newUser: UserItem = {
       id: Date.now(),
-      name: data.name,
-      email: data.email,
+      name: data.name.trim(),
+      email: data.email.trim(),
       role: data.role,
-      permissions: [...(ROLE_DEFAULT_PERMISSIONS[data.role] || [])],
+      permissions,
       department: data.department || 'Geral',
       status: data.status || 'Ativo',
       lastLogin: 'Nunca',
+      sodException: Boolean(data.sodException),
+      sodJustification: data.sodJustification,
     }
-    usersState.value.unshift(newUser)
+    repo.users.unshift(newUser)
+
+    repo.recordSecurityEvent({
+      action: 'Criação de Conta',
+      details: `Cadastrou o usuário ${newUser.name} com papel ${newUser.role}.${
+        newUser.sodException ? ` Exceção SoD: "${newUser.sodJustification}"` : ''
+      }`,
+      severity: newUser.sodException ? 'DANGER' : 'INFO',
+    })
+
     return newUser
   },
 
-  /**
-   * Atualiza dados cadastrais de um usuário.
-   * Se a role for alterada, as permissões são redefinidas para o pacote padrão da nova role.
-   */
+  async updateUserAsync(id: number, dto: UpdateUserDto): Promise<UserItem | null> {
+    return roleService.getRepo().updateUser(id, dto)
+  },
+
   updateUser(
     id: number,
     data: {
@@ -137,43 +306,68 @@ export const userService = {
       role: SystemRole
       department: string
       status: 'Ativo' | 'Inativo'
+      sodException?: boolean
+      sodJustification?: string
     },
   ): UserItem | null {
-    const idx = usersState.value.findIndex((u) => u.id === id)
+    const users = this.getUsers()
+    const idx = users.findIndex((u) => u.id === id)
     if (idx === -1) return null
 
-    const existing = usersState.value[idx]!
+    const existing = users[idx]!
     const roleChanged = existing.role !== data.role
-    const newPermissions = roleChanged
-      ? [...(ROLE_DEFAULT_PERMISSIONS[data.role] || [])]
-      : [...existing.permissions]
+    let permissions = [...existing.permissions]
+    if (roleChanged) {
+      const repo = roleService.getRepo() as any
+      const roleDef = repo.roles.find((r: any) => r.id === data.role)
+      permissions = roleDef ? [...roleDef.permissions] : []
+    }
 
-    usersState.value[idx] = {
-      id: existing.id,
-      lastLogin: existing.lastLogin,
-      name: data.name,
-      email: data.email,
+    users[idx] = {
+      ...existing,
+      name: data.name.trim(),
+      email: data.email.trim(),
       role: data.role,
-      permissions: newPermissions,
+      permissions,
       department: data.department,
       status: data.status,
+      sodException: data.sodException !== undefined ? data.sodException : existing.sodException,
+      sodJustification: data.sodJustification || existing.sodJustification,
     }
-    return usersState.value[idx]!
+
+    if (roleChanged) {
+      const repo = roleService.getRepo() as any
+      repo.recordSecurityEvent({
+        action: 'Troca de Cargo',
+        details: `Alterou o papel do usuário ${users[idx]!.name} de ${existing.role} para ${data.role}.`,
+        severity: 'INFO',
+      })
+    }
+
+    return users[idx]!
   },
 
-  /**
-   * Alterna o status do usuário entre 'Ativo' e 'Inativo'.
-   */
   toggleUserStatus(id: number): UserItem | null {
     const user = this.getUserById(id)
     if (!user) return null
+
+    // Trava de Auto-Exclusão / Auto-Inativação (Tarefa 8)
+    if (currentUser.value.email && user.email.toLowerCase() === currentUser.value.email.toLowerCase()) {
+      throw new Error('Você não pode inativar seu próprio acesso de Administrador.')
+    }
+
     user.status = user.status === 'Ativo' ? 'Inativo' : 'Ativo'
+
+    const repo = roleService.getRepo() as any
+    repo.recordSecurityEvent({
+      action: user.status === 'Ativo' ? 'Ativação de Conta' : 'Inativação de Conta',
+      details: `${user.status === 'Ativo' ? 'Ativou' : 'Inativou'} o acesso do usuário ${user.name}.`,
+      severity: user.status === 'Inativo' ? 'WARNING' : 'INFO',
+    })
+
     return user
   },
 
-  /**
-   * Atualiza as permissões específicas associadas ao usuário.
-   */
   updateUserPermissions(id: number, permissions: string[]): UserItem | null {
     const user = this.getUserById(id)
     if (!user) return null
@@ -181,35 +375,44 @@ export const userService = {
     return user
   },
 
-  /**
-   * Restaura o pacote de subpermissões para o padrão configurado para a role do usuário.
-   */
   resetPermissionsToRole(id: number): string[] {
     const user = this.getUserById(id)
     if (!user) return []
-    const defaults = ROLE_DEFAULT_PERMISSIONS[user.role] || []
+    const repo = roleService.getRepo() as any
+    const roleDef = repo.roles.find((r: any) => r.id === user.role)
+    const defaults = roleDef?.permissions || []
     user.permissions = [...defaults]
     return user.permissions
   },
 
-  /**
-   * Retorna o catálogo de todas as subpermissões do sistema.
-   */
   getAllPermissions(): PermissionDefinition[] {
     return ALL_PERMISSIONS
   },
 
-  /**
-   * Retorna o catálogo de papéis disponíveis no sistema.
-   */
   getAvailableRoles(): RoleOption[] {
     return MOCK_AVAILABLE_ROLES
   },
 
-  /**
-   * Retorna as permissões padrão para um determinado papel.
-   */
   getRoleDefaultPermissions(role: SystemRole): string[] {
-    return ROLE_DEFAULT_PERMISSIONS[role] || []
+    const repo = roleService.getRepo() as any
+    const found = repo.roles.find((r: any) => r.id === role)
+    if (found) return found.permissions
+    return (ROLE_DEFAULT_PERMISSIONS as Record<string, string[]>)[role] || []
+  },
+
+  // -------------------------------------------------------------
+  // Trilha de Auditoria de Segurança
+  // -------------------------------------------------------------
+
+  async getSecurityEvents(): Promise<SecurityEvent[]> {
+    return roleService.getRepo().listSecurityEvents()
+  },
+
+  async recordSecurityEvent(dto: RecordSecurityEventDto): Promise<SecurityEvent> {
+    return roleService.getRepo().recordSecurityEvent({
+      ...dto,
+      actorEmail: dto.actorEmail || currentUser.value.email,
+      actorName: dto.actorName || currentUser.value.name,
+    })
   },
 }

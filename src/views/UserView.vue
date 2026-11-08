@@ -1,162 +1,170 @@
 <script setup lang="ts">
 /**
- * View de gerenciamento e administração de usuários do sistema.
- * Atua estritamente na camada de apresentação visual, delegando toda
- * a busca de dados, mutações e regras de permissão ao userService.
+ * View de Administração de Usuários, Perfis e Permissões (US13).
+ * Estruturada em 3 abas especializadas:
+ * 1. Colaboradores e Acessos (Listagem, busca, filtros e ações)
+ * 2. Cargos e Permissões (Matriz RBAC por módulo e cargos customizados)
+ * 3. Auditoria de Segurança (Trilha imutável de eventos administrativos)
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   FiUsers,
-  FiUserPlus,
-  FiSearch,
-  FiFilter,
   FiShield,
-  FiEdit2,
+  FiClock,
   FiCheckCircle,
-  FiXCircle,
+  FiAlertCircle,
   FiX,
   FiCheck,
   FiSave,
-  FiKey,
 } from 'vue-icons-plus/fi'
-import DataTable, { type Column } from '../components/DataTable.vue'
+import UserManagementTab from '@/components/admin/UserManagementTab.vue'
+import UserFormModal from '@/components/admin/UserFormModal.vue'
+import RolePermissionMatrix from '@/components/admin/RolePermissionMatrix.vue'
+import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
 import {
   userService,
   type UserItem,
-  type SystemRole,
+  type RoleDef,
   type PermissionDefinition,
-} from '../services/user'
+  type SecurityEvent,
+} from '@/services/user'
+import { roleService } from '@/services/roles'
+import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
 
-// Colunas para a DataTable
-const columns: Column[] = [
-  { key: 'name', label: 'Nome / Usuário' },
-  { key: 'role', label: 'Role Associada' },
-  { key: 'department', label: 'Departamento' },
-  { key: 'status', label: 'Status' },
-  { key: 'lastLogin', label: 'Último Acesso' },
-  { key: 'actions', label: 'Ações' },
-]
+type AdminTab = 'colaboradores' | 'matriz' | 'auditoria'
+const activeTab = ref<AdminTab>('colaboradores')
 
-// Dados e catálogo providos pelo serviço
-const availableRoles = userService.getAvailableRoles()
-const allPermissions = userService.getAllPermissions()
+// Estados reativos
+const users = ref<UserItem[]>([])
+const roles = ref<RoleDef[]>([])
+const allPermissions = ref<PermissionDefinition[]>([])
+const securityEvents = ref<SecurityEvent[]>([])
 
-// Filtros
-const searchQuery = ref('')
-const selectedRoleFilter = ref<string>('')
-const selectedStatusFilter = ref<string>('')
-const feedbackMsg = ref('')
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error'>('success')
 
-// Modal 1: Cadastro / Edição Básica
-const isModalOpen = ref(false)
-const isEditing = ref(false)
-const modalUserId = ref<number | null>(null)
-const modalName = ref('')
-const modalEmail = ref('')
-const modalRole = ref<SystemRole>('ANALISTA')
-const modalDepartment = ref('')
-const modalStatus = ref<'Ativo' | 'Inativo'>('Ativo')
+// Modal de Formulário (Cadastro / Edição)
+const isFormModalOpen = ref(false)
+const isEditingUser = ref(false)
+const selectedUserToEdit = ref<UserItem | null>(null)
 
-// Modal 2: Gerenciamento Exclusivo de Permissões
+// Modal de Permissões Granulares por Usuário
 const isPermModalOpen = ref(false)
 const permUser = ref<UserItem | null>(null)
 const selectedPermissions = ref<Set<string>>(new Set())
 const permModuleFilter = ref('')
 const permSearchFilter = ref('')
 
-// Usuários obtidos do serviço com filtro reativo
-const filteredUsers = computed(() => {
-  return userService.getUsers().filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      user.department.toLowerCase().includes(searchQuery.value.toLowerCase())
+const loggedInAdmin = computed(() => userService.getCurrentUser())
 
-    const matchesRole = !selectedRoleFilter.value || user.role === selectedRoleFilter.value
-    const matchesStatus = !selectedStatusFilter.value || user.status === selectedStatusFilter.value
-
-    return matchesSearch && matchesRole && matchesStatus
-  })
+const availableRoleOptions = computed(() => {
+  return roles.value.map((r: RoleDef) => ({
+    value: r.id,
+    label: r.nome,
+    desc: r.descricao,
+  }))
 })
 
-// Módulos únicos para filtro do modal de permissões
-const uniqueModules = computed(() => {
-  const set = new Set<string>()
-  allPermissions.forEach((p) => set.add(p.modulo))
-  return Array.from(set)
+const refreshData = async () => {
+  users.value = [...userService.getUsers()]
+  roles.value = await roleService.getRoles()
+  allPermissions.value = userService.getAllPermissions()
+  securityEvents.value = await userService.getSecurityEvents()
+}
+
+onMounted(async () => {
+  await refreshData()
 })
 
-// Subpermissões filtradas no modal
-const filteredPermissionDefs = computed(() => {
-  return allPermissions.filter((p) => {
-    const matchesMod = !permModuleFilter.value || p.modulo === permModuleFilter.value
-    const matchesQuery =
-      !permSearchFilter.value ||
-      p.modulo.toLowerCase().includes(permSearchFilter.value.toLowerCase()) ||
-      p.subpermissao.toLowerCase().includes(permSearchFilter.value.toLowerCase())
-    return matchesMod && matchesQuery
-  })
-})
-
-const getPermKey = (p: PermissionDefinition) => `${p.modulo}:${p.subpermissao}`
-
-const openCreateModal = () => {
-  isEditing.value = false
-  modalUserId.value = null
-  modalName.value = ''
-  modalEmail.value = ''
-  modalRole.value = 'ANALISTA'
-  modalDepartment.value = 'Geoprocessamento'
-  modalStatus.value = 'Ativo'
-  isModalOpen.value = true
+const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+  toastMessage.value = msg
+  toastType.value = type
+  setTimeout(() => {
+    toastMessage.value = ''
+  }, 4500)
 }
 
-const openEditModal = (user: UserItem) => {
-  isEditing.value = true
-  modalUserId.value = user.id
-  modalName.value = user.name
-  modalEmail.value = user.email
-  modalRole.value = user.role
-  modalDepartment.value = user.department
-  modalStatus.value = user.status
-  isModalOpen.value = true
+// -------------------------------------------------------------
+// Ações de Usuário (Aba 1)
+// -------------------------------------------------------------
+
+const openCreateUserModal = () => {
+  isEditingUser.value = false
+  selectedUserToEdit.value = null
+  isFormModalOpen.value = true
 }
 
-const closeModal = () => {
-  isModalOpen.value = false
+const openEditUserModal = (user: UserItem) => {
+  isEditingUser.value = true
+  selectedUserToEdit.value = user
+  isFormModalOpen.value = true
 }
 
-const saveUser = () => {
-  if (!modalName.value || !modalEmail.value) {
-    return
-  }
-
-  if (isEditing.value && modalUserId.value !== null) {
-    const updated = userService.updateUser(modalUserId.value, {
-      name: modalName.value,
-      email: modalEmail.value,
-      role: modalRole.value,
-      department: modalDepartment.value || 'Geral',
-      status: modalStatus.value,
-    })
-    if (updated) {
-      showFeedback('Usuário atualizado com sucesso!')
+const handleSaveUser = async (data: {
+  name: string
+  email: string
+  role: string
+  department: string
+  status: 'Ativo' | 'Inativo'
+  password?: string
+  sodException?: boolean
+  sodJustification?: string
+}) => {
+  try {
+    if (isEditingUser.value && selectedUserToEdit.value) {
+      const updated = userService.updateUser(selectedUserToEdit.value.id, {
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        department: data.department,
+        status: data.status,
+        sodException: data.sodException,
+        sodJustification: data.sodJustification,
+      })
+      if (updated) {
+        showToast(`Colaborador ${updated.name} atualizado com sucesso!`)
+      }
+    } else {
+      const created = await userService.createUserAsync({
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        department: data.department,
+        status: data.status,
+        temporaryPassword: data.password,
+        sodException: data.sodException,
+        sodJustification: data.sodJustification,
+      })
+      showToast(`Novo colaborador ${created.name} cadastrado com sucesso!`)
     }
-  } else {
-    userService.createUser({
-      name: modalName.value,
-      email: modalEmail.value,
-      role: modalRole.value,
-      department: modalDepartment.value || 'Geral',
-      status: modalStatus.value,
-    })
-    showFeedback('Novo usuário cadastrado com sucesso!')
-  }
 
-  closeModal()
+    isFormModalOpen.value = false
+    await refreshData()
+  } catch (error: any) {
+    if (error instanceof DuplicateEmailError || error?.name === 'DuplicateEmailError') {
+      showToast(error.message, 'error')
+    } else {
+      showToast(error?.message || 'Falha ao salvar dados do colaborador.', 'error')
+    }
+  }
 }
 
-// Modal de Permissões
+const handleToggleUserStatus = (user: UserItem) => {
+  try {
+    const updated = userService.toggleUserStatus(user.id)
+    if (updated) {
+      showToast(`Status de ${updated.name} alterado para ${updated.status}.`)
+      refreshData()
+    }
+  } catch (err: any) {
+    showToast(err?.message || 'Ação bloqueada pelas regras de segurança.', 'error')
+  }
+}
+
+// -------------------------------------------------------------
+// Subpermissões Granulares por Usuário
+// -------------------------------------------------------------
+
 const openPermissionsModal = (user: UserItem) => {
   permUser.value = user
   selectedPermissions.value = new Set(user.permissions)
@@ -169,6 +177,25 @@ const closePermissionsModal = () => {
   isPermModalOpen.value = false
   permUser.value = null
 }
+
+const getPermKey = (p: PermissionDefinition) => `${p.modulo}:${p.subpermissao}`
+
+const uniqueModules = computed(() => {
+  const set = new Set<string>()
+  allPermissions.value.forEach((p) => set.add(p.modulo))
+  return Array.from(set)
+})
+
+const filteredPermissionDefs = computed(() => {
+  return allPermissions.value.filter((p) => {
+    const matchesMod = !permModuleFilter.value || p.modulo === permModuleFilter.value
+    const matchesQuery =
+      !permSearchFilter.value ||
+      p.modulo.toLowerCase().includes(permSearchFilter.value.toLowerCase()) ||
+      p.subpermissao.toLowerCase().includes(permSearchFilter.value.toLowerCase())
+    return matchesMod && matchesQuery
+  })
+})
 
 const togglePermission = (key: string) => {
   const updated = new Set(selectedPermissions.value)
@@ -184,303 +211,200 @@ const resetToRoleDefaults = () => {
   if (!permUser.value) return
   const defaults = userService.resetPermissionsToRole(permUser.value.id)
   selectedPermissions.value = new Set(defaults)
-  showFeedback(`Permissões restauradas para os padrões da role ${permUser.value.role}.`)
+  showToast(`Permissões restauradas para os padrões da role ${permUser.value.role}.`)
 }
 
-const savePermissions = () => {
+const saveUserPermissions = () => {
   if (!permUser.value) return
   userService.updateUserPermissions(permUser.value.id, Array.from(selectedPermissions.value))
-  showFeedback(`Permissões de ${permUser.value.name} atualizadas com sucesso!`)
+  showToast(`Permissões de ${permUser.value.name} atualizadas com sucesso!`)
   closePermissionsModal()
+  refreshData()
 }
 
-const toggleUserStatus = (user: UserItem) => {
-  const updated = userService.toggleUserStatus(user.id)
-  if (updated) {
-    showFeedback(`Status de ${updated.name} alterado para ${updated.status}.`)
+// -------------------------------------------------------------
+// Ações de Roles (Aba 2)
+// -------------------------------------------------------------
+
+const handleCreateRole = async (data: {
+  id: string
+  nome: string
+  descricao: string
+  permissions: string[]
+}) => {
+  try {
+    const created = await roleService.createRole(data)
+    showToast(`Papel customizado "${created.nome}" criado com sucesso!`)
+    await refreshData()
+  } catch (err: any) {
+    showToast(err?.message || 'Falha ao criar papel customizado.', 'error')
   }
 }
 
-const showFeedback = (msg: string) => {
-  feedbackMsg.value = msg
-  setTimeout(() => {
-    feedbackMsg.value = ''
-  }, 4000)
+const handleDeleteRole = async (roleId: string) => {
+  try {
+    await roleService.deleteRole(roleId)
+    showToast(`Papel "${roleId}" removido com sucesso!`)
+    await refreshData()
+  } catch (err: any) {
+    showToast(err?.message || 'Não foi possível excluir o papel.', 'error')
+  }
 }
 </script>
 
 <template>
-  <main class="users-view">
+  <main class="users-view" data-testid="users-view">
+    <!-- Cabeçalho Principal -->
     <header class="page-heading">
       <div class="heading-content">
         <div>
           <p class="eyebrow">Administração e Acesso</p>
-          <h1>Gerenciamento de Usuários e Permissões</h1>
+          <h1>Gestão de Colaboradores e Permissões</h1>
           <p class="page-description">
-            Associe papéis aos usuários e configure subpermissões personalizadas para controle de
-            acesso granular na plataforma GeoRural.
+            Gerencie colaboradores, configure papéis dinâmicos e audite trilhas de segurança e segregação de funções.
           </p>
         </div>
-        <button type="button" class="btn btn_primary" @click="openCreateModal">
-          <FiUserPlus size="16" />
-          <span>Novo Usuário</span>
-        </button>
       </div>
     </header>
 
-    <!-- Feedback Banner -->
-    <div v-if="feedbackMsg" class="alert-banner alert-success">
-      <FiCheckCircle size="18" />
-      <span>{{ feedbackMsg }}</span>
+    <!-- Toast / Banner de Feedback -->
+    <div
+      v-if="toastMessage"
+      class="alert-banner"
+      :class="toastType === 'error' ? 'alert-danger' : 'alert-success'"
+      data-testid="toast-feedback"
+    >
+      <FiAlertCircle v-if="toastType === 'error'" size="18" />
+      <FiCheckCircle v-else size="18" />
+      <span>{{ toastMessage }}</span>
+      <button type="button" class="btn-toast-close" @click="toastMessage = ''">&times;</button>
     </div>
 
-    <!-- Barra de Filtros e Busca -->
-    <section class="card filter-card">
-      <div class="filter-grid">
-        <div class="search-box">
-          <FiSearch class="search-icon" size="16" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            class="input search-input"
-            placeholder="Buscar por nome, e-mail ou departamento..."
-          />
-        </div>
+    <!-- Navegação por Abas Especializadas -->
+    <div class="tabs-nav" data-testid="admin-tabs-nav">
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'colaboradores' }"
+        data-testid="tab-colaboradores"
+        @click="activeTab = 'colaboradores'"
+      >
+        <FiUsers size="16" />
+        <span>Colaboradores e Acessos</span>
+      </button>
 
-        <div class="filter-selects">
-          <div class="select-group">
-            <FiShield size="14" class="select-icon" />
-            <select v-model="selectedRoleFilter" class="select">
-              <option value="">Todas as Roles</option>
-              <option v-for="r in availableRoles" :key="r.value" :value="r.value">
-                {{ r.label }}
-              </option>
-            </select>
-          </div>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'matriz' }"
+        data-testid="tab-matriz"
+        @click="activeTab = 'matriz'"
+      >
+        <FiShield size="16" />
+        <span>Cargos e Permissões</span>
+      </button>
 
-          <div class="select-group">
-            <FiFilter size="14" class="select-icon" />
-            <select v-model="selectedStatusFilter" class="select">
-              <option value="">Todos os Status</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Inativo">Inativo</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </section>
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'auditoria' }"
+        data-testid="tab-auditoria"
+        @click="activeTab = 'auditoria'"
+      >
+        <FiClock size="16" />
+        <span>Auditoria de Segurança</span>
+      </button>
+    </div>
 
-    <!-- Tabela de Usuários com DataTable (expand desabilitado) -->
-    <section class="card table-card">
-      <DataTable :columns="columns" :data="filteredUsers" row-key="id" :disable-expand="true">
-        <template #cell-name="{ item }">
-          <div class="user-cell">
-            <div class="user-avatar-mini">
-              {{ item.name.charAt(0).toUpperCase() }}
-            </div>
-            <div>
-              <strong class="user-cell-name">{{ item.name }}</strong>
-              <span class="user-cell-email">{{ item.email }}</span>
-            </div>
-          </div>
-        </template>
+    <!-- Conteúdo da Aba 1: Colaboradores e Acessos (Tarefa 1 e 8) -->
+    <UserManagementTab
+      v-if="activeTab === 'colaboradores'"
+      :users="users"
+      :available-roles="availableRoleOptions"
+      :logged-in-admin-email="loggedInAdmin.email"
+      @create-user="openCreateUserModal"
+      @edit-user="openEditUserModal"
+      @manage-permissions="openPermissionsModal"
+      @toggle-status="handleToggleUserStatus"
+    />
 
-        <template #cell-role="{ item }">
-          <span class="role-badge" :class="item.role.toLowerCase()">
-            {{ item.role }}
-          </span>
-        </template>
+    <!-- Conteúdo da Aba 2: Cargos e Permissões (Tarefas 4 e 9) -->
+    <RolePermissionMatrix
+      v-else-if="activeTab === 'matriz'"
+      :roles="roles"
+      :all-permissions="allPermissions"
+      @create-role="handleCreateRole"
+      @delete-role="handleDeleteRole"
+    />
 
-        <template #cell-department="{ item }">
-          <span class="dept-text">{{ item.department }}</span>
-        </template>
+    <!-- Conteúdo da Aba 3: Auditoria de Segurança (Tarefa 3) -->
+    <SecurityAuditTab
+      v-else-if="activeTab === 'auditoria'"
+      :events="securityEvents"
+    />
 
-        <template #cell-status="{ item }">
-          <span class="status-pill" :class="item.status.toLowerCase()">
-            <span class="status-dot"></span>
-            {{ item.status }}
-          </span>
-        </template>
+    <!-- Modal de Cadastro / Edição de Colaborador (Tarefas 2, 5 e 10) -->
+    <UserFormModal
+      :is-open="isFormModalOpen"
+      :is-editing="isEditingUser"
+      :user-to-edit="selectedUserToEdit"
+      :available-roles="availableRoleOptions"
+      :logged-in-admin-email="loggedInAdmin.email"
+      @close="isFormModalOpen = false"
+      @save="handleSaveUser"
+    />
 
-        <template #cell-lastLogin="{ item }">
-          <span class="date-text">{{ item.lastLogin }}</span>
-        </template>
-
-        <template #cell-actions="{ item }">
-          <div class="table-actions">
-            <button
-              type="button"
-              class="btn-action permissions"
-              title="Gerenciar Subpermissões"
-              @click.stop="openPermissionsModal(item)"
-            >
-              <FiKey size="14" />
-            </button>
-            <button
-              type="button"
-              class="btn-action edit"
-              title="Editar Dados do Usuário"
-              @click.stop="openEditModal(item)"
-            >
-              <FiEdit2 size="14" />
-            </button>
-            <button
-              type="button"
-              class="btn-action status"
-              :title="item.status === 'Ativo' ? 'Desativar Usuário' : 'Ativar Usuário'"
-              @click.stop="toggleUserStatus(item)"
-            >
-              <FiXCircle v-if="item.status === 'Ativo'" size="14" />
-              <FiCheckCircle v-else size="14" />
-            </button>
-          </div>
-        </template>
-      </DataTable>
-
-      <div v-if="filteredUsers.length === 0" class="empty-state">
-        <FiUsers size="36" />
-        <p>Nenhum usuário encontrado com os filtros atuais.</p>
-      </div>
-    </section>
-
-    <!-- Modal 1: Criação / Edição do Usuário -->
-    <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
-      <div class="modal-dialog">
+    <!-- Modal de Gerenciamento Exclusivo de Subpermissões -->
+    <div
+      v-if="isPermModalOpen && permUser"
+      class="modal-backdrop"
+      data-testid="permissions-modal"
+      @click.self="closePermissionsModal"
+    >
+      <div class="modal-dialog modal-lg">
         <div class="modal-header">
-          <h3>{{ isEditing ? 'Editar Usuário' : 'Cadastrar Novo Usuário' }}</h3>
-          <button type="button" class="btn-close" @click="closeModal">
+          <div class="modal-title-group">
+            <FiShield size="22" class="icon-brand" />
+            <div>
+              <h3>Gerenciar Permissões de {{ permUser.name }}</h3>
+              <p class="subtitle">
+                Cargo base: <strong>{{ permUser.role }}</strong> &bull; Personalize as capacidades deste usuário
+              </p>
+            </div>
+          </div>
+          <button type="button" class="btn-close" aria-label="Fechar" @click="closePermissionsModal">
             <FiX size="18" />
           </button>
         </div>
 
-        <form @submit.prevent="saveUser" class="modal-body">
-          <div class="form-group">
-            <label class="label">Nome Completo</label>
+        <div class="modal-body">
+          <div class="perm-filters-row">
             <input
-              v-model="modalName"
+              v-model="permSearchFilter"
               type="text"
-              class="input"
-              placeholder="Ex: Ana Silva"
-              required
+              class="input search-perm-input"
+              placeholder="Filtrar por nome da ação ou módulo..."
             />
-          </div>
-
-          <div class="form-group">
-            <label class="label">E-mail Corporativo</label>
-            <input
-              v-model="modalEmail"
-              type="email"
-              class="input"
-              placeholder="ana.silva@georural.com.br"
-              required
-            />
-          </div>
-
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label class="label">Role Associada</label>
-              <select v-model="modalRole" class="select">
-                <option v-for="r in availableRoles" :key="r.value" :value="r.value">
-                  {{ r.label }}
-                </option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="label">Status Inicial</label>
-              <select v-model="modalStatus" class="select">
-                <option value="Ativo">Ativo</option>
-                <option value="Inativo">Inativo</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="label">Departamento</label>
-            <input
-              v-model="modalDepartment"
-              type="text"
-              class="input"
-              placeholder="Ex: Análise Espacial"
-            />
-          </div>
-
-          <p class="modal-role-tip">
-            <FiShield size="14" />
-            Ao associar a role <strong>{{ modalRole }}</strong
-            >, o usuário receberá o pacote básico de subpermissões desta role. Você poderá anexar ou
-            remover permissões específicas a qualquer momento no modal de acessos.
-          </p>
-
-          <div class="modal-footer">
-            <button type="button" class="btn btn_outline" @click="closeModal">Cancelar</button>
-            <button type="submit" class="btn btn_primary">
-              <FiSave size="16" />
-              Salvar
+            <select v-model="permModuleFilter" class="select select-module-filter">
+              <option value="">Todos os Módulos</option>
+              <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <button
+              type="button"
+              class="btn btn_outline btn-reset-role"
+              @click="resetToRoleDefaults"
+            >
+              Restaurar Padrão do Cargo
             </button>
           </div>
-        </form>
-      </div>
-    </div>
 
-    <!-- Modal 2: Modal Dedicado de Permissões -->
-    <div v-if="isPermModalOpen" class="modal-backdrop" @click.self="closePermissionsModal">
-      <div class="modal-dialog modal-permissions-dialog">
-        <div class="modal-header">
-          <div class="modal-header-titles">
-            <h3>Gerenciamento de Subpermissões</h3>
-            <p class="modal-subtitle">
-              Usuário: <strong>{{ permUser?.name }}</strong> &bull; Role Associada:
-              <span class="role-badge" :class="permUser?.role.toLowerCase()">{{
-                permUser?.role
-              }}</span>
-            </p>
-          </div>
-          <button type="button" class="btn-close" aria-label="Fechar" @click="closePermissionsModal">
-            <FiX size="20" />
-          </button>
-        </div>
-
-        <div class="modal-body-permissions">
-          <!-- Barra de Ações Rápidas e Filtro -->
-          <div class="perm-toolbar">
-            <div class="perm-search-box">
-              <FiSearch class="search-icon" size="15" />
-              <input
-                v-model="permSearchFilter"
-                type="text"
-                class="input perm-input"
-                placeholder="Buscar por módulo ou subpermissão..."
-              />
-            </div>
-
-            <div class="perm-filter-actions">
-              <div class="perm-module-select">
-                <select v-model="permModuleFilter" class="select select-compact">
-                  <option value="">Todos os Módulos ({{ uniqueModules.length }})</option>
-                  <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
-                </select>
-              </div>
-
-              <button
-                type="button"
-                class="btn btn_outline btn-sm btn-reset-role"
-                title="Restaurar para as permissões originais da role"
-                @click="resetToRoleDefaults"
-              >
-                Restaurar Padrão da Role
-              </button>
-            </div>
-          </div>
-
-          <!-- Tabela de Subpermissões com Check / X -->
           <div class="permissions-table-wrapper">
             <table class="perm-table">
               <thead>
                 <tr>
                   <th class="th-module">Módulo</th>
                   <th class="th-subperm">Subpermissão</th>
-                  <th class="th-status">Atribuição / Status</th>
+                  <th class="th-status">Status de Acesso</th>
                 </tr>
               </thead>
               <tbody>
@@ -505,37 +429,29 @@ const showFeedback = (msg: string) => {
                     >
                       <template v-if="selectedPermissions.has(getPermKey(p))">
                         <FiCheck size="15" />
-                        <span>Permitido (Check)</span>
+                        <span>Permitido</span>
                       </template>
                       <template v-else>
                         <FiX size="15" />
-                        <span>Sem Acesso (X)</span>
+                        <span>Sem Acesso</span>
                       </template>
                     </button>
-                  </td>
-                </tr>
-
-                <tr v-if="filteredPermissionDefs.length === 0">
-                  <td colspan="3" class="text-center empty-perms-cell">
-                    Nenhuma subpermissão encontrada com os filtros informados.
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Rodapé do Modal -->
           <div class="modal-footer-wrapper">
             <span class="summary-text">
               Total concedido: <strong>{{ selectedPermissions.size }}</strong> de
               {{ allPermissions.length }} subpermissões do sistema.
             </span>
-
             <div class="modal-footer-btns">
               <button type="button" class="btn btn_outline" @click="closePermissionsModal">
                 Cancelar
               </button>
-              <button type="button" class="btn btn_primary" @click="savePermissions">
+              <button type="button" class="btn btn_primary" @click="saveUserPermissions">
                 <FiSave size="16" />
                 <span>Salvar Permissões</span>
               </button>
@@ -549,699 +465,268 @@ const showFeedback = (msg: string) => {
 
 <style scoped>
 .users-view {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
-
-.heading-content {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 20px;
 }
 
-@media (max-width: 640px) {
-  .heading-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-.eyebrow {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--vis-brand-orange, #e67e22);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.page-heading {
   margin-bottom: 4px;
 }
 
-.heading-content h1 {
-  font-size: 1.85rem;
+.eyebrow {
+  font-size: 0.76rem;
   font-weight: 700;
-  color: var(--color-heading);
-  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-brand, #f26522);
+  margin: 0 0 4px;
+}
+
+h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-heading, #f8fafc);
+  margin: 0 0 6px;
 }
 
 .page-description {
-  color: var(--color-text-muted, #718096);
-  font-size: 0.95rem;
-}
-
-.card {
-  background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  margin-bottom: 24px;
-}
-
-.filter-card {
-  padding: 16px 20px;
-}
-
-.filter-grid {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  position: relative;
-  flex: 1;
-  min-width: 280px;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: var(--color-text-muted, #a0aec0);
-  pointer-events: none;
-}
-
-.search-input {
-  padding-left: 38px !important;
-  width: 100%;
-}
-
-.filter-selects {
-  display: flex;
-  gap: 12px;
-}
-
-.select-group {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.select-icon {
-  position: absolute;
-  left: 12px;
-  color: var(--color-text-muted, #a0aec0);
-  pointer-events: none;
-}
-
-.select {
-  padding-left: 34px !important;
-}
-
-.table-card {
-  overflow: hidden;
-  padding: 0;
-}
-
-.user-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-avatar-mini {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--color-background-soft, #edf2f7);
-  color: var(--vis-brand-orange, #e67e22);
-  font-weight: 700;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.user-cell-name {
-  display: block;
-  font-size: 0.92rem;
-  color: var(--color-heading);
-}
-
-.user-cell-email {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #718096);
-}
-
-.dept-text,
-.date-text {
   font-size: 0.88rem;
-  color: var(--color-text);
-}
-
-.role-badge {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  text-transform: uppercase;
-}
-
-.role-badge.admin {
-  background: #feebc8;
-  color: #c05621;
-}
-
-.role-badge.analista {
-  background: #e2e8f0;
-  color: #2b6cb0;
-}
-
-.role-badge.auditor {
-  background: #fed7d7;
-  color: #9b2c2c;
-}
-
-.role-badge.operador_dados {
-  background: #c6f6d5;
-  color: #22543d;
-}
-
-.role-badge.gestor {
-  background: #e9d8fd;
-  color: #553c9e;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.status-pill.ativo {
-  color: #38a169;
-}
-
-.status-pill.ativo .status-dot {
-  background: #38a169;
-}
-
-.status-pill.inativo {
-  color: #a0aec0;
-}
-
-.status-pill.inativo .status-dot {
-  background: #a0aec0;
-}
-
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-action {
-  background: transparent;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 4px;
-  padding: 6px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted, #718096);
-  transition: all 0.2s ease;
-}
-
-.btn-action:hover {
-  background: var(--color-background-soft, #f7fafc);
-  color: var(--color-heading);
-}
-
-.btn-action.permissions:hover {
-  color: var(--vis-brand-orange, #e67e22);
-  border-color: var(--vis-brand-orange, #e67e22);
-}
-
-.btn-action.edit:hover {
-  color: #3182ce;
-  border-color: #3182ce;
-}
-
-.btn-action.status:hover {
-  color: var(--vis-brand-orange, #e67e22);
-  border-color: var(--vis-brand-orange, #e67e22);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 48px 16px;
-  color: var(--color-text-muted, #a0aec0);
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0;
 }
 
 .alert-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 6px;
-  font-size: 0.88rem;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 0.86rem;
   font-weight: 500;
-  margin-bottom: 20px;
 }
 
 .alert-success {
-  background-color: #f0fff4;
-  color: #276749;
-  border: 1px solid #c6f6d5;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
 }
 
-/* Modais */
+.alert-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.btn-toast-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: currentColor;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* Abas de Navegação */
+.tabs-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border, #334155);
+  padding-bottom: 4px;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.tab-btn:hover {
+  color: var(--color-heading, #f8fafc);
+}
+
+.tab-btn.active {
+  color: var(--color-brand, #f26522);
+  border-bottom-color: var(--color-brand, #f26522);
+}
+
+/* Modal de Permissões */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  overflow-y: auto;
 }
 
 .modal-dialog {
-  background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
+  max-width: 600px;
   width: 100%;
-  max-width: 520px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  background: var(--color-surface, #1e293b);
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: modalFadeIn 0.2s ease-out;
 }
 
-.modal-permissions-dialog {
-  max-width: 820px;
-  max-height: 90vh;
-}
-
-@keyframes modalFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.modal-lg {
+  max-width: 780px;
 }
 
 .modal-header {
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.modal-header-titles {
-  flex: 1;
-  min-width: 0;
-}
-
-.modal-header h3 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin: 0;
-}
-
-.modal-subtitle {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  margin-top: 6px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-border, #334155);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-brand {
+  color: var(--color-brand, #f26522);
+}
+
+h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-heading, #f8fafc);
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #94a3b8);
 }
 
 .btn-close {
   background: transparent;
-  border: 0;
-  color: var(--color-text-muted);
+  border: none;
+  color: var(--color-text-muted, #94a3b8);
   cursor: pointer;
-  padding: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.btn-close:hover {
-  color: var(--color-heading);
-  background: var(--color-background-soft);
 }
 
 .modal-body {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
-}
-
-.modal-body-permissions {
   padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: hidden;
-  flex: 1;
 }
 
-.perm-toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.perm-search-box {
-  position: relative;
-  flex: 1;
-  min-width: 240px;
-  display: flex;
-  align-items: center;
-}
-
-.perm-input {
-  padding-left: 36px !important;
-  font-size: 0.88rem;
-  width: 100%;
-}
-
-.perm-filter-actions {
+.perm-filters-row {
   display: flex;
   gap: 10px;
-  align-items: center;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
-.select-compact {
-  font-size: 0.86rem;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  min-width: 190px;
+.search-perm-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.select-module-filter {
+  min-width: 160px;
 }
 
 .btn-reset-role {
   white-space: nowrap;
-}
-
-.btn-sm {
-  font-size: 0.82rem;
-  padding: 8px 14px;
-  font-weight: 600;
+  font-size: 0.8rem;
 }
 
 .permissions-table-wrapper {
-  flex: 1;
-  max-height: 440px;
-  min-height: 220px;
+  max-height: 380px;
   overflow-y: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border, #334155);
   border-radius: 8px;
-  background: var(--color-surface);
 }
 
 .perm-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
 }
 
 .perm-table th,
 .perm-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border, #334155);
 }
 
 .perm-table th {
-  position: sticky;
-  top: 0;
-  background: var(--color-background-soft);
-  z-index: 2;
+  background: var(--color-background, #0f172a);
+  color: var(--color-heading, #f8fafc);
   font-weight: 700;
-  font-size: 0.8rem;
-  color: var(--color-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.perm-table .th-module {
-  width: 25%;
-}
-
-.perm-table .th-subperm {
-  width: 45%;
-}
-
-.perm-table .th-status {
-  width: 30%;
-  text-align: right;
-}
-
-.perm-table tbody tr {
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.perm-table tbody tr:hover {
-  background: var(--color-background-soft);
-}
-
-.perm-table tbody tr.row-active {
-  background: rgba(242, 101, 34, 0.06);
+  text-align: left;
 }
 
 .module-tag {
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
   font-size: 0.74rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
-  display: inline-block;
-  letter-spacing: 0.03em;
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
 }
 
 .cell-subperm code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.84rem;
-  color: var(--color-heading);
-  background: transparent;
-  font-weight: 600;
-}
-
-.cell-toggle {
-  text-align: right;
+  color: var(--color-heading, #f8fafc);
 }
 
 .toggle-perm-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  padding: 6px 14px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 4px 10px;
   border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: none;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+  transition: all 150ms ease;
 }
 
-.toggle-perm-btn.is-granted {
-  background: var(--badge-success-bg, rgba(16, 185, 129, 0.15));
-  color: var(--badge-success-text, #15803d);
-  border-color: var(--badge-success-border, rgba(16, 185, 129, 0.35));
+.is-granted {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
 }
 
-.toggle-perm-btn.is-revoked {
-  background: var(--badge-danger-bg, rgba(239, 68, 68, 0.12));
-  color: var(--badge-danger-text, #b91c1c);
-  border-color: var(--badge-danger-border, rgba(239, 68, 68, 0.35));
-}
-
-.toggle-perm-btn:hover {
-  filter: brightness(0.95);
-  transform: translateY(-1px);
-}
-
-.empty-perms-cell {
-  padding: 36px 16px !important;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
+.is-revoked {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 .modal-footer-wrapper {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
-  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border, #334155);
 }
 
 .summary-text {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.summary-text strong {
-  color: var(--color-heading);
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #94a3b8);
 }
 
 .modal-footer-btns {
   display: flex;
   gap: 10px;
-  align-items: center;
-  margin-left: auto;
-}
-
-.modal-role-tip {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  background: var(--color-background-soft);
-  padding: 10px 14px;
-  border-radius: 6px;
-  border-left: 3px solid var(--vis-brand-orange, #f26522);
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  line-height: 1.4;
-}
-
-.form-row.two-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-/* Responsividade Mobile e Tablet */
-@media (max-width: 768px) {
-  .modal-permissions-dialog {
-    max-height: 96vh;
-    margin: 8px;
-  }
-
-  .modal-header {
-    padding: 14px 18px;
-  }
-
-  .modal-body-permissions {
-    padding: 14px 18px;
-    gap: 12px;
-  }
-
-  .perm-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .perm-search-box {
-    min-width: 100%;
-  }
-
-  .perm-filter-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .select-compact {
-    min-width: 100%;
-  }
-
-  .btn-reset-role {
-    width: 100%;
-    text-align: center;
-    justify-content: center;
-  }
-
-  .permissions-table-wrapper {
-    max-height: 350px;
-  }
-
-  .perm-table th,
-  .perm-table td {
-    padding: 10px 10px;
-    font-size: 0.82rem;
-  }
-
-  .toggle-perm-btn {
-    padding: 4px 10px;
-    font-size: 0.76rem;
-  }
-
-  .modal-footer-wrapper {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .modal-footer-btns {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .modal-footer-btns button {
-    flex: 1;
-    justify-content: center;
-  }
-}
-
-.text-center {
-  text-align: center !important;
 }
 </style>

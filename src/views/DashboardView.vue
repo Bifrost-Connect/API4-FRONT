@@ -20,6 +20,7 @@ import {
   type ProcessLog,
 } from '../services/dashboard'
 import { processService } from '../services/process'
+import { userService } from '../services/user'
 import {
   PROCESS_STEPS,
   type ProcessCategory,
@@ -41,6 +42,12 @@ import {
 } from 'vue-icons-plus/fi'
 
 const router = useRouter()
+
+// Permissões de ação orientadas a RBAC
+const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
+const canAssignSpecialist = computed(
+  () => !userService.can('AUDITORIA:RASTREAR_ORIGEM') || userService.can('QUARENTENA:CORRIGIR'),
+)
 
 // Estados dos dados do dashboard
 const summaryData = ref<DashboardSummary[]>([])
@@ -178,7 +185,11 @@ onMounted(async () => {
  * Aplica os filtros na busca do servidor.
  */
 const applyFilters = async () => {
-  await loadData(filters.value)
+  const f: any = { ...filters.value }
+  if (f.conjunto && /^\d+$/.test(String(f.conjunto))) {
+    f.conjunto = Number(f.conjunto)
+  }
+  await loadData(f)
 }
 
 /**
@@ -421,7 +432,7 @@ const requestAuditor = async (item: ProcessLog) => {
                 </button>
 
                 <button
-                  v-if="hasErrorAwaitingEditor(item)"
+                  v-if="hasErrorAwaitingEditor(item) && canAssignSpecialist"
                   type="button"
                   class="btn btn_action_editor"
                   @click="openAssignModal(item)"
@@ -508,7 +519,7 @@ const requestAuditor = async (item: ProcessLog) => {
       </div>
 
       <!-- Atalho de Upload de Carga -->
-      <div class="bottom-action">
+      <div v-if="canUpload" class="bottom-action">
         <RouterLink to="/upload" class="btn-upload">
           + NOVA CARGA DE DADOS (Upload)
         </RouterLink>
