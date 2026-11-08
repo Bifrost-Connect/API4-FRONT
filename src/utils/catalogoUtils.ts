@@ -11,9 +11,9 @@ export const QUARANTINE_TOOLTIP =
   'Base em processamento ou retida em validação — aguardando publicação oficial pelo Gestor'
 
 /**
- * Valida se uma base está plenamente disponível / publicada para ações analíticas e inspeção.
+ * Valida se uma base está plenamente disponível para ações analíticas e inspeção.
  * REGRA DE ESCOPO: A blindagem baseia-se estritamente no status operacional da base.
- * Apenas bases Publicadas / Concluídas liberam mapa, comparação de safra e ficha técnica.
+ * Apenas bases Publicadas e Concluídas liberam mapa, comparação de safra e ficha técnica.
  */
 export function isBaseDisponivel(item?: { status?: string; stage?: string } | null): boolean {
   if (!item || !item.status) return false

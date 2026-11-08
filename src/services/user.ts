@@ -28,6 +28,13 @@ import type {
   UpdateUserDto,
   RecordSecurityEventDto,
 } from './access/AccessRepository'
+import {
+  authStorage,
+  DEFAULT_SESSION_TTL_MS,
+  type StoredAuthSession,
+} from './storage/authStorage'
+import { geojsonCache } from './storage/geojsonCache'
+import { uiPreferencesStorage } from './storage/uiPreferencesStorage'
 
 export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent }
 export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | string
@@ -123,7 +130,52 @@ const DEMO_USERS: Record<string, UserSession> = {
 // Sessão padrão inicial
 const defaultSession: UserSession = { ...DEMO_USERS.Operador! }
 
-const currentUser = ref<UserSession>({ ...defaultSession })
+function resolveInitialSession(): UserSession {
+  const stored = authStorage.getSession()
+  if (stored) {
+    return {
+      id: stored.userId,
+      name: stored.name,
+      email: stored.email,
+      role: stored.role,
+      roleId: stored.roleId,
+      permissions: [...stored.permissions],
+    }
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const legacyRole = window.localStorage.getItem('api4-demo-role')
+      if (legacyRole && DEMO_USERS[legacyRole]) {
+        return { ...DEMO_USERS[legacyRole] }
+      }
+    }
+  } catch {}
+
+  return { ...defaultSession }
+}
+
+const currentUser = ref<UserSession>(resolveInitialSession())
+
+if (typeof window !== 'undefined') {
+  authStorage.subscribeToStorageChanges((newSession) => {
+    if (newSession) {
+      currentUser.value = {
+        id: newSession.userId,
+        name: newSession.name,
+        email: newSession.email,
+        role: newSession.role,
+        roleId: newSession.roleId,
+        permissions: [...newSession.permissions],
+      }
+    } else {
+      currentUser.value = {
+        ...defaultSession,
+        permissions: [...defaultSession.permissions],
+      }
+    }
+  })
+}
 
 export const userService = {
   /**
@@ -157,9 +209,18 @@ export const userService = {
       }
     }
 
-    try {
-      localStorage.setItem('api4-demo-role', role)
-    } catch {}
+    const cur = currentUser.value
+    authStorage.saveSession({
+      userId: cur.id,
+      name: cur.name,
+      email: cur.email || `${role.toLowerCase()}@georural.com.br`,
+      role: cur.role,
+      roleId: cur.roleId || normalizeRoleKey(role),
+      permissions: [...cur.permissions],
+      loggedAt: Date.now(),
+      expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
+      isSimulated: true,
+    })
   },
 
   /**
@@ -170,6 +231,18 @@ export const userService = {
       ...user,
       permissions: Array.isArray(user.permissions) ? [...user.permissions] : [],
     }
+
+    authStorage.saveSession({
+      userId: user.id,
+      name: user.name,
+      email: user.email || `${user.role.toLowerCase()}@georural.com.br`,
+      role: user.role,
+      roleId: user.roleId || normalizeRoleKey(user.role),
+      permissions: [...currentUser.value.permissions],
+      loggedAt: Date.now(),
+      expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
+      isSimulated: true,
+    })
   },
 
   /**
@@ -180,8 +253,18 @@ export const userService = {
       ...defaultSession,
       permissions: [...defaultSession.permissions],
     }
+    authStorage.clearSession()
+  },
+
+  /**
+   * Executa logout limpo: revoga credenciais, limpa filtros de sessão e
+   * descarta camadas GeoJSON restritas no cache local.
+   */
+  async logout() {
+    this.clearCurrentUser()
+    uiPreferencesStorage.clearCatalogFilters()
     try {
-      localStorage.removeItem('api4-demo-role')
+      await geojsonCache.clearRestricted()
     } catch {}
   },
 
@@ -372,6 +455,15 @@ export const userService = {
     const user = this.getUserById(id)
     if (!user) return null
     user.permissions = [...permissions]
+
+    const repo = roleService.getRepo() as any
+    if (typeof repo.persist === 'function') repo.persist()
+
+    if (currentUser.value.id === id) {
+      currentUser.value.permissions = [...permissions]
+      authStorage.updateSessionPermissions(permissions)
+    }
+
     return user
   },
 
@@ -382,6 +474,14 @@ export const userService = {
     const roleDef = repo.roles.find((r: any) => r.id === user.role)
     const defaults = roleDef?.permissions || []
     user.permissions = [...defaults]
+
+    if (typeof repo.persist === 'function') repo.persist()
+
+    if (currentUser.value.id === id) {
+      currentUser.value.permissions = [...defaults]
+      authStorage.updateSessionPermissions(defaults)
+    }
+
     return user.permissions
   },
 

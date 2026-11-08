@@ -122,7 +122,7 @@ export function isAuditorReadOnlyLocked(permission: string): boolean {
  * Mapeamento das permissões necessárias para cada rota da aplicação.
  */
 export const ROUTE_PERMISSIONS: Record<string, string | string[]> = {
-  dashboard: 'INGESTAO:VISUALIZAR_PROCESSAMENTO',
+  dashboard: ['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS'],
   upload: 'INGESTAO:UPLOAD',
   catalogo: 'BASES:CONSULTAR_CATALOGO',
   mapa: 'MAPA:VISUALIZAR',
@@ -148,13 +148,13 @@ export function homeFor(session: SessionUser | null | undefined): string {
     return '/users'
   }
 
-  // Operador focado no Dashboard de Cargas
-  if (can(session, 'INGESTAO:VISUALIZAR_PROCESSAMENTO')) {
-    return '/'
+  // Gestor com poder de homologação de bases (área de governança e catálogo)
+  if (can(session, 'BASES:HOMOLOGAR')) {
+    return '/catalogo'
   }
 
-  // Gestor com poder de homologação de bases
-  if (can(session, 'BASES:HOMOLOGAR')) {
+  // Auditor com foco em auditoria e catálogo de bases
+  if (can(session, 'AUDITORIA:RASTREAR_ORIGEM')) {
     return '/catalogo'
   }
 
@@ -163,9 +163,9 @@ export function homeFor(session: SessionUser | null | undefined): string {
     return '/analise-territorial'
   }
 
-  // Auditor com foco em auditoria e catálogo de bases
-  if (can(session, 'AUDITORIA:RASTREAR_ORIGEM')) {
-    return '/catalogo'
+  // Operador focado no Dashboard de Cargas
+  if (can(session, 'INGESTAO:VISUALIZAR_PROCESSAMENTO')) {
+    return '/'
   }
 
   // Consulta ao catálogo geral
@@ -195,7 +195,7 @@ export const MENU_ITEMS: MenuItem[] = [
     label: 'Dashboard',
     to: '/',
     icon: FiGrid,
-    permission: 'INGESTAO:VISUALIZAR_PROCESSAMENTO',
+    permission: ['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS'],
   },
   {
     label: 'Upload de carga',

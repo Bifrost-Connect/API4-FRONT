@@ -142,7 +142,7 @@ const onSodConfirm = () => {
       <table class="matrix-table" data-testid="matrix-table">
         <thead>
           <tr>
-            <th class="th-module">Módulo / Subpermissão</th>
+            <th class="th-module">Módulo e Permissão</th>
             <th
               v-for="role in roles"
               :key="role.id"

@@ -330,8 +330,8 @@ const confirmCancelLoad = async () => {
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID Polígono / Registro</th>
-              <th>Motivo da Rejeição / Erro Topológico</th>
+              <th>ID do Registro</th>
+              <th>Motivo da Rejeição</th>
               <th>Etapa de Origem</th>
               <th>ID Execução</th>
             </tr>
@@ -374,7 +374,7 @@ const confirmCancelLoad = async () => {
           {{
             signalStatus === 'signaled'
               ? 'Operador Sinalizado para Reprocessamento'
-              : 'Sinalizar / Solicitar Reprocessamento ao Operador'
+              : 'Solicitar Reprocessamento ao Operador'
           }}
         </button>
 
@@ -397,7 +397,7 @@ const confirmCancelLoad = async () => {
             @click="showCancelModal = true"
           >
             <FiXCircle size="14" />
-            Cancelar / Invalidar Envio
+            Cancelar Envio
           </button>
         </template>
       </div>
@@ -518,7 +518,7 @@ const confirmCancelLoad = async () => {
     >
       <div class="modal-dialog">
         <div class="modal-header">
-          <h4>Cancelar / Invalidar Envio #{{ details.id }}</h4>
+          <h4>Cancelar Envio #{{ details.id }}</h4>
           <button type="button" class="modal-close" @click="showCancelModal = false">
             &times;
           </button>

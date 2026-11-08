@@ -123,6 +123,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
+      expect(labels).toContain('Dashboard')
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
@@ -130,11 +131,12 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
 
-    it('exibe Catálogo, Mapa e Análise Territorial para o Gestor de Dados', () => {
+    it('exibe Dashboard, Catálogo, Mapa e Análise Territorial para o Gestor de Dados', () => {
       userService.setCurrentUserRole('GESTOR')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
+      expect(labels).toContain('Dashboard')
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')

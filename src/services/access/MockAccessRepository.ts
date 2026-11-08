@@ -21,6 +21,7 @@ import {
   type PermissionDefinition,
   type SecurityEvent,
 } from '@/mocks/user.mock'
+import { rbacStorage } from '../storage/rbacStorage'
 
 export class DuplicateEmailError extends Error {
   constructor(email: string) {
@@ -44,9 +45,42 @@ export class RoleInUseError extends Error {
 }
 
 export class MockAccessRepository implements AccessRepository {
-  private users: UserItem[] = JSON.parse(JSON.stringify(MOCK_USERS_LIST))
-  private roles: RoleDef[] = JSON.parse(JSON.stringify(MOCK_ROLES))
-  private securityEvents: SecurityEvent[] = JSON.parse(JSON.stringify(MOCK_SECURITY_EVENTS))
+  private users: UserItem[] = []
+  private roles: RoleDef[] = []
+  private securityEvents: SecurityEvent[] = []
+
+  constructor() {
+    this.loadFromStorage()
+  }
+
+  loadFromStorage(): void {
+    const snapshot = rbacStorage.loadSnapshot()
+    if (snapshot) {
+      this.users = snapshot.users
+      this.roles = snapshot.roles
+      this.securityEvents = snapshot.securityEvents
+    } else {
+      this.users = JSON.parse(JSON.stringify(MOCK_USERS_LIST))
+      this.roles = JSON.parse(JSON.stringify(MOCK_ROLES))
+      this.securityEvents = JSON.parse(JSON.stringify(MOCK_SECURITY_EVENTS))
+      this.persist()
+    }
+  }
+
+  persist(): void {
+    rbacStorage.saveSnapshot({
+      users: this.users,
+      roles: this.roles,
+      securityEvents: this.securityEvents,
+    })
+  }
+
+  resetToSeed(): void {
+    rbacStorage.clear()
+    this.users = JSON.parse(JSON.stringify(MOCK_USERS_LIST))
+    this.roles = JSON.parse(JSON.stringify(MOCK_ROLES))
+    this.securityEvents = JSON.parse(JSON.stringify(MOCK_SECURITY_EVENTS))
+  }
 
   // -------------------------------------------------------------
   // Usuários
@@ -161,6 +195,7 @@ export class MockAccessRepository implements AccessRepository {
     const user = await this.getUserById(id)
     if (!user) return null
     user.permissions = [...permissions]
+    this.persist()
     return user
   }
 
@@ -169,6 +204,7 @@ export class MockAccessRepository implements AccessRepository {
     if (!user) return []
     const roleDef = this.roles.find((r) => r.id === user.role)
     user.permissions = roleDef ? [...roleDef.permissions] : []
+    this.persist()
     return user.permissions
   }
 
@@ -291,6 +327,7 @@ export class MockAccessRepository implements AccessRepository {
     }
 
     this.securityEvents.unshift(newEvent)
+    this.persist()
     return newEvent
   }
 }

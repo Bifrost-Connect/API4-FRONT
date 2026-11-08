@@ -180,12 +180,12 @@ const handleChangePassword = () => {
 
             <div class="form-row two-cols">
               <div class="form-group">
-                <label for="cargo" class="label">Cargo / Função</label>
+                <label for="cargo" class="label">Cargo</label>
                 <input id="cargo" v-model="formCargo" type="text" class="input" />
               </div>
 
               <div class="form-group">
-                <label for="depto" class="label">Departamento / Diretoria</label>
+                <label for="depto" class="label">Departamento</label>
                 <input id="depto" v-model="formDepartamento" type="text" class="input" />
               </div>
             </div>

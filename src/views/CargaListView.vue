@@ -31,6 +31,7 @@ import CatalogDetailDrawer from '@/components/catalog/CatalogDetailDrawer.vue'
 import { dashboardService, type ProcessLog } from '@/services/dashboard'
 import { catalogoService, type CatalogoBase } from '@/services/catalogo'
 import type { CatalogoItem, CatalogoKpis, CatalogoSortOption, ViewMode } from '@/types/catalogo'
+import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
 import {
   QUARANTINE_TOOLTIP,
   isBaseDisponivel,
@@ -48,14 +49,19 @@ import {
 
 const router = useRouter()
 
-// Modo de visualização (Grade de Cards ou Tabela Detalhada) - Tarefa 1
-const viewMode = ref<ViewMode>('grid')
+// Recuperação de preferências de UI e filtros persistidos
+const initialViewMode = uiPreferencesStorage.getCatalogViewMode('grid')
+const initialPageSize = uiPreferencesStorage.getCatalogPageSize(12)
+const savedFilters = uiPreferencesStorage.getCatalogFilters()
 
-// Categoria selecionada na aba rápida (padrão: Concluídas / Vigentes)
-const selectedCategory = ref<ProcessCategory>('CONCLUIDAS')
+// Modo de visualização (Grade de Cards ou Tabela Detalhada) - Tarefa 1
+const viewMode = ref<ViewMode>(initialViewMode)
+
+// Categoria selecionada na aba rápida (padrão: Disponíveis)
+const selectedCategory = ref<ProcessCategory>((savedFilters?.selectedCategory as ProcessCategory) || 'CONCLUIDAS')
 
 // Filtro rápido: "Mostrar apenas prontas para consulta" - Tarefa 4 (ativo por padrão)
-const showOnlyProntas = ref(true)
+const showOnlyProntas = ref(savedFilters?.showOnlyProntas ?? true)
 
 // Sincronização entre toggle de prontas e abas rápidas
 watch(showOnlyProntas, (val) => {
@@ -80,25 +86,59 @@ watch(selectedCategory, (cat) => {
 
 // Filtros de formulário tradicionais
 const filters = ref<StandardFilters>({
-  dateBeggin: '',
-  dateEnd: '',
-  conjunto: '',
-  etapa: '',
-  situacao: '',
+  dateBeggin: savedFilters?.standardFilters?.dateBeggin || '',
+  dateEnd: savedFilters?.standardFilters?.dateEnd || '',
+  conjunto: savedFilters?.standardFilters?.conjunto || '',
+  etapa: savedFilters?.standardFilters?.etapa || '',
+  situacao: savedFilters?.standardFilters?.situacao || '',
 })
 
 // Busca textual rápida e filtros específicos de safra/órgão/classificação/cobertura/status
-const searchQuery = ref('')
-const selectedSource = ref('')
-const selectedYear = ref('')
-const selectedAccess = ref('')
-const selectedCoverage = ref('')
-const selectedStatus = ref('')
+const searchQuery = ref(savedFilters?.searchQuery || '')
+const selectedSource = ref(savedFilters?.selectedSource || '')
+const selectedYear = ref(savedFilters?.selectedYear || '')
+const selectedAccess = ref(savedFilters?.selectedAccess || '')
+const selectedCoverage = ref(savedFilters?.selectedCoverage || '')
+const selectedStatus = ref(savedFilters?.selectedStatus || '')
 
 // Ordenação dinâmica e paginação configurável - Tarefa 5
-const sortBy = ref<CatalogoSortOption>('data_desc')
-const pageSize = ref<number>(12)
-const clientCurrentPage = ref<number>(0)
+const sortBy = ref<CatalogoSortOption>((savedFilters?.sortBy as CatalogoSortOption) || 'data_desc')
+const pageSize = ref<number>(initialPageSize)
+const clientCurrentPage = ref<number>(savedFilters?.clientCurrentPage || 0)
+
+watch(viewMode, (mode) => {
+  uiPreferencesStorage.setCatalogViewMode(mode)
+})
+
+watch(pageSize, (size) => {
+  uiPreferencesStorage.setCatalogPageSize(size)
+})
+
+watch(
+  [selectedCategory, showOnlyProntas, searchQuery, selectedSource, selectedYear, selectedAccess, selectedCoverage, selectedStatus, sortBy, clientCurrentPage, filters],
+  () => {
+    uiPreferencesStorage.setCatalogFilters({
+      selectedCategory: selectedCategory.value,
+      showOnlyProntas: showOnlyProntas.value,
+      searchQuery: searchQuery.value,
+      selectedSource: selectedSource.value,
+      selectedYear: selectedYear.value,
+      selectedAccess: selectedAccess.value,
+      selectedCoverage: selectedCoverage.value,
+      selectedStatus: selectedStatus.value,
+      sortBy: sortBy.value,
+      clientCurrentPage: clientCurrentPage.value,
+      standardFilters: {
+        dateBeggin: filters.value.dateBeggin,
+        dateEnd: filters.value.dateEnd,
+        conjunto: filters.value.conjunto,
+        etapa: filters.value.etapa,
+        situacao: filters.value.situacao,
+      },
+    })
+  },
+  { deep: true },
+)
 
 // Dados e paginação do servidor
 const processos = ref<ProcessLog[]>([])
@@ -699,7 +739,7 @@ const closeDrawer = () => {
         <div class="selectors-row">
           <!-- Órgão de Origem -->
           <div class="filter-field">
-            <label for="filter-source">Órgão de Origem:</label>
+            <label for="filter-source">Órgão de Origem</label>
             <select
               id="filter-source"
               v-model="selectedSource"
@@ -715,7 +755,7 @@ const closeDrawer = () => {
 
           <!-- Ano da Safra -->
           <div class="filter-field">
-            <label for="filter-year">Ano da Safra:</label>
+            <label for="filter-year">Ano da Safra</label>
             <select
               id="filter-year"
               v-model="selectedYear"
@@ -731,14 +771,14 @@ const closeDrawer = () => {
 
           <!-- Classificação de Acesso -->
           <div class="filter-field">
-            <label for="filter-access">Acesso:</label>
+            <label for="filter-access">Acesso</label>
             <select
               id="filter-access"
               v-model="selectedAccess"
               data-testid="filter-access"
               class="filter-select"
             >
-              <option value="">Todas as classificações</option>
+              <option value="">Todos os acessos</option>
               <option value="pública">Pública</option>
               <option value="restrita">Restrita</option>
             </select>
@@ -746,7 +786,7 @@ const closeDrawer = () => {
 
           <!-- Cobertura Espacial/Temporal -->
           <div class="filter-field">
-            <label for="filter-coverage">Cobertura:</label>
+            <label for="filter-coverage">Cobertura</label>
             <select
               id="filter-coverage"
               v-model="selectedCoverage"
@@ -762,7 +802,7 @@ const closeDrawer = () => {
 
           <!-- Status Operacional -->
           <div class="filter-field">
-            <label for="filter-status">Situação:</label>
+            <label for="filter-status">Situação</label>
             <select
               id="filter-status"
               v-model="selectedStatus"
@@ -779,39 +819,50 @@ const closeDrawer = () => {
           </div>
         </div>
 
-        <!-- Barra de Configurações de Exibição (Ordenação e Itens por Página) - Tarefa 5 -->
-        <div class="controls-bar">
-          <div class="sort-wrapper">
-            <label for="sort-select">Ordenar por:</label>
-            <select id="sort-select" v-model="sortBy" data-testid="sort-select" class="sort-select">
-              <option value="data_desc">Data de Publicação (Mais recentes)</option>
-              <option value="data_asc">Data de Publicação (Mais antigas)</option>
-              <option value="safra_desc">Ano da Safra (Decrescente)</option>
-              <option value="safra_asc">Ano da Safra (Crescente)</option>
-              <option value="nome_asc">Nome do Conjunto (A &rarr; Z)</option>
-              <option value="nome_desc">Nome do Conjunto (Z &rarr; A)</option>
-              <option value="registros_desc">Quantidade de Registros</option>
-            </select>
-          </div>
-
-          <div class="page-size-wrapper">
-            <label for="page-size-select">Itens por página:</label>
-            <select
-              id="page-size-select"
-              v-model="pageSize"
-              data-testid="page-size-select"
-              class="sort-select"
-              @change="clientCurrentPage = 0"
-            >
-              <option :value="10">10 por página</option>
-              <option :value="12">12 por página</option>
-              <option :value="25">25 por página</option>
-              <option :value="50">50 por página</option>
-            </select>
-          </div>
-        </div>
+        <!-- Divisor sutil entre filtros de catálogo e filtros avançados de processo -->
+        <div class="extra-filters-divider"></div>
       </template>
     </ProcessFilterBar>
+
+    <!-- Barra de Configurações de Exibição (Ordenação e Itens por Página) - Tarefa 5 -->
+    <div class="controls-bar" data-testid="controls-bar">
+      <div class="controls-left">
+        <span class="results-badge" data-testid="results-count-badge">
+          {{ sortedAndEnrichedItems.length }} {{ sortedAndEnrichedItems.length === 1 ? 'base encontrada' : 'bases encontradas' }}
+        </span>
+      </div>
+
+      <div class="controls-right">
+        <div class="sort-wrapper">
+          <label for="sort-select">Ordenar por:</label>
+          <select id="sort-select" v-model="sortBy" data-testid="sort-select" class="sort-select">
+            <option value="data_desc">Data de Publicação (Mais recentes)</option>
+            <option value="data_asc">Data de Publicação (Mais antigas)</option>
+            <option value="safra_desc">Ano da Safra (Decrescente)</option>
+            <option value="safra_asc">Ano da Safra (Crescente)</option>
+            <option value="nome_asc">Nome do Conjunto (A &rarr; Z)</option>
+            <option value="nome_desc">Nome do Conjunto (Z &rarr; A)</option>
+            <option value="registros_desc">Quantidade de Registros</option>
+          </select>
+        </div>
+
+        <div class="page-size-wrapper">
+          <label for="page-size-select">Itens por página:</label>
+          <select
+            id="page-size-select"
+            v-model="pageSize"
+            data-testid="page-size-select"
+            class="sort-select"
+            @change="clientCurrentPage = 0"
+          >
+            <option :value="10">10 por página</option>
+            <option :value="12">12 por página</option>
+            <option :value="25">25 por página</option>
+            <option :value="50">50 por página</option>
+          </select>
+        </div>
+      </div>
+    </div>
 
     <!-- Estado de Carregamento com Skeletons - Tarefa 9 -->
     <div v-if="isLoading" class="mt-4" role="status" data-testid="loading-state">
@@ -1297,14 +1348,20 @@ const closeDrawer = () => {
 /* Seletores Combinados */
 .selectors-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  padding: 4px 14px 12px;
+  padding: 6px 14px 12px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .selectors-row {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .selectors-row {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1312,10 +1369,11 @@ const closeDrawer = () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--color-surface, #1e293b);
+  background: var(--vis-c-dark, #0f172a);
   border: 1px solid var(--color-border, #334155);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
+  min-width: 0;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
@@ -1343,6 +1401,7 @@ const closeDrawer = () => {
   outline: none;
   cursor: pointer;
   padding: 2px 0;
+  text-overflow: ellipsis;
 }
 
 .filter-select option {
@@ -1350,15 +1409,42 @@ const closeDrawer = () => {
   color: #f8fafc;
 }
 
+.extra-filters-divider {
+  border-bottom: 1px solid var(--color-border, #334155);
+  margin: 0 14px 4px;
+}
+
 .controls-bar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 10px 14px 12px;
+  padding: 10px 4px 6px;
   flex-wrap: wrap;
-  border-top: 1px solid var(--color-border, #334155);
-  margin-top: 4px;
+  margin-top: 10px;
+}
+
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.results-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-muted, #94a3b8);
+  background: var(--color-surface, #1e293b);
+  border: 1px solid var(--color-border, #334155);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .sort-wrapper,

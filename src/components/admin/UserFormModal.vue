@@ -264,10 +264,10 @@ const onSodConfirm = (justification: string) => {
 
           <!-- Grid: Cargo/Perfil e Departamento -->
           <div class="form-row">
-            <!-- Cargo / Perfil -->
+            <!-- Cargo -->
             <div class="form-group flex-1">
               <label for="form-role" class="label">
-                Cargo / Perfil Atribuído: <span class="required">*</span>
+                Cargo Atribuído: <span class="required">*</span>
               </label>
               <div class="input-wrap">
                 <FiShield class="field-icon" size="16" />

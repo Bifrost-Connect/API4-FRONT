@@ -17,7 +17,7 @@ export const UPLOAD_FORMATO_CONFIG_MAP: Record<string, FormatoConfig> = {
   GeoJSON: {
     extensions: ['.geojson', '.json'],
     label: 'GeoJSON (.geojson, .json)',
-    tag: '.geojson / .json',
+    tag: '.geojson, .json',
   },
   'Shapefile (ZIP)': {
     extensions: ['.zip'],
@@ -37,7 +37,7 @@ export const UPLOAD_FORMATO_CONFIG_MAP: Record<string, FormatoConfig> = {
   KML: {
     extensions: ['.kml', '.kmz'],
     label: 'Keyhole Markup Language (.kml, .kmz)',
-    tag: '.kml / .kmz',
+    tag: '.kml, .kmz',
   },
 }
 

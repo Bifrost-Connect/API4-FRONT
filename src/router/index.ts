@@ -11,6 +11,7 @@ import ProfileView from '../views/ProfileView.vue'
 import UserView from '../views/UserView.vue'
 import ForbiddenView from '../views/ForbiddenView.vue'
 import { userService } from '@/services/user'
+import { authStorage } from '@/services/storage/authStorage'
 
 /**
  * Definição centralizada de rotas com controle de acesso RBAC por permissão (Tarefa 6 e 7).
@@ -22,7 +23,12 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
-      meta: { permission: 'INGESTAO:VISUALIZAR_PROCESSAMENTO' },
+      meta: {
+        permission: [
+          'INGESTAO:VISUALIZAR_PROCESSAMENTO',
+          'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+        ],
+      },
     },
     {
       path: '/analise-territorial',
@@ -103,9 +109,21 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  const hasAccess = Array.isArray(reqPerm)
-    ? userService.canAny(reqPerm)
-    : userService.can(reqPerm)
+  // Verifica se a sessão está explicitamente expirada
+  const session = authStorage.getSession()
+  if (
+    to.name !== 'login' &&
+    authStorage.isSessionExpired(session) &&
+    authStorage.getAccessToken()
+  ) {
+    authStorage.clearSession()
+    return next({
+      name: 'login',
+      query: { redirect: to.fullPath },
+    })
+  }
+
+  const hasAccess = Array.isArray(reqPerm) ? userService.canAny(reqPerm) : userService.can(reqPerm)
 
   if (hasAccess) {
     return next()

@@ -14,13 +14,10 @@ import ProcessFilterBar, {
   type FilterOptionsData,
 } from '../components/ProcessFilterBar.vue'
 import Stepper from '../components/Stepper.vue'
-import {
-  dashboardService,
-  type DashboardSummary,
-  type ProcessLog,
-} from '../services/dashboard'
+import { dashboardService, type DashboardSummary, type ProcessLog } from '../services/dashboard'
 import { processService } from '../services/process'
 import { userService } from '../services/user'
+import { userUploadsStorage } from '../services/storage/userUploadsStorage'
 import {
   PROCESS_STEPS,
   type ProcessCategory,
@@ -48,6 +45,52 @@ const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
 const canAssignSpecialist = computed(
   () => !userService.can('AUDITORIA:RASTREAR_ORIGEM') || userService.can('QUARENTENA:CORRIGIR'),
 )
+// Permissão para auditar carga e rastrear linhagem (Auditor e Gestor)
+const canAuditProcess = computed(() =>
+  userService.canAny([
+    'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+    'AUDITORIA:RASTREAR_ORIGEM',
+    'BASES:HOMOLOGAR',
+  ]),
+)
+// Permissão para homologar e aprovar o processo (Gestor e Administrador)
+const canApproveProcess = computed(
+  () => userService.can('BASES:HOMOLOGAR') || userService.isAdmin(),
+)
+// Identifica se o usuário é estritamente operador de dados
+const isOperadorOnly = computed(
+  () =>
+    userService.can('INGESTAO:UPLOAD') &&
+    !userService.can('AUDITORIA:VISUALIZAR_PROCESSAMENTOS') &&
+    !userService.can('BASES:HOMOLOGAR'),
+)
+
+/**
+ * Escopo de visualização: Operador comum visualiza apenas as cargas que ele mesmo submeteu.
+ */
+const isProcessUploadedByUser = (item: ProcessLog): boolean => {
+  if (!isOperadorOnly.value) return true
+  const cur = userService.getCurrentUser()
+
+  if ((item as any).operadorId !== undefined && cur.id !== undefined) {
+    return Number((item as any).operadorId) === Number(cur.id)
+  }
+  if ((item as any).operadorEmail && cur.email) {
+    return (item as any).operadorEmail === cur.email
+  }
+  if ((item as any).uploadedBy && cur.name) {
+    return (item as any).uploadedBy === cur.name
+  }
+  if (userUploadsStorage.hasUpload(item.id, cur)) {
+    return true
+  }
+
+  // Fallback quando a API remota/mock não enviar metadados de operador_id
+  const hasExplicitOwner = recentProcesses.value.some(
+    (p: any) => p.operadorId !== undefined || p.operadorEmail || p.uploadedBy,
+  )
+  return !hasExplicitOwner
+}
 
 // Estados dos dados do dashboard
 const summaryData = ref<DashboardSummary[]>([])
@@ -98,6 +141,9 @@ const tableColumns: Column[] = [
  */
 const displayedProcesses = computed(() => {
   return recentProcesses.value.filter((item) => {
+    if (!isProcessUploadedByUser(item)) {
+      return false
+    }
     if (!matchesCategory(item, selectedCategory.value)) {
       return false
     }
@@ -122,19 +168,22 @@ const displayedSummary = computed<DashboardSummary[]>(() => {
     },
     {
       title: 'Cargas Concluídas',
-      value: recentProcesses.value.filter((p) => (p.status || '').toLowerCase().includes('conclu')).length,
+      value: recentProcesses.value.filter((p) => (p.status || '').toLowerCase().includes('conclu'))
+        .length,
       type: 'success',
       iconType: 'check',
     },
     {
-      title: 'Inconsistências / Falhas',
+      title: 'Inconsistências',
       value: recentProcesses.value.filter(isErrorOrQuarantined).length,
       type: 'danger',
       iconType: 'error',
     },
     {
       title: 'Em Andamento',
-      value: recentProcesses.value.filter((p) => (p.status || '').toLowerCase().includes('andamento')).length,
+      value: recentProcesses.value.filter((p) =>
+        (p.status || '').toLowerCase().includes('andamento'),
+      ).length,
       type: 'warning',
       iconType: 'warning',
     },
@@ -298,8 +347,12 @@ const requestAuditor = async (item: ProcessLog) => {
         <p class="eyebrow">Monitoramento do Sistema</p>
         <h1>Dashboard Operacional</h1>
         <p class="page-description">
-          Acompanhamento em tempo real da esteira de ingestão, validação, tratamento e publicação de cargas.
+          Acompanhamento em tempo real da esteira de ingestão, validação, tratamento e publicação de
+          cargas.
         </p>
+        <div v-if="isOperadorOnly" class="operator-badge-pill" data-testid="operator-scope-badge">
+          <span>Minhas Cargas: visualizando as bases submetidas por você</span>
+        </div>
       </div>
     </header>
 
@@ -381,6 +434,7 @@ const requestAuditor = async (item: ProcessLog) => {
           <!-- Linha Expandida com Detalhes, Stepper e Ações -->
           <template #expanded-row="{ item }">
             <div class="expanded-details">
+              <h3 class="expanded-details-title">Detalhes do Processo de Carga</h3>
               <p v-if="item.source">
                 <strong>Fonte:</strong> {{ item.source }} | <strong>Ano:</strong> {{ item.year }} |
                 <strong>EPSG:</strong> {{ item.epsg }}
@@ -401,7 +455,7 @@ const requestAuditor = async (item: ProcessLog) => {
                 <span class="alert-icon">⚠️</span>
                 <div>
                   <strong>Motivo da Inconsistência:</strong>
-                  <p style="margin: 0.25rem 0 0;">{{ item.pauseReason }}</p>
+                  <p style="margin: 0.25rem 0 0">{{ item.pauseReason }}</p>
                 </div>
               </div>
 
@@ -409,12 +463,17 @@ const requestAuditor = async (item: ProcessLog) => {
               <div v-if="item.assignedEditor" class="alert alert-info mt-2">
                 <FiUserCheck size="16" style="flex-shrink: 0" />
                 <span>
-                  <strong>Especialista Designado:</strong> {{ item.assignedEditor }} (atuando na correção)
+                  <strong>Especialista Designado:</strong> {{ item.assignedEditor }} (atuando na
+                  correção)
                 </span>
               </div>
 
               <!-- Logs do Sistema -->
-              <section v-if="getProcessLogs(item).length" class="system-log mt-3" aria-label="Log do sistema">
+              <section
+                v-if="getProcessLogs(item).length"
+                class="system-log mt-3"
+                aria-label="Log do sistema"
+              >
                 <h3>Logs e Trilha de Execução</h3>
                 <ul>
                   <li v-for="(entry, index) in getProcessLogs(item)" :key="index">{{ entry }}</li>
@@ -424,11 +483,22 @@ const requestAuditor = async (item: ProcessLog) => {
               <!-- Ações da Linha Expandida -->
               <div class="expanded-actions mt-3">
                 <button
+                  v-if="canAuditProcess"
                   type="button"
                   class="btn btn_outline btn_action_audit"
                   @click="goToLog(item.id)"
                 >
-                  AUDITAR CARGA / VER LINHAGEM
+                  AUDITAR CARGA
+                </button>
+
+                <button
+                  v-if="canApproveProcess"
+                  type="button"
+                  class="btn btn_action_approve"
+                  @click="goToLog(item.id)"
+                >
+                  <FiCheckCircle size="14" />
+                  HOMOLOGAR PROCESSO
                 </button>
 
                 <button
@@ -442,7 +512,10 @@ const requestAuditor = async (item: ProcessLog) => {
                 </button>
 
                 <button
-                  v-if="item.quarantined || (item.status && item.status.toLowerCase().includes('quarentena'))"
+                  v-if="
+                    item.quarantined ||
+                    (item.status && item.status.toLowerCase().includes('quarentena'))
+                  "
                   class="btn btn_action_notify"
                   type="button"
                   :disabled="auditorStatus[item.id] === 'loading' || item.auditorRequested"
@@ -482,7 +555,8 @@ const requestAuditor = async (item: ProcessLog) => {
             <p>
               A carga <strong>{{ selectedProcessForEditor.id }}</strong> ({{
                 selectedProcessForEditor.dataset
-              }}) apresentou inconsistência na etapa de <strong>{{ selectedProcessForEditor.stage }}</strong
+              }}) apresentou inconsistência na etapa de
+              <strong>{{ selectedProcessForEditor.stage }}</strong
               >.
             </p>
             <div v-if="selectedProcessForEditor.pauseReason" class="alert alert-warning mb-3">
@@ -520,9 +594,7 @@ const requestAuditor = async (item: ProcessLog) => {
 
       <!-- Atalho de Upload de Carga -->
       <div v-if="canUpload" class="bottom-action">
-        <RouterLink to="/upload" class="btn-upload">
-          + NOVA CARGA DE DADOS (Upload)
-        </RouterLink>
+        <RouterLink to="/upload" class="btn-upload"> + NOVA CARGA DE DADOS (Upload) </RouterLink>
       </div>
     </template>
   </main>
@@ -619,11 +691,31 @@ const requestAuditor = async (item: ProcessLog) => {
   text-transform: uppercase;
 }
 
-.badge_success { background: var(--badge-success-bg); color: var(--badge-success-text); border: 1px solid var(--badge-success-border); }
-.badge_info { background: var(--badge-info-bg); color: var(--badge-info-text); border: 1px solid var(--badge-info-border); }
-.badge_warning { background: var(--badge-warning-bg); color: var(--badge-warning-text); border: 1px solid var(--badge-warning-border); }
-.badge_danger { background: var(--badge-danger-bg); color: var(--badge-danger-text); border: 1px solid var(--badge-danger-border); }
-.badge_primary { background: var(--badge-neutral-bg); color: var(--badge-neutral-text); border: 1px solid var(--badge-neutral-border); }
+.badge_success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+}
+.badge_info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+.badge_warning {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
+}
+.badge_danger {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
+}
+.badge_primary {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
+}
 
 .badge-editor-assigned {
   background: var(--badge-editor-bg);
@@ -697,6 +789,49 @@ const requestAuditor = async (item: ProcessLog) => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.operator-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 20px;
+  background: var(--color-surface, #f8f9fa);
+  color: var(--color-text-muted, #6c757d);
+  border: 1px solid var(--color-border, #dee2e6);
+}
+
+.expanded-details-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.btn_action_approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-success, #28a745);
+  color: #fff;
+  border: 1px solid var(--color-success, #28a745);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn_action_approve:hover {
+  filter: brightness(1.1);
 }
 
 .btn_action_audit {
@@ -805,8 +940,12 @@ const requestAuditor = async (item: ProcessLog) => {
   text-align: center;
 }
 
-.text-success { color: var(--vis-c-success); }
-.text-muted { color: var(--color-text-muted); }
+.text-success {
+  color: var(--vis-c-success);
+}
+.text-muted {
+  color: var(--color-text-muted);
+}
 
 .alert-success-notification {
   display: flex;

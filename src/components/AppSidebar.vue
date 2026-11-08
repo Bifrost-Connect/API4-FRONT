@@ -4,13 +4,20 @@
  * Renderiza dinamicamente as seções conforme as permissões da sessão ativa (Tarefa 6).
  */
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { FiRotateCcw } from 'vue-icons-plus/fi'
 import { userService } from '@/services/user'
 import { getVisibleMenuItems } from '@/utils/rbac'
 
+const router = useRouter()
+
 // Lista dinâmica de navegação filtrada por permissão
 const navigationItems = computed(() => getVisibleMenuItems(userService.getCurrentUser()))
+
+const handleLogout = async () => {
+  await userService.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -43,12 +50,12 @@ const navigationItems = computed(() => getVisibleMenuItems(userService.getCurren
 
     <!-- Rodapé da Barra Lateral -->
     <div class="sidebar-footer">
-      <RouterLink to="/login" class="login-link">
+      <button type="button" class="login-link logout-btn" @click="handleLogout">
         <span class="navigation-icon" aria-hidden="true">
           <FiRotateCcw size="17" />
         </span>
         <span>Sair</span>
-      </RouterLink>
+      </button>
     </div>
   </aside>
 </template>
@@ -131,6 +138,17 @@ const navigationItems = computed(() => getVisibleMenuItems(userService.getCurren
     background-color 150ms ease,
     color 150ms ease,
     border-color 150ms ease;
+}
+
+.logout-btn {
+  background: transparent;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
 }
 
 .navigation-link:hover,

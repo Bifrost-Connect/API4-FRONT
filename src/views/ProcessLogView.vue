@@ -22,6 +22,7 @@ import {
   type ProcessVersion,
   type AuditProcessCarga,
 } from '@/services/auditoria'
+import { userService } from '@/services/user'
 
 interface Props {
   processId?: string
@@ -62,6 +63,15 @@ const toggleAuditPanel = () => {
 const closeAuditPanel = () => {
   saveAuditOpenState(false)
 }
+
+// Permissão de Auditoria: Operador comum não visualiza trilha de auditoria/linhagem lateral
+const canViewAudit = computed(() =>
+  userService.canAny([
+    'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+    'AUDITORIA:RASTREAR_ORIGEM',
+    'BASES:HOMOLOGAR',
+  ]),
+)
 
 const processId = computed(() => props.processId || (route?.params?.id as string) || '')
 const isLoading = ref(!props.detailsData)
@@ -356,7 +366,7 @@ const currentComponent = computed(() => {
 </script>
 
 <template>
-  <div class="process-log-page" :class="{ 'has-audit-open': isAuditOpen && auditVersions.length > 0 }">
+  <div class="process-log-page" :class="{ 'has-audit-open': canViewAudit && isAuditOpen && auditVersions.length > 0 }">
     <!-- Coluna Principal com a Visualização do Processo -->
     <div class="process-main-column">
       <div class="process-header">
@@ -374,7 +384,7 @@ const currentComponent = computed(() => {
           </div>
 
           <!-- Botão para alternar a exibição da Auditoria -->
-          <div v-if="auditVersions.length > 0" class="process-nav-right">
+          <div v-if="canViewAudit && auditVersions.length > 0" class="process-nav-right">
             <button
               class="btn btn_outline btn-sm audit-toggle-btn"
               :class="{ 'btn-active': isAuditOpen }"
@@ -473,7 +483,7 @@ const currentComponent = computed(() => {
     </div>
 
     <!-- Componente Auditoria (Painel lateral integrado) -->
-    <div v-if="isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
+    <div v-if="canViewAudit && isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
       <Auditoria
         :versions="auditVersions"
         :selectedVersionId="details?.id"

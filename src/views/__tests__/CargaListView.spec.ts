@@ -84,6 +84,10 @@ const basesCadastradasMock: ProcessLog[] = [
 describe('Catálogo de Bases Geoespaciais', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.clear()
+      if (typeof sessionStorage !== 'undefined') sessionStorage.clear()
+    } catch {}
     vi.spyOn(dashboardService, 'getDashboardProcesses').mockResolvedValue({
       content: [...basesCadastradasMock],
       totalElements: basesCadastradasMock.length,

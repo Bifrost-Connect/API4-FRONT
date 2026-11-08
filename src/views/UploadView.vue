@@ -10,6 +10,8 @@ import {
   type FormatoConfig,
 } from '@/services/upload'
 import { processService } from '@/services/process'
+import { userService } from '@/services/user'
+import { userUploadsStorage } from '@/services/storage/userUploadsStorage'
 import Stepper from '@/components/Stepper.vue'
 
 // Passos
@@ -233,7 +235,9 @@ const handleUpload = async () => {
     }
 
     // 2. Upload de nova carga
+    const currentUser = userService.getCurrentUser()
     const metadataPayload = {
+      operadorId: currentUser.id || 1,
       nomeCamada: nomeCamada.value,
       orgaoEmissor: orgaoEmissor.value,
       anoReferencia: anoReferencia.value,
@@ -256,8 +260,9 @@ const handleUpload = async () => {
     }
 
     if (arquivoSelecionado.value && processoId) {
-      const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
+      const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value, currentUser.id)
       uploadResult.value = response
+      userUploadsStorage.recordUpload(processoId, { id: currentUser.id, email: currentUser.email })
       currentStep.value = 3
     }
   } catch (err: any) {
@@ -332,7 +337,7 @@ const resetForm = () => {
 
       <div class="form-grid">
         <div class="form-group form-group--full">
-          <label class="label" for="upload-nome">Nome da Fonte de Dados / Camada *</label>
+          <label class="label" for="upload-nome">Nome da Camada *</label>
           <input
             id="upload-nome"
             v-model="nomeCamada"
@@ -499,11 +504,11 @@ const resetForm = () => {
                 {{ formatoConfigAtual.tag }}
               </span>
               <template v-else>
-                <span class="format-tag">.geojson / .json</span>
-                <span class="format-tag">.zip (Shapefile / CSV)</span>
+                <span class="format-tag">.geojson, .json</span>
+                <span class="format-tag">.zip (Shapefile)</span>
                 <span class="format-tag">.csv</span>
                 <span class="format-tag">.gpkg (GeoPackage)</span>
-                <span class="format-tag">.kml / .kmz</span>
+                <span class="format-tag">.kml, .kmz</span>
               </template>
             </div>
           </template>

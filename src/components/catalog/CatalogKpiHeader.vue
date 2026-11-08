@@ -28,14 +28,14 @@ withDefaults(
     <CatalogSkeleton v-if="loading" type="kpi" />
 
     <div v-else class="kpis-grid" data-testid="kpis-header">
-      <!-- Card 1: Total de Bases Carregadas -->
+      <!-- Card 1: Total de Bases -->
       <article class="kpi-card kpi-total" data-testid="kpi-total">
         <div class="kpi-icon-wrapper total-icon">
           <FiDatabase size="22" aria-hidden="true" />
         </div>
         <div class="kpi-content">
           <span class="kpi-value" data-testid="kpi-value-total">{{ kpis.totalCarregadas }}</span>
-          <span class="kpi-label">Total de Bases Carregadas</span>
+          <span class="kpi-label">Total de Bases</span>
         </div>
       </article>
 
@@ -79,22 +79,22 @@ withDefaults(
 
 <style scoped>
 .kpis-section {
-  margin: 20px 0 24px;
+  margin: 16px 0 20px;
 }
 
 .kpis-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1200px) {
   .kpis-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .kpis-grid {
     grid-template-columns: 1fr;
   }
@@ -103,14 +103,14 @@ withDefaults(
 .kpi-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 20px;
-  border-radius: 12px;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 10px;
   border: 1px solid var(--vis-c-divider-dark-2, #334155);
   background: var(--vis-c-dark-soft, #1e293b);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-  min-height: 96px;
+  min-height: 82px;
 }
 
 .kpi-card:hover {
@@ -120,9 +120,9 @@ withDefaults(
 }
 
 .kpi-icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;

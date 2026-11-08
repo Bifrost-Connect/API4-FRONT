@@ -300,7 +300,7 @@ const goToMap = () => {
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Parâmetro / Algoritmo</th>
+                  <th>Parâmetro</th>
                   <th>Resultado</th>
                   <th>Referência (Lei)</th>
                   <th>Status</th>
@@ -592,7 +592,7 @@ const goToMap = () => {
 
           <div class="publish-meta-box">
             <div class="meta-row">
-              <span class="meta-label">Carga / Processo:</span>
+              <span class="meta-label">Processo:</span>
               <strong>{{ details.id }}</strong>
             </div>
             <div class="meta-row">

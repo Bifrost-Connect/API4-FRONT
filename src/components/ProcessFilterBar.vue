@@ -97,7 +97,7 @@ const onApply = () => {
         data-testid="tab-concluidas"
         @click="setCategory('CONCLUIDAS')"
       >
-        Concluídas ({{ countConcluidas }})
+        Disponíveis ({{ countConcluidas }})
       </button>
 
       <button
@@ -311,16 +311,18 @@ const onApply = () => {
 
 /* Container de filtros */
 .card-filters {
-  background: var(--color-surface);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+  background: var(--color-surface, #1e293b);
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #334155);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .filters-container {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.75rem;
-  padding: 0.75rem;
+  gap: 10px;
+  padding: 12px 14px;
 }
 
 @media (min-width: 768px) {
@@ -339,32 +341,41 @@ const onApply = () => {
 .filter-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
-  background: var(--color-background);
+  gap: 8px;
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: var(--vis-c-dark, #0f172a);
   min-width: 0;
+  transition: border-color 150ms ease;
+}
+
+.filter-item:hover,
+.filter-item:focus-within {
+  border-color: var(--vis-brand-orange, #f26522);
 }
 
 .filter-item label {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   white-space: nowrap;
-  color: var(--color-heading);
+  color: var(--color-text-muted, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .filter-dates {
   flex-direction: column;
   align-items: stretch;
-  gap: 0.25rem;
+  gap: 4px;
+  padding: 4px 10px;
 }
 
 .date-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 8px;
 }
 
 .input-inline {
@@ -373,10 +384,16 @@ const onApply = () => {
   border: none;
   background: transparent;
   outline: none;
-  color: var(--color-text);
-  font-size: 0.8rem;
-  padding: 0;
+  color: var(--color-heading, #f8fafc);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 0;
   cursor: pointer;
+}
+
+.input-inline option {
+  background: var(--vis-c-dark, #0f172a);
+  color: #f8fafc;
 }
 
 .filter-actions {
@@ -387,20 +404,23 @@ const onApply = () => {
 
 .btn-filter {
   height: 100%;
+  min-height: 40px;
   border: 1px solid var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
-  background: transparent;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--vis-brand-orange, #f26522);
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
   padding: 0.5rem 1.4rem;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-filter:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: #ea580c;
+  border-color: #ea580c;
+  box-shadow: 0 4px 12px rgba(242, 101, 34, 0.25);
 }
 </style>
 

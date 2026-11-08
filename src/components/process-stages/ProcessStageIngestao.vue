@@ -116,7 +116,7 @@ const lineageTree = computed(() => {
       status: pubStatus.includes('Vigente') ? 'ok' : 'neutral',
     },
     {
-      step: '2. Resultado do Tratamento / Cálculo',
+      step: '2. Resultado do Tratamento',
       detail: treatStatus,
       status: treatErrors > 0 ? 'error' : hasEpsgDivergence.value ? 'warning' : 'ok',
     },
@@ -236,7 +236,7 @@ const lineageTree = computed(() => {
       <!-- Grid de Metadados Ricos (Tarefa 4) -->
       <div class="form-grid">
         <div class="form-group form-group--full">
-          <label>Nome da Fonte de Dados / Camada</label>
+          <label>Nome da Camada</label>
           <input
             v-if="isEditing && !readOnly"
             type="text"
@@ -258,7 +258,7 @@ const lineageTree = computed(() => {
         </div>
 
         <div class="form-group">
-          <label>Fonte / Órgão Emissor</label>
+          <label>Órgão Emissor</label>
           <input
             v-if="isEditing && !readOnly"
             type="text"
@@ -269,7 +269,7 @@ const lineageTree = computed(() => {
         </div>
 
         <div class="form-group">
-          <label>Ano Base / Competência</label>
+          <label>Ano da Safra</label>
           <input
             v-if="isEditing && !readOnly"
             type="text"
@@ -280,7 +280,7 @@ const lineageTree = computed(() => {
         </div>
 
         <div class="form-group">
-          <label>Data / Hora da Ingestão</label>
+          <label>Data e Hora da Ingestão</label>
           <p class="form-value">{{ traceability?.dataCarga || details.dateTime || '—' }}</p>
         </div>
 
@@ -300,14 +300,14 @@ const lineageTree = computed(() => {
         </div>
 
         <div class="form-group">
-          <label>Formato / Classificação de Acesso</label>
+          <label>Formato e Classificação de Acesso</label>
           <p class="form-value" data-testid="meta-formato">
             {{ details.formato || '—' }} • {{ details.classificacaoAcesso || '—' }}
           </p>
         </div>
 
         <div class="form-group form-group--full">
-          <label>Cobertura Espacial / Temporal</label>
+          <label>Cobertura Espacial e Temporal</label>
           <p class="form-value" data-testid="meta-cobertura">
             {{ details.coberturaEspacial || '—' }}
             <template v-if="details.coberturaTemporalInicio || details.coberturaTemporalFim">

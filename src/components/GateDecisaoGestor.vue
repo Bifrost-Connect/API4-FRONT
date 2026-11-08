@@ -336,7 +336,7 @@ const handleConfirmarRejeicao = async () => {
               Ao rejeitar esta etapa, a carga será enviada imediatamente para a <strong>Quarentena</strong> para atuação de um auditor.
             </p>
             <div class="form-group">
-              <label for="parecer-txt"><strong>Parecer Técnico / Justificativa *</strong></label>
+              <label for="parecer-txt"><strong>Parecer Técnico *</strong></label>
               <textarea
                 id="parecer-txt"
                 v-model="parecerRejeicao"

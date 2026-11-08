@@ -78,7 +78,7 @@ const filteredEvents = computed(() => {
         <table class="audit-table" data-testid="security-audit-table">
           <thead>
             <tr>
-              <th class="th-time">Data / Hora</th>
+              <th class="th-time">Data e Hora</th>
               <th class="th-actor">Responsável (Ator)</th>
               <th class="th-action">Ação Administrativa</th>
               <th class="th-details">Detalhes &amp; Justificativa</th>

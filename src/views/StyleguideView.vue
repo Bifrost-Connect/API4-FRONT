@@ -160,7 +160,7 @@
     </section>
 
     <section>
-      <h2>4. Badges (Tags / Status)</h2>
+      <h2>4. Badges de Status</h2>
       <p class="section-desc">
         Pequenos indicadores usando a classe <code>.badge</code> combinada com modificadores de cor.
       </p>

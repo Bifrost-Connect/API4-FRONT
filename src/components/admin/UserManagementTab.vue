@@ -34,8 +34,8 @@ const emit = defineEmits<{
 
 // Colunas da tabela
 const columns: Column[] = [
-  { key: 'name', label: 'Nome / Usuário' },
-  { key: 'role', label: 'Cargo / Perfil' },
+  { key: 'name', label: 'Nome' },
+  { key: 'role', label: 'Cargo' },
   { key: 'department', label: 'Departamento' },
   { key: 'sod', label: 'Exceção SoD' },
   { key: 'status', label: 'Status' },
