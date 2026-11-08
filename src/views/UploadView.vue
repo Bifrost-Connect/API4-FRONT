@@ -605,7 +605,7 @@ const resetForm = () => {
               >
                 {{
                   processamentoStatus?.quarentena
-                    ? 'Em Quarentena / Análise'
+                    ? 'Em Quarentena'
                     : processamentoStatus?.situacaoAtualId === 3
                     ? 'Com Ressalva de EPSG'
                     : processamentoStatus

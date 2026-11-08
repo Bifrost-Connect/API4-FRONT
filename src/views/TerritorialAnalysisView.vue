@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -9,6 +10,7 @@ import {
   type SpatialAnalysisResult,
 } from '../services/spatialAnalysis'
 
+const route = useRoute()
 const documents = ref<SpatialAnalysisDocument[]>([])
 const selectedCarId = ref('')
 const selectedRestrictionIds = ref<string[]>([])
@@ -482,7 +484,12 @@ onMounted(async () => {
   initializeMap()
   try {
     documents.value = await spatialAnalysisService.listDocuments()
-    selectedCarId.value = carDocuments.value[0]?.id ?? ''
+    const targetBaseId = route.query.baseId ? String(route.query.baseId) : ''
+    const targetSafra = route.query.safra ? String(route.query.safra) : ''
+    const matchingDoc = targetBaseId
+      ? carDocuments.value.find((d) => String(d.id) === targetBaseId)
+      : (targetSafra ? carDocuments.value.find((d) => String(d.year) === targetSafra) : null)
+    selectedCarId.value = matchingDoc?.id ?? carDocuments.value[0]?.id ?? ''
     selectedRestrictionIds.value = restrictionDocuments.value
       .filter((document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year)
       .slice(0, 3)
