@@ -3,7 +3,8 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { mapService } from '../services/map'
+import { mapService, DEFAULT_MAP_PALETTE } from '../services/map'
+import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
 
 interface MapLocation {
   id: string
@@ -32,6 +33,8 @@ const searchTerm = ref('')
 const selectedLocation = ref<MapLocation | null>(null)
 const selectedCoordinates = ref({ latitude: -15.78, longitude: -47.93 })
 const mapError = ref('')
+const isFromCache = ref(false)
+const isRefreshingCache = ref(false)
 
 const locations = ref<MapLocation[]>([])
 
@@ -49,18 +52,7 @@ interface BaseLayerItem {
 
 const baseLayers = ref<BaseLayerItem[]>([])
 
-const DEFAULT_PALETTE = [
-  '#10b981', // Verde Esmeralda
-  '#3b82f6', // Azul Royal
-  '#8b5cf6', // Roxo Violeta
-  '#f59e0b', // Âmbar / Laranja
-  '#ec4899', // Rosa
-  '#06b6d4', // Ciano
-  '#ef4444', // Vermelho
-  '#14b8a6', // Verde Água
-  '#84cc16', // Lima
-  '#6366f1', // Índigo
-]
+const DEFAULT_PALETTE = DEFAULT_MAP_PALETTE
 
 let map: L.Map | null = null
 let markers: L.LayerGroup | null = null
@@ -302,7 +294,7 @@ const limparFiltroProcesso = async () => {
   }
 }
 
-const carregarCamadasElocais = async () => {
+const carregarCamadasElocais = async (forceRefresh = false) => {
   const rawLocations = await mapService.getPublishedLocations()
   locations.value = Array.isArray(rawLocations)
     ? rawLocations.map((loc: any) => ({
@@ -329,8 +321,16 @@ const carregarCamadasElocais = async () => {
     if (requestedYear) initialFilters.anoSafra = requestedYear
   }
 
-  const fetchedTerritories = await mapService.getTerritories(initialFilters)
-  buildBaseLayersFromGeoJson(fetchedTerritories)
+  isRefreshingCache.value = true
+  try {
+    const fetchedTerritories = await mapService.getTerritories(initialFilters, { forceRefresh })
+    isFromCache.value = Boolean((fetchedTerritories as any).fromCache)
+    buildBaseLayersFromGeoJson(fetchedTerritories)
+  } catch (err) {
+    console.warn('Falha ao carregar camadas do mapa:', err)
+  } finally {
+    isRefreshingCache.value = false
+  }
 
   if (markers && map) {
     markers.clearLayers()
@@ -359,6 +359,10 @@ const carregarCamadasElocais = async () => {
   }
 }
 
+const forcarAtualizacaoCache = async () => {
+  await carregarCamadasElocais(true)
+}
+
 onMounted(async () => {
   const scrollContainer = document.querySelector('.content-scroll-container')
   if (scrollContainer) {
@@ -367,8 +371,23 @@ onMounted(async () => {
 
   if (!mapElement.value) return
 
-  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
+  const savedCamera = uiPreferencesStorage.getMapCamera()
+  const initialLat = savedCamera?.lat ?? -15.78
+  const initialLng = savedCamera?.lng ?? -47.93
+  const initialZoom = savedCamera?.zoom ?? 4
+
+  map = L.map(mapElement.value, { zoomControl: false }).setView([initialLat, initialLng], initialZoom)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+  map.on('moveend', () => {
+    if (!map) return
+    const center = map.getCenter()
+    uiPreferencesStorage.setMapCamera({
+      lat: Number(center.lat.toFixed(4)),
+      lng: Number(center.lng.toFixed(4)),
+      zoom: map.getZoom(),
+    })
+  })
 
   const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -440,6 +459,25 @@ onBeforeUnmount(() => {
     <div v-if="route.query?.processoId || route.query?.id" class="filter-badge-banner" role="status">
       <span>Exibindo delimitações da <strong>Carga #{{ route.query?.processoId || route.query?.id }}</strong></span>
       <button type="button" class="btn-clear-filter" @click="limparFiltroProcesso">Ver todas as cargas</button>
+    </div>
+
+    <!-- Indicador de Cache e Ação de Atualização -->
+    <div class="cache-status-bar">
+      <span v-if="isFromCache" class="cache-badge cache-hit" title="Camadas carregadas instantaneamente do IndexedDB local">
+        ⚡ Carregado do cache local
+      </span>
+      <span v-else class="cache-badge cache-miss" title="Camadas sincronizadas diretamente da API REST">
+        🌐 Sincronizado da API
+      </span>
+      <button
+        type="button"
+        class="btn-refresh-cache"
+        :disabled="isRefreshingCache"
+        @click="forcarAtualizacaoCache"
+        title="Limpar cache e buscar feições atualizadas da API"
+      >
+        {{ isRefreshingCache ? 'Atualizando...' : '🔄 Atualizar camadas (limpar cache)' }}
+      </button>
     </div>
 
     <section class="map-toolbar" aria-label="Ferramentas do mapa">
@@ -982,5 +1020,55 @@ h2 {
   .location-list {
     grid-template-columns: 1fr;
   }
+}
+
+.cache-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cache-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.cache-badge.cache-hit {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.cache-badge.cache-miss {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.btn-refresh-cache {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-refresh-cache:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.btn-refresh-cache:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

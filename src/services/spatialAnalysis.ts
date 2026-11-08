@@ -4,6 +4,7 @@
  */
 import api from './api'
 import { catalogoService } from './catalogo'
+import { geojsonCache } from './storage/geojsonCache'
 
 export type SpatialLayerCategory = 'CAR' | 'ALERTA' | 'APP' | 'RESERVA_LEGAL' | 'TERRA_INDIGENA'
 
@@ -129,15 +130,28 @@ export const spatialAnalysisService = {
 
   /**
    * Obtém as geometrias em GeoJSON da camada/documento selecionado.
-   * Consulta arquivos locais ou a API /mapa/camadas (filtrada por BBox).
+   * Consulta arquivos locais, cache IndexedDB ou a API /mapa/camadas (filtrada por BBox).
    */
   async getDocumentGeoJSON(
     documentId: string,
     bbox?: string,
+    options?: { forceRefresh?: boolean },
   ): Promise<GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>>> {
     if (documentId.startsWith('local-')) {
       const localGeometry = this.localDocuments.get(documentId)
       if (localGeometry) return localGeometry
+    }
+
+    if (!options?.forceRefresh) {
+      try {
+        const cached = await geojsonCache.get({
+          baseId: `doc_${documentId}`,
+          bbox,
+        })
+        if (cached?.geojsonData && cached.geojsonData.type === 'FeatureCollection' && cached.geojsonData.features?.length > 0) {
+          return cached.geojsonData
+        }
+      } catch {}
     }
 
     // Se for ID numérico (base do catálogo), busca da API real /mapa/camadas
@@ -150,6 +164,16 @@ export const spatialAnalysisService = {
           },
         })
         if (response.data && response.data.type === 'FeatureCollection' && response.data.features?.length > 0) {
+          try {
+            await geojsonCache.set({
+              baseId: `doc_${documentId}`,
+              versao: 'oficial',
+              safra: 'any',
+              bbox,
+              classificacaoAcesso: 'Pública',
+              geojsonData: response.data,
+            })
+          } catch {}
           return response.data
         }
       } catch {
@@ -163,6 +187,18 @@ export const spatialAnalysisService = {
         params: bbox ? { bbox } : undefined,
       })
       if (fallbackResponse.data && fallbackResponse.data.type === 'FeatureCollection') {
+        if (fallbackResponse.data.features && fallbackResponse.data.features.length > 0) {
+          try {
+            await geojsonCache.set({
+              baseId: `doc_${documentId}`,
+              versao: 'oficial',
+              safra: 'any',
+              bbox,
+              classificacaoAcesso: 'Pública',
+              geojsonData: fallbackResponse.data,
+            })
+          } catch {}
+        }
         return fallbackResponse.data
       }
     } catch {

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import api from '../services/api'
+import { mapService } from '../services/map'
 import { useRouter } from 'vue-router'
 
 const props = withDefaults(
@@ -42,47 +42,15 @@ const carregarGeometrias = async () => {
   errorMsg.value = ''
 
   try {
-    // 1. Tenta carregar da revisão de publicação
-    try {
-      const res = await api.get(`/publicacao/${props.processoId}/revisao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Tenta rota alternativa
-    }
-
-    // 2. Tenta carregar via /carga/{id}/revisao-publicacao
-    try {
-      const res = await api.get(`/carga/${props.processoId}/revisao-publicacao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Segue para fallback
-    }
-
-    // 3. Fallback para /mapa/camadas?processoId=
-    const fallbackRes = await api.get('/mapa/camadas', {
-      params: { processoId: props.processoId },
-    })
-    if (fallbackRes.data && fallbackRes.data.features && fallbackRes.data.features.length > 0) {
-      isLoading.value = false
-      renderizarMapa(fallbackRes.data)
-      totalFeicoes.value = fallbackRes.data.features.length
+    const geojson = await mapService.getProcessPreviewGeometry(props.processoId)
+    if (geojson && geojson.features && geojson.features.length > 0) {
+      renderizarMapa(geojson)
+      totalFeicoes.value = geojson.features.length
       return
     }
 
-    errorMsg.value = 'Nenhuma geometria encontrada para esta carga.'
-  } catch (err: any) {
+    errorMsg.value = 'Nenhuma geomet ria encontrada para esta carga.'
+  } catch {
     errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
   } finally {
     isLoading.value = false
@@ -153,9 +121,12 @@ const abrirNoMapaCompleto = () => {
   router.push(`/mapa?processoId=${props.processoId}`)
 }
 
-watch(() => props.processoId, () => {
-  carregarGeometrias()
-})
+watch(
+  () => props.processoId,
+  () => {
+    carregarGeometrias()
+  },
+)
 
 onMounted(() => {
   carregarGeometrias()
@@ -187,13 +158,24 @@ onBeforeUnmount(() => {
         title="Visualizar no mapa com ferramentas completas"
       >
         <span>Abrir no Mapa Completo</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
           <polyline points="15 3 21 3 21 9"></polyline>
           <line x1="10" y1="14" x2="21" y2="3"></line>
         </svg>
       </button>
-      <span v-else class="badge-preview-tag" title="Disponível no mapa completo após a publicação oficial">
+      <span
+        v-else
+        class="badge-preview-tag"
+        title="Disponível no mapa completo após a publicação oficial"
+      >
         Pré-visualização
       </span>
     </div>
@@ -204,7 +186,14 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else-if="errorMsg" class="mini-mapa-empty" :style="{ height }">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
         <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
         <line x1="8" y1="2" x2="8" y2="18"></line>
         <line x1="16" y1="6" x2="16" y2="22"></line>

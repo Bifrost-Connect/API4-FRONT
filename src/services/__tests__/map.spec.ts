@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mapService } from '../map'
 import api from '../api'
+import { geojsonCache } from '../storage/geojsonCache'
 
 vi.mock('../api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api')>()
@@ -15,8 +16,9 @@ vi.mock('../api', async (importOriginal) => {
 })
 
 describe('Map Service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    await geojsonCache.clearAll()
   })
 
   it('deve buscar locais publicados do mapa via /mapa/camadas-legado', async () => {

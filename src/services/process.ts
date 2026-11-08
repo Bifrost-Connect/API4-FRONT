@@ -224,7 +224,7 @@ export const processService = {
         id: Date.now(),
         processoId: id,
         gestorId: payload.gestorId,
-        gestorNome: 'Gestor API4',
+        gestorNome: 'Gestor',
         etapa: payload.etapa,
         decisao: payload.decisao,
         parecer: payload.parecer,
@@ -276,15 +276,9 @@ export const processService = {
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         return res.data
       }
-      return [
-        { id: 2, nome: 'Carlos Silva (Auditor)', email: 'carlos.auditor@agro.gov.br' },
-        { id: 3, nome: 'Mariana Santos (Auditora Sênior)', email: 'mariana.auditora@agro.gov.br' },
-      ]
-    } catch (err: any) {
-      return [
-        { id: 2, nome: 'Carlos Silva (Auditor)', email: 'carlos.auditor@agro.gov.br' },
-        { id: 3, nome: 'Mariana Santos (Auditora Sênior)', email: 'mariana.auditora@agro.gov.br' },
-      ]
+      return []
+    } catch {
+      return []
     }
   },
 

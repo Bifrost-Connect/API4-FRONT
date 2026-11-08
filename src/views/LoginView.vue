@@ -1,22 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { AiOutlineEye, AiOutlineEyeInvisible } from 'vue-icons-plus/ai'
-import { userService, type UserRole } from '../services/user'
+import { userService } from '../services/user'
+import { homeFor, can, canAny } from '@/utils/rbac'
+import { geojsonCache } from '@/services/storage/geojsonCache'
 
 const router = useRouter()
+const route = useRoute()
 const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
-const selectedRole = ref<UserRole>(userService.getCurrentUser().role)
+const selectedRole = ref<string>(userService.getCurrentUser().role)
 
-const fillLogin = (role: UserRole) => {
+const fillLogin = (role: string) => {
   selectedRole.value = role
   email.value = `${role.toLowerCase()}@georural.com.br`
   senha.value = 'Troca123'
 }
 
-const handleLogin = () => {
+const handleLogin = async () => {
   const emailLower = email.value.trim().toLowerCase()
   if (emailLower.includes('operador') || emailLower.includes('tecnico')) {
     selectedRole.value = 'Operador'
@@ -24,17 +27,57 @@ const handleLogin = () => {
     selectedRole.value = 'Analista'
   } else if (emailLower.includes('auditor')) {
     selectedRole.value = 'Auditor'
+  } else if (emailLower.includes('gestor')) {
+    selectedRole.value = 'Gestor'
   } else if (emailLower.includes('admin')) {
     selectedRole.value = 'Administrador'
   }
 
+  // Remove camadas restritas de sessões anteriores
+  try {
+    await geojsonCache.clearRestricted()
+  } catch {}
+
   userService.setCurrentUserRole(selectedRole.value)
-  const destination =
-    selectedRole.value === 'Auditor'
-      ? '/auditor'
-      : selectedRole.value === 'Analista'
-        ? '/analise-territorial'
-        : '/'
+  const user = userService.getCurrentUser()
+
+  // Normaliza o destino de redirecionamento caso exista
+  const rawRedirect = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : null
+  let cleanRedirect: string | null = null
+
+  if (rawRedirect && rawRedirect.startsWith('/')) {
+    const rawBase = import.meta.env?.BASE_URL || '/'
+    const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase
+    let path = rawRedirect
+    if (baseUrl && path.startsWith(baseUrl)) {
+      path = path.slice(baseUrl.length) || '/'
+    }
+    if (path !== '/login' && path !== '/acesso-negado') {
+      cleanRedirect = path
+    }
+  }
+
+  // Valida permissão para o redirect usando router.resolve
+  if (cleanRedirect) {
+    try {
+      const resolved = router.resolve(cleanRedirect)
+      if (resolved && resolved.name && resolved.name !== 'login' && resolved.name !== 'forbidden') {
+        const reqPerm = resolved.meta?.permission as string | string[] | undefined
+        const hasAccess =
+          !reqPerm ||
+          (Array.isArray(reqPerm) ? canAny(user, reqPerm) : can(user, reqPerm))
+
+        if (hasAccess) {
+          router.replace(cleanRedirect)
+          return
+        }
+      }
+    } catch {
+      // Fallback em caso de erro na resolução da rota
+    }
+  }
+
+  const destination = homeFor(user)
   router.replace(destination)
 }
 </script>
@@ -96,10 +139,17 @@ const handleLogin = () => {
         </button>
         <button
           class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Gestor' }"
+          @click="fillLogin('Gestor')"
+        >
+          Entrar Gestor
+        </button>
+        <button
+          class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Administrador' }"
           @click="fillLogin('Administrador')"
         >
-          Entrar Gestor
+          Entrar Administrador
         </button>
       </div>
     </div>

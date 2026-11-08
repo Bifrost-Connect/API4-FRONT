@@ -18,8 +18,8 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
 import { processService } from '../../services/process'
-import { userService } from '../../services/user'
 import { dashboardService } from '../../services/dashboard'
+import { userService } from '../../services/user'
 import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
 const props = withDefaults(
@@ -44,9 +44,8 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Apenas Administrador vê e aciona Aprovar/Reprovar e Fechar Versão
-const currentUser = computed(() => userService.getCurrentUser())
-const canApprove = computed(() => userService.isAdmin())
+// Permissão de homologação habilitada
+const canApprove = computed(() => !props.readOnly && (userService.can('BASES:HOMOLOGAR') || userService.isAdmin()))
 
 // Estados de submissão e decisão
 const isSubmitting = ref(false)
@@ -133,7 +132,7 @@ const confirmPublishAndClose = async () => {
     if (/^\d+$/.test(String(props.details.id))) {
       try {
         await processService.registrarDecisaoGestor(props.details.id, {
-          gestorId: currentUser.value.id || 1,
+          gestorId: 1,
           etapa: 'PUBLICACAO',
           decisao: 'APROVADO',
           parecer: 'Publicação oficial homologada pelo gestor.',
@@ -155,7 +154,7 @@ const confirmPublishAndClose = async () => {
           year: props.details.year,
           epsg: props.details.epsg,
         },
-        currentUser.value.name,
+        'Gestor',
       )
     } catch (e) {
       console.warn('Aviso ao fechar versão via dashboardService:', e)
@@ -165,7 +164,7 @@ const confirmPublishAndClose = async () => {
     isRejected.value = false
     props.details.status = 'Concluída'
     props.details.stage = 'Publicação'
-    props.details.assignedEditor = currentUser.value.name
+    props.details.assignedEditor = 'Gestor'
   } catch (err: any) {
     console.error('Erro ao aprovar e publicar:', err)
     publishError.value = err?.response?.data?.message || err?.message || 'Falha ao homologar publicação.'
@@ -202,7 +201,7 @@ const confirmReject = async () => {
   try {
     if (/^\d+$/.test(String(props.details.id))) {
       await processService.registrarDecisaoGestor(props.details.id, {
-        gestorId: currentUser.value.id || 1,
+        gestorId: 1,
         etapa: 'PUBLICACAO',
         decisao: 'REPROVADO',
         parecer: rejectionReason.value.trim(),
@@ -226,7 +225,7 @@ const confirmReject = async () => {
 
     isRejected.value = true
     isApproved.value = false
-    props.details.assignedEditor = currentUser.value.name
+    props.details.assignedEditor = 'Gestor'
 
     if (rejectionDestination.value === 'reprocessar') {
       props.details.stage = 'Tratamento'
@@ -301,7 +300,7 @@ const goToMap = () => {
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Parâmetro / Algoritmo</th>
+                  <th>Parâmetro</th>
                   <th>Resultado</th>
                   <th>Referência (Lei)</th>
                   <th>Status</th>
@@ -593,7 +592,7 @@ const goToMap = () => {
 
           <div class="publish-meta-box">
             <div class="meta-row">
-              <span class="meta-label">Carga / Processo:</span>
+              <span class="meta-label">Processo:</span>
               <strong>{{ details.id }}</strong>
             </div>
             <div class="meta-row">
@@ -602,7 +601,7 @@ const goToMap = () => {
             </div>
             <div class="meta-row">
               <span class="meta-label">Responsável pela Publicação:</span>
-              <strong>{{ currentUser.name }}</strong>
+              <strong>Gestor</strong>
             </div>
           </div>
         </div>

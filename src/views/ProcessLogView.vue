@@ -7,7 +7,7 @@ import {
   type ProcessLogDetails,
   type ProcessTraceability,
 } from '../services/process'
-import { userService } from '../services/user'
+import { PROCESS_STEPS, getStepIndex, getProgressStep, getWarningStep } from '../utils/processUtils'
 import { dashboardService } from '../services/dashboard'
 import { uploadService } from '../services/upload'
 import Stepper from '../components/Stepper.vue'
@@ -22,6 +22,7 @@ import {
   type ProcessVersion,
   type AuditProcessCarga,
 } from '@/services/auditoria'
+import { userService } from '@/services/user'
 
 interface Props {
   processId?: string
@@ -63,6 +64,15 @@ const closeAuditPanel = () => {
   saveAuditOpenState(false)
 }
 
+// Permissão de Auditoria: Operador comum não visualiza trilha de auditoria/linhagem lateral
+const canViewAudit = computed(() =>
+  userService.canAny([
+    'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+    'AUDITORIA:RASTREAR_ORIGEM',
+    'BASES:HOMOLOGAR',
+  ]),
+)
+
 const processId = computed(() => props.processId || (route?.params?.id as string) || '')
 const isLoading = ref(!props.detailsData)
 const details = ref<ProcessLogDetails | null>(props.detailsData || null)
@@ -72,7 +82,6 @@ const auditVersions = ref<ProcessVersion[]>([])
 const currentCarga = ref<AuditProcessCarga | null>(null)
 const currentCargaLinhagem = computed(() => currentCarga.value?.linhagemCompleta || null)
 const quarentenaStageRef = ref<any>(null)
-const currentUser = computed(() => userService.getCurrentUser())
 
 // Rastreabilidade e Exportação (US05 e US07)
 const traceability = ref<ProcessTraceability | null>(null)
@@ -92,9 +101,9 @@ const isBackendProcess = computed(
     /^\d+$/.test(String(details.value.id)),
 )
 
+// Modo somente leitura ativado se a versão histórica estiver fechada
 const isClosed = computed(() => details.value?.status?.toLowerCase().includes('fechad') ?? false)
-const isAuditor = computed(() => userService.getCurrentUser().role === 'Auditor')
-const isReadOnly = computed(() => isClosed.value || isAuditor.value)
+const isReadOnly = computed(() => isClosed.value)
 
 const loadTraceability = async (id: string, backendProcess: boolean) => {
   const requestId = ++traceabilityRequestId
@@ -142,28 +151,16 @@ const exportIndicator = async (format: IndicatorExportFormat) => {
   }
 }
 
-const processSteps = ['Ingestão', 'Validação', 'Tratamento', 'Publicação']
+const processSteps = PROCESS_STEPS
 
 const progressStepIndex = computed(() => {
   if (!details.value) return 1
-  if (details.value.status === 'Concluída') return 5 // Todas concluídas
-  const stage = details.value.stage === 'Cálculo analítico' ? 'Publicação' : details.value.stage
-  const index = processSteps.indexOf(stage)
-  return index >= 0 ? index + 1 : 1
+  return getProgressStep(details.value as any)
 })
 
 const warningStepIndex = computed(() => {
   if (!details.value) return undefined
-  const isErrorStage = details.value.stage === 'Validação' || details.value.stage === 'Tratamento'
-  const isErrorStatus =
-    details.value.status === 'Falhou' ||
-    details.value.status === 'Em quarentena' ||
-    (details.value.quarantineRecords?.length ?? 0) > 0 ||
-    (details.value.validationChecks?.some((c) => c.status === 'error') ?? false)
-  if (isErrorStage && isErrorStatus && !details.value.assignedEditor) {
-    return processSteps.indexOf(details.value.stage) + 1
-  }
-  return undefined
+  return getWarningStep(details.value as any)
 })
 
 const activeStepIndex = ref(1)
@@ -369,7 +366,7 @@ const currentComponent = computed(() => {
 </script>
 
 <template>
-  <div class="process-log-page" :class="{ 'has-audit-open': isAuditOpen && auditVersions.length > 0 }">
+  <div class="process-log-page" :class="{ 'has-audit-open': canViewAudit && isAuditOpen && auditVersions.length > 0 }">
     <!-- Coluna Principal com a Visualização do Processo -->
     <div class="process-main-column">
       <div class="process-header">
@@ -387,7 +384,7 @@ const currentComponent = computed(() => {
           </div>
 
           <!-- Botão para alternar a exibição da Auditoria -->
-          <div v-if="auditVersions.length > 0" class="process-nav-right">
+          <div v-if="canViewAudit && auditVersions.length > 0" class="process-nav-right">
             <button
               class="btn btn_outline btn-sm audit-toggle-btn"
               :class="{ 'btn-active': isAuditOpen }"
@@ -486,7 +483,7 @@ const currentComponent = computed(() => {
     </div>
 
     <!-- Componente Auditoria (Painel lateral integrado) -->
-    <div v-if="isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
+    <div v-if="canViewAudit && isAuditOpen && auditVersions.length > 0" class="audit-side-wrapper">
       <Auditoria
         :versions="auditVersions"
         :selectedVersionId="details?.id"
@@ -495,7 +492,6 @@ const currentComponent = computed(() => {
         :layerName="details?.layerName"
         :canClose="true"
         :linhagemCompleta="currentCargaLinhagem"
-        :userRole="currentUser.role"
         @select-version="handleVersionChange"
         @close="closeAuditPanel"
         @notificar-operador="handleNotificarOperadorAuditoria"

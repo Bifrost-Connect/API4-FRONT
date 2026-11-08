@@ -12,7 +12,6 @@ import {
 import type { ProcessLogDetails } from '../../services/process'
 import { processService } from '../../services/process'
 import { dashboardService } from '../../services/dashboard'
-import { userService } from '../../services/user'
 import { uploadService } from '../../services/upload'
 
 const props = withDefaults(
@@ -25,12 +24,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'reload'): void }>()
 
-const currentUser = computed(() => userService.getCurrentUser())
-const isAuditor = computed(() => currentUser.value.role === 'Auditor')
-const isAdmin = computed(() => userService.isAdmin())
-
-// Trava read-only de mutação para Auditor ou versão fechada (Tarefa 9)
-const isMutationReadOnly = computed(() => props.readOnly || isAuditor.value)
+// Apenas respeita read-only de versão fechada
+const isMutationReadOnly = computed(() => props.readOnly)
 
 // Toast de erro / sucesso (Tarefa 10)
 const toastError = ref<string | null>(null)
@@ -69,7 +64,7 @@ const confirmAlocarAuditor = async () => {
   isAlocandoAuditor.value = true
   try {
     const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-    await processService.alocarAuditor(numericId || props.details.id, selectedAuditorId.value, currentUser.value.id || 1)
+    await processService.alocarAuditor(numericId || props.details.id, selectedAuditorId.value, 1)
     const auditorObj = auditores.value.find((a) => a.id === selectedAuditorId.value)
     showSuccessToast(`Auditor ${auditorObj ? auditorObj.nome : ''} alocado com sucesso para a carga ${props.details.id}!`)
     showAlocarAuditorModal.value = false
@@ -335,8 +330,8 @@ const confirmCancelLoad = async () => {
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID Polígono / Registro</th>
-              <th>Motivo da Rejeição / Erro Topológico</th>
+              <th>ID do Registro</th>
+              <th>Motivo da Rejeição</th>
               <th>Etapa de Origem</th>
               <th>ID Execução</th>
             </tr>
@@ -353,11 +348,10 @@ const confirmCancelLoad = async () => {
       </div>
       <p v-else>Nenhum registro detalhado na quarentena.</p>
 
-      <!-- Barra de Ações por Perfil (Tarefas 5, 7, 8 e 9) -->
+      <!-- Barra de Ações Operacionais -->
       <div class="mt-4 border-top pt-4 action-footer">
-        <!-- Alocar Auditor pelo Gestor / Administrador -->
+        <!-- Alocar Auditor -->
         <button
-          v-if="isAdmin || (currentUser.role as string) === 'Gestor'"
           type="button"
           class="btn btn_outline"
           style="color: var(--color-brand); border-color: var(--color-brand); display: flex; align-items: center; gap: 0.4rem"
@@ -368,9 +362,8 @@ const confirmCancelLoad = async () => {
           Alocar Auditor
         </button>
 
-        <!-- Tarefa 5: Botão do Auditor / Admin para Sinalizar Reprocessamento ao Operador -->
+        <!-- Botão para Sinalizar Reprocessamento ao Operador -->
         <button
-          v-if="isAuditor || isAdmin"
           type="button"
           class="btn btn_outline btn-signal"
           data-testid="btn-signal-operator"
@@ -381,11 +374,11 @@ const confirmCancelLoad = async () => {
           {{
             signalStatus === 'signaled'
               ? 'Operador Sinalizado para Reprocessamento'
-              : 'Sinalizar / Solicitar Reprocessamento ao Operador'
+              : 'Solicitar Reprocessamento ao Operador'
           }}
         </button>
 
-        <!-- Tarefa 7 e 8: Botões de Mutação do Operador/Admin (Ocultos para o Auditor - Tarefa 9) -->
+        <!-- Botões de Mutação (Ocultos se a versão estiver fechada) -->
         <template v-if="!isMutationReadOnly">
           <button
             type="button"
@@ -404,7 +397,7 @@ const confirmCancelLoad = async () => {
             @click="showCancelModal = true"
           >
             <FiXCircle size="14" />
-            Cancelar / Invalidar Envio
+            Cancelar Envio
           </button>
         </template>
       </div>
@@ -525,7 +518,7 @@ const confirmCancelLoad = async () => {
     >
       <div class="modal-dialog">
         <div class="modal-header">
-          <h4>Cancelar / Invalidar Envio #{{ details.id }}</h4>
+          <h4>Cancelar Envio #{{ details.id }}</h4>
           <button type="button" class="modal-close" @click="showCancelModal = false">
             &times;
           </button>

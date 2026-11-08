@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   layerName: '',
   canClose: true,
   linhagemCompleta: null,
-  userRole: 'Auditor',
+  userRole: '',
 })
 
 const emit = defineEmits<{
@@ -336,7 +336,7 @@ const formatDateTime = (dt?: string) => {
           @click="emit('cancelar', String(cargaId))"
         >
           <FiXCircle />
-          <span>Cancelar / Invalidar Carga</span>
+          <span>Cancelar Carga</span>
         </button>
       </div>
 
