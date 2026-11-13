@@ -56,6 +56,9 @@ const totalPages = ref(1)
 
 // Permissão para abrir auditoria detalhada e visualização de processo
 const currentUser = computed(() => userService.getCurrentUser())
+const canCompareSeasons = computed(() =>
+  ['Analista', 'Administrador'].includes(currentUser.value.role),
+)
 const canAuditProcess = computed(() => true)
 
 /**
@@ -378,6 +381,10 @@ const viewOnMap = (process: ProcessLog) => {
       year: resolveYear(process),
     },
   })
+}
+
+const compareSeasons = (process: ProcessLog) => {
+  router.push({ name: 'comparacao-temporal', query: { baseA: process.id } })
 }
 
 const getStatusBadgeClass = (status: string) => {
@@ -739,6 +746,14 @@ const getStatusBadgeClass = (status: string) => {
 
           <!-- Ações do Card (Tarefa 3) -->
           <div class="card-actions">
+            <button
+              v-if="canCompareSeasons && isVigente(process)"
+              type="button"
+              class="btn-card-map"
+              @click="compareSeasons(process)"
+            >
+              Comparar safras
+            </button>
             <button
               type="button"
               class="btn-card-map"
@@ -1290,6 +1305,7 @@ const getStatusBadgeClass = (status: string) => {
 
 .card-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
   padding-top: 0.85rem;

@@ -26,6 +26,7 @@ const navigationItems = computed(() => {
       { label: 'Catálogo de Bases', to: '/catalogo', icon: FiDatabase },
       { label: 'Mapa operacional', to: '/mapa', icon: FiMap },
       { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
+      { label: 'Comparação temporal', to: '/comparacao-temporal', icon: FiMap },
       { label: 'Painel do auditor', to: '/auditor', icon: FiShield },
     ]
   }
@@ -35,6 +36,7 @@ const navigationItems = computed(() => {
       { label: 'Catálogo de bases', to: '/catalogo', icon: FiDatabase },
       { label: 'Mapa territorial', to: '/mapa', icon: FiMap },
       { label: 'Análise territorial', to: '/analise-territorial', icon: FiPieChart },
+      { label: 'Comparação temporal', to: '/comparacao-temporal', icon: FiMap },
     ]
   }
 

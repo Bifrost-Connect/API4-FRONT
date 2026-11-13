@@ -25,6 +25,12 @@ const router = createRouter({
       meta: { allowedRoles: ['Analista', 'Administrador'] },
     },
     {
+      path: '/comparacao-temporal',
+      name: 'comparacao-temporal',
+      component: () => import('../views/TemporalComparisonView.vue'),
+      meta: { allowedRoles: ['Analista', 'Administrador'] },
+    },
+    {
       path: '/auditor',
       name: 'auditor',
       component: DashboardView,
