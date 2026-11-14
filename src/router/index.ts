@@ -37,6 +37,12 @@ const router = createRouter({
       meta: { permission: 'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO' },
     },
     {
+      path: '/comparacao-temporal',
+      name: 'comparacao-temporal',
+      component: () => import('../views/TemporalComparisonView.vue'),
+      meta: { permission: 'MAPA:COMPARAR_SAFRAS' },
+    },
+    {
       path: '/catalogo',
       name: 'catalogo',
       component: CargaListView,

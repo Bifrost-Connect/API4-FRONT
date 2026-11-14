@@ -18,6 +18,7 @@ const pageTitles: Record<string, string> = {
   styleguide: 'Guia de estilos',
   'process-log': 'Acompanhar processamento de cargas',
   'analise-territorial': 'Análise territorial',
+  'comparacao-temporal': 'Comparação temporal de safras',
   catalogo: 'Catálogo de bases geoespaciais',
   profile: 'Meu perfil',
   users: 'Gerenciamento de usuários',

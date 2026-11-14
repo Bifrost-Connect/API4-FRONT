@@ -358,10 +358,9 @@ describe('Catálogo de Bases Geoespaciais', () => {
       // Redireciona para comparação de safra
       await btnCompare.trigger('click')
       expect(pushMock).toHaveBeenCalledWith({
-        name: 'analise-territorial',
+        name: 'comparacao-temporal',
         query: {
-          baseId: '101',
-          safra: '2026',
+          baseA: '101',
         },
       })
     })

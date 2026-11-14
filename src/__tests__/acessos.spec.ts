@@ -92,6 +92,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Catálogo de Bases')
       expect(labels).not.toContain('Mapa operacional')
+      expect(labels).not.toContain('Comparação temporal')
     })
 
     it('exibe Dashboard, Upload, Catálogo e Mapa para o Operador de Dados', () => {
@@ -103,6 +104,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Upload de carga')
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).not.toContain('Gerenciamento de usuários')
+      expect(labels).not.toContain('Comparação temporal')
     })
 
     it('exibe Catálogo, Mapa e Análise Territorial para o Analista sem atalhos de ingestão', () => {
@@ -113,6 +115,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
+      expect(labels).toContain('Comparação temporal')
       expect(labels).not.toContain('Upload de carga')
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Gerenciamento de usuários')
@@ -127,6 +130,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
+      expect(labels).not.toContain('Comparação temporal')
       expect(labels).not.toContain('Upload de carga')
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
@@ -140,6 +144,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
+      expect(labels).toContain('Comparação temporal')
       expect(labels).not.toContain('Upload de carga')
       expect(labels).not.toContain('Gerenciamento de usuários')
     })

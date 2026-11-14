@@ -127,6 +127,7 @@ export const ROUTE_PERMISSIONS: Record<string, string | string[]> = {
   catalogo: 'BASES:CONSULTAR_CATALOGO',
   mapa: 'MAPA:VISUALIZAR',
   'analise-territorial': 'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
+  'comparacao-temporal': 'MAPA:COMPARAR_SAFRAS',
   'process-log': [
     'QUARENTENA:VISUALIZAR',
     'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
@@ -220,6 +221,12 @@ export const MENU_ITEMS: MenuItem[] = [
     to: '/analise-territorial',
     icon: FiPieChart,
     permission: 'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
+  },
+  {
+    label: 'Comparação temporal',
+    to: '/comparacao-temporal',
+    icon: FiMap,
+    permission: 'MAPA:COMPARAR_SAFRAS',
   },
   {
     label: 'Perfil do usuário',

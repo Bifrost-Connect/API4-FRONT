@@ -560,10 +560,9 @@ const compareSafra = (process: ProcessLog | CatalogoItem) => {
     return
   }
   router.push({
-    name: 'analise-territorial',
+    name: 'comparacao-temporal',
     query: {
-      baseId: String(process.id),
-      safra: resolveYear(process as ProcessLog),
+      baseA: String(process.id),
     },
   })
 }
