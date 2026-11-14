@@ -35,9 +35,11 @@ import {
 } from './storage/authStorage'
 import { geojsonCache } from './storage/geojsonCache'
 import { uiPreferencesStorage } from './storage/uiPreferencesStorage'
+import { DuplicateEmailError } from './access/MockAccessRepository'
 
+export { DuplicateEmailError }
 export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent }
-export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | string
+export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | 'Integrador' | string
 
 export type UserSession = SessionUser & {
   email?: string
@@ -124,6 +126,22 @@ const DEMO_USERS: Record<string, UserSession> = {
     role: 'Gestor',
     roleId: 'GESTOR',
     permissions: [...(ROLE_DEFAULT_PERMISSIONS.GESTOR || [])],
+  },
+  Integrador: {
+    id: 6,
+    name: 'Sistema Integrador',
+    email: 'integrador@georural.com.br',
+    role: 'INTEGRADOR_EXTERNO',
+    roleId: 'INTEGRADOR_EXTERNO',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO || [])],
+  },
+  INTEGRADOR_EXTERNO: {
+    id: 6,
+    name: 'Sistema Integrador',
+    email: 'integrador@georural.com.br',
+    role: 'INTEGRADOR_EXTERNO',
+    roleId: 'INTEGRADOR_EXTERNO',
+    permissions: [...(ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO || [])],
   },
 }
 
@@ -315,6 +333,7 @@ export const userService = {
       Analista: { ...DEMO_USERS.Analista! },
       Administrador: { ...DEMO_USERS.Administrador! },
       Gestor: { ...DEMO_USERS.Gestor! },
+      Integrador: { ...DEMO_USERS.Integrador! },
     }
   },
 
@@ -349,6 +368,14 @@ export const userService = {
     sodJustification?: string
   }): UserItem {
     const repo = roleService.getRepo() as any
+    const emailNorm = data.email.trim().toLowerCase()
+    const duplicate = (repo.users as UserItem[]).some(
+      (u) => u.email.trim().toLowerCase() === emailNorm,
+    )
+    if (duplicate) {
+      throw new DuplicateEmailError(data.email)
+    }
+
     const roleDef = repo.roles.find((r: any) => r.id === data.role)
     const permissions = roleDef ? [...roleDef.permissions] : []
 

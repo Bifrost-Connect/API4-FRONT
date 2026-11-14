@@ -2,7 +2,7 @@
  * @file Fixtures e dados simulados para gerenciamento de usuários, papéis e permissões.
  */
 
-export type StandardRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR'
+export type StandardRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR' | 'INTEGRADOR_EXTERNO'
 export type SystemRole = StandardRole | (string & {})
 
 export interface RoleDef {
@@ -69,6 +69,11 @@ export const MOCK_AVAILABLE_ROLES: RoleOption[] = [
     value: 'GESTOR',
     label: 'GESTOR',
     desc: 'Governança, homologação, exportação e integrações.',
+  },
+  {
+    value: 'INTEGRADOR_EXTERNO',
+    label: 'INTEGRADOR_EXTERNO',
+    desc: 'Consumo externo de catálogo, mapas e exportação via API.',
   },
 ]
 
@@ -224,6 +229,17 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<StandardRole, string[]> = {
     'EXPORTACAO:CSV',
     'EXPORTACAO:GEOJSON',
   ],
+  INTEGRADOR_EXTERNO: [
+    'BASES:VISUALIZAR',
+    'BASES:CONSULTAR_CATALOGO',
+    'MAPA:VISUALIZAR',
+    'MAPA:VISUALIZAR_CAMADAS',
+    'EXPORTACAO:CSV',
+    'EXPORTACAO:GEOJSON',
+    'API:VISUALIZAR_CHAVES',
+    'API:GERAR_CHAVE',
+    'API:REVOGAR_CHAVE',
+  ],
 }
 
 export const MOCK_USERS_LIST: UserItem[] = [
@@ -314,6 +330,13 @@ export const MOCK_ROLES: RoleDef[] = [
     descricao: 'Governança, homologação, exportação e integrações.',
     padrao: true,
     permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
+  },
+  {
+    id: 'INTEGRADOR_EXTERNO',
+    nome: 'INTEGRADOR_EXTERNO',
+    descricao: 'Consumo externo de catálogo, mapas e exportação via API.',
+    padrao: true,
+    permissions: [...ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO],
   },
 ]
 

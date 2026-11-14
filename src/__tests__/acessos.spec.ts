@@ -12,6 +12,7 @@ import UserFormModal from '@/components/admin/UserFormModal.vue'
 import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
 import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
 import { userService, type UserItem } from '@/services/user'
+import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
 import {
   hasSoDConflict,
   isAuditorReadOnlyLocked,
@@ -147,6 +148,21 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Comparação temporal')
       expect(labels).not.toContain('Upload de carga')
       expect(labels).not.toContain('Gerenciamento de usuários')
+    })
+
+    it('exibe Catálogo de Bases, Mapa e Perfil para o Integrador Externo, ocultando Dashboard, Upload e Gestão', () => {
+      userService.setCurrentUserRole('INTEGRADOR_EXTERNO')
+      const user = userService.getCurrentUser()
+      const menu = getVisibleMenuItems(user)
+      const labels = menu.map((m) => m.label)
+
+      expect(labels).toContain('Catálogo de Bases')
+      expect(labels).toContain('Mapa operacional')
+      expect(labels).toContain('Perfil do usuário')
+      expect(labels).not.toContain('Dashboard')
+      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Gerenciamento de usuários')
+      expect(homeFor(user)).toBe('/catalogo')
     })
 
     it('reflete dinamicamente as permissões concedidas a uma role customizada', () => {
@@ -386,6 +402,16 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
 
       expect(wrapper.find('[data-testid="badge-sod-active"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="badge-sod-active"]').text()).toContain('Exceção SoD')
+    })
+
+    it('rejeita cadastro de usuário com e-mail já existente (case-insensitive) lançando DuplicateEmailError', () => {
+      expect(() => {
+        userService.createUser({
+          name: 'Carlos Duplicado',
+          email: 'CARLOS.MENDES@GEORURAL.COM.BR',
+          role: 'ANALISTA',
+        })
+      }).toThrow(DuplicateEmailError)
     })
   })
 
