@@ -56,11 +56,57 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response Interceptor: Trata erro 401 Unauthorized com limpeza de credenciais e redirecionamento
+/**
+ * Extrai mensagem amigável de erro HTTP preservando o formato { erro, message } do API4-BACK.
+ */
+export function extractApiErrorMessage(error: unknown, fallback = 'Erro ao comunicar com o servidor.'): string {
+  if (!error || typeof error !== 'object') return fallback
+  const errObj = error as {
+    response?: { data?: { erro?: string; message?: string; error?: string } | string }
+    message?: string
+  }
+  const data = errObj.response?.data
+  if (typeof data === 'string' && data.trim()) return data.trim()
+  if (data && typeof data === 'object') {
+    if (typeof data.erro === 'string' && data.erro.trim()) return data.erro.trim()
+    if (typeof data.message === 'string' && data.message.trim()) return data.message.trim()
+    if (typeof data.error === 'string' && data.error.trim()) return data.error.trim()
+  }
+  if (typeof errObj.message === 'string' && errObj.message.trim()) {
+    return errObj.message.trim()
+  }
+  return fallback
+}
+
+export class ApiError extends Error {
+  status?: number
+  erro?: string
+  data?: unknown
+  cause?: unknown
+
+  constructor(error: unknown, fallback?: string) {
+    const message = extractApiErrorMessage(error, fallback)
+    super(message)
+    this.name = 'ApiError'
+    this.cause = error
+    const errObj = error as { response?: { status?: number; data?: { erro?: string } } }
+    this.status = errObj?.response?.status
+    this.erro = errObj?.response?.data?.erro
+    this.data = errObj?.response?.data
+  }
+}
+
+// Response Interceptor: Trata erro 401 Unauthorized e 403 Forbidden
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
+    const status = error?.response?.status
+
+    if (status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api4:forbidden', { detail: error }))
+    }
+
+    if (status === 401) {
       const session = authStorage.getSession()
 
       // Se a sessão for simulada, não desloga o usuário local por 401 da API remota

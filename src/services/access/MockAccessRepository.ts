@@ -5,6 +5,9 @@
 
 import type {
   AccessRepository,
+  PaginatedResult,
+  UserListFilters,
+  SecurityEventFilters,
   CreateUserDto,
   UpdateUserDto,
   CreateRoleDto,
@@ -86,8 +89,28 @@ export class MockAccessRepository implements AccessRepository {
   // Usuários
   // -------------------------------------------------------------
 
-  async listUsers(): Promise<UserItem[]> {
-    return this.users
+  async listUsers(filters?: UserListFilters): Promise<UserItem[]> {
+    if (!filters) return this.users
+    return this.users.filter((u) => {
+      if (filters.nome && !u.name.toLowerCase().includes(filters.nome.toLowerCase())) return false
+      if (filters.email && !u.email.toLowerCase().includes(filters.email.toLowerCase())) return false
+      if (filters.ativo !== undefined && (u.status === 'Ativo') !== filters.ativo) return false
+      return true
+    })
+  }
+
+  async listUsersPaged(filters?: UserListFilters): Promise<PaginatedResult<UserItem>> {
+    const filtered = await this.listUsers(filters)
+    const page = filters?.page ?? 0
+    const size = filters?.size ?? 20
+    const start = page * size
+    return {
+      items: filtered.slice(start, start + size),
+      page,
+      size,
+      totalElements: filtered.length,
+      totalPages: Math.max(1, Math.ceil(filtered.length / size)),
+    }
   }
 
   async getUserById(id: number): Promise<UserItem | undefined> {
@@ -175,12 +198,14 @@ export class MockAccessRepository implements AccessRepository {
     return updated
   }
 
-  async toggleUserStatus(id: number): Promise<UserItem | null> {
+  async toggleUserStatus(id: number, targetAtivo?: boolean): Promise<UserItem | null> {
     const user = await this.getUserById(id)
     if (!user) return null
 
     const prev = user.status
-    user.status = prev === 'Ativo' ? 'Inativo' : 'Ativo'
+    const nextStatus =
+      targetAtivo !== undefined ? (targetAtivo ? 'Ativo' : 'Inativo') : prev === 'Ativo' ? 'Inativo' : 'Ativo'
+    user.status = nextStatus
 
     await this.recordSecurityEvent({
       action: user.status === 'Ativo' ? 'Ativação de Conta' : 'Inativação de Conta',
@@ -189,6 +214,22 @@ export class MockAccessRepository implements AccessRepository {
     })
 
     return user
+  }
+
+  async resetPassword(id: number, novaSenha: string): Promise<void> {
+    const user = await this.getUserById(id)
+    if (!user) {
+      throw new Error('Usuário não encontrado.')
+    }
+    if (!novaSenha || novaSenha.length < 8) {
+      throw new Error('A nova senha deve ter no mínimo 8 caracteres.')
+    }
+
+    await this.recordSecurityEvent({
+      action: 'Redefinição de Senha',
+      details: `Redefiniu a senha de acesso do usuário ${user.name}.`,
+      severity: 'INFO',
+    })
   }
 
   async updateUserPermissions(id: number, permissions: string[]): Promise<UserItem | null> {
@@ -305,8 +346,28 @@ export class MockAccessRepository implements AccessRepository {
   // Auditoria de Segurança
   // -------------------------------------------------------------
 
-  async listSecurityEvents(): Promise<SecurityEvent[]> {
-    return this.securityEvents
+  async listSecurityEvents(filters?: SecurityEventFilters): Promise<SecurityEvent[]> {
+    if (!filters) return this.securityEvents
+    return this.securityEvents.filter((ev) => {
+      if (filters.acao && ev.actionCode !== filters.acao && !ev.action.includes(filters.acao)) {
+        return false
+      }
+      return true
+    })
+  }
+
+  async listSecurityEventsPaged(filters?: SecurityEventFilters): Promise<PaginatedResult<SecurityEvent>> {
+    const filtered = await this.listSecurityEvents(filters)
+    const page = filters?.page ?? 0
+    const size = filters?.size ?? 20
+    const start = page * size
+    return {
+      items: filtered.slice(start, start + size),
+      page,
+      size,
+      totalElements: filtered.length,
+      totalPages: Math.max(1, Math.ceil(filtered.length / size)),
+    }
   }
 
   async recordSecurityEvent(dto: RecordSecurityEventDto): Promise<SecurityEvent> {

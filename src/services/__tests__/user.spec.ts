@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { userService } from '../user'
+import api from '../api'
+import { authStorage } from '../storage/authStorage'
 
 const storageMock = (() => {
   let store: Record<string, string> = {}
@@ -69,6 +71,44 @@ describe('User Service', () => {
     expect(demoUsers.Auditor).toBeDefined()
     expect(demoUsers.Analista).toBeDefined()
     expect(demoUsers.Administrador).toBeDefined()
+  })
+
+  it('deve autenticar via POST /auth/login salvando sessão real (isSimulated: false) com permissões adaptadas', async () => {
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValueOnce({
+      data: {
+        token: 'jwt-real-token-123',
+        tipo: 'Bearer',
+        expira_em: '2026-11-16T18:00:00Z',
+        usuario: {
+          id: 7,
+          nome: 'Carlos Admin',
+          email: 'carlos.mendes@georural.com.br',
+          perfil: 'ADMINISTRADOR',
+          permissoes: ['USUARIO_GERENCIAR', 'GOVERNANCA_CONSULTAR'],
+        },
+      },
+    })
+
+    const session = await userService.loginWithCredentials('carlos.mendes@georural.com.br', 'Senha@123')
+
+    expect(postSpy).toHaveBeenCalledWith('/auth/login', {
+      email: 'carlos.mendes@georural.com.br',
+      senha: 'Senha@123',
+    })
+    expect(session.id).toBe(7)
+    expect(session.role).toBe('ADMIN')
+    expect(session.permissions).toContain('USUARIOS:VISUALIZAR')
+    expect(session.permissions).toContain('PERFIL:VISUALIZAR')
+
+    const stored = authStorage.getSession()
+    expect(stored?.isSimulated).toBe(false)
+    expect(authStorage.getAccessToken()).toBe('jwt-real-token-123')
+  })
+
+  it('deve criar sessão simulada explicitamente via loginDemoOffline', () => {
+    const session = userService.loginDemoOffline('Analista')
+    expect(session.role).toBe('Analista')
+    expect(authStorage.getSession()?.isSimulated).toBe(true)
   })
 })
 

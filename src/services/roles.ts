@@ -1,23 +1,44 @@
 /**
  * Serviço de Gerenciamento de Papéis (Roles) e Permissões.
- * Permite listar, criar, editar e excluir papéis do sistema.
+ * Alterna automaticamente entre MockAccessRepository (sessão simulada/offline)
+ * e HttpAccessRepository (sessão JWT real).
  */
 
 import { ref } from 'vue'
 import type { RoleDef } from '@/mocks/user.mock'
 import { MockAccessRepository } from './access/MockAccessRepository'
-import type { CreateRoleDto, UpdateRoleDto } from './access/AccessRepository'
+import { HttpAccessRepository } from './access/HttpAccessRepository'
+import type { AccessRepository, CreateRoleDto, UpdateRoleDto } from './access/AccessRepository'
+import { authStorage } from './storage/authStorage'
 
-// Instância compartilhada do repositório
-const repo = new MockAccessRepository()
+const mockRepo = new MockAccessRepository()
+const httpRepo = new HttpAccessRepository()
 const rolesList = ref<RoleDef[]>([])
 
 export const roleService = {
   /**
+   * Seleciona o repositório ativo conforme o tipo de sessão (real JWT vs simulada).
+   */
+  getRepo(): AccessRepository {
+    const session = authStorage.getSession()
+    if (session && session.isSimulated === false) {
+      return httpRepo
+    }
+    return mockRepo
+  },
+
+  /**
+   * Acesso direto ao repositório simulado para compatibilidade com métodos síncronos legados.
+   */
+  getMockRepo(): MockAccessRepository {
+    return mockRepo
+  },
+
+  /**
    * Obtém a lista atualizada de papéis do sistema.
    */
   async getRoles(): Promise<RoleDef[]> {
-    rolesList.value = await repo.listRoles()
+    rolesList.value = await this.getRepo().listRoles()
     return rolesList.value
   },
 
@@ -25,41 +46,36 @@ export const roleService = {
    * Busca um papel pelo seu identificador único.
    */
   async getRoleById(id: string): Promise<RoleDef | undefined> {
-    return repo.getRoleById(id)
+    return this.getRepo().getRoleById(id)
   },
 
   /**
    * Cria um novo papel customizado.
+   * // TODO: Aguardando endpoint no API4-BACK
    */
   async createRole(dto: CreateRoleDto): Promise<RoleDef> {
-    const created = await repo.createRole(dto)
+    const created = await this.getRepo().createRole(dto)
     await this.getRoles()
     return created
   },
 
   /**
    * Atualiza nome, descrição e permissões de um papel.
+   * // TODO: Aguardando endpoint no API4-BACK
    */
   async updateRole(id: string, dto: UpdateRoleDto): Promise<RoleDef | null> {
-    const updated = await repo.updateRole(id, dto)
+    const updated = await this.getRepo().updateRole(id, dto)
     await this.getRoles()
     return updated
   },
 
   /**
    * Remove um papel customizado.
-   * Lança exceção se o papel for padrão ou estiver em uso por usuários cadastrados.
+   * // TODO: Aguardando endpoint no API4-BACK
    */
   async deleteRole(id: string): Promise<boolean> {
-    const ok = await repo.deleteRole(id)
+    const ok = await this.getRepo().deleteRole(id)
     await this.getRoles()
     return ok
-  },
-
-  /**
-   * Retorna a referência do repositório para composição no userService.
-   */
-  getRepo(): MockAccessRepository {
-    return repo
   },
 }

@@ -2,9 +2,10 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AiOutlineEye, AiOutlineEyeInvisible } from 'vue-icons-plus/ai'
-import { userService } from '../services/user'
+import { userService, type UserSession } from '../services/user'
 import { homeFor, can, canAny } from '@/utils/rbac'
 import { geojsonCache } from '@/services/storage/geojsonCache'
+import { extractApiErrorMessage } from '@/services/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,38 +13,31 @@ const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
 const selectedRole = ref<string>(userService.getCurrentUser().role)
+const usedDemoRole = ref<string | null>(null)
 const loginError = ref('')
 const isSubmitting = ref(false)
 
 const fillLogin = (role: string) => {
   selectedRole.value = role
+  usedDemoRole.value = role
   email.value = `${role.toLowerCase()}@georural.com.br`
   senha.value = 'Troca123'
+  loginError.value = ''
 }
 
-const handleLogin = async () => {
-  const emailLower = email.value.trim().toLowerCase()
-  if (emailLower.includes('operador') || emailLower.includes('tecnico')) {
-    selectedRole.value = 'Operador'
-  } else if (emailLower.includes('analista')) {
-    selectedRole.value = 'Analista'
-  } else if (emailLower.includes('auditor')) {
-    selectedRole.value = 'Auditor'
-  } else if (emailLower.includes('gestor')) {
-    selectedRole.value = 'Gestor'
-  } else if (emailLower.includes('admin')) {
-    selectedRole.value = 'Administrador'
+const resolveDemoRoleFromEmail = (emailLower: string): string | null => {
+  if (emailLower === 'operador@georural.com.br') return 'Operador'
+  if (emailLower === 'analista@georural.com.br') return 'Analista'
+  if (emailLower === 'auditor@georural.com.br') return 'Auditor'
+  if (emailLower === 'gestor@georural.com.br') return 'Gestor'
+  if (emailLower === 'administrador@georural.com.br' || emailLower === 'admin@georural.com.br') {
+    return 'Administrador'
   }
+  if (emailLower === 'integrador@georural.com.br') return 'Integrador'
+  return null
+}
 
-  // Remove camadas restritas de sessões anteriores
-  try {
-    await geojsonCache.clearRestricted()
-  } catch {}
-
-  userService.setCurrentUserRole(selectedRole.value)
-  const user = userService.getCurrentUser()
-
-  // Normaliza o destino de redirecionamento caso exista
+const redirectAfterLogin = (user: UserSession) => {
   const rawRedirect = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : null
   let cleanRedirect: string | null = null
 
@@ -59,7 +53,6 @@ const handleLogin = async () => {
     }
   }
 
-  // Valida permissão para o redirect usando router.resolve
   if (cleanRedirect) {
     try {
       const resolved = router.resolve(cleanRedirect)
@@ -79,8 +72,53 @@ const handleLogin = async () => {
     }
   }
 
-  const destination = homeFor(user)
-  router.replace(destination)
+  router.replace(homeFor(user))
+}
+
+const handleLogin = async () => {
+  loginError.value = ''
+  const trimmedEmail = email.value.trim()
+  if (!trimmedEmail || !senha.value) {
+    loginError.value = 'Informe e-mail e senha para entrar.'
+    return
+  }
+
+  isSubmitting.value = true
+  try {
+    // Remove camadas restritas de sessões anteriores
+    try {
+      await geojsonCache.clearRestricted()
+    } catch {}
+
+    const user = await userService.loginWithCredentials(trimmedEmail, senha.value)
+    redirectAfterLogin(user)
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status
+    const isRejectedCredential = status === 401 || status === 403 || status === 400 || status === 422
+    const isBackendUnavailable = !status || status === 404 || status >= 500
+
+    if (!isRejectedCredential && isBackendUnavailable) {
+      const emailLower = trimmedEmail.toLowerCase()
+      const matchesFilledDemo =
+        usedDemoRole.value && emailLower === `${usedDemoRole.value.toLowerCase()}@georural.com.br`
+      const demoRole = matchesFilledDemo ? usedDemoRole.value : resolveDemoRoleFromEmail(emailLower)
+
+      if (demoRole && (matchesFilledDemo || senha.value === 'Troca123')) {
+        const demoUser = userService.loginDemoOffline(demoRole)
+        redirectAfterLogin(demoUser)
+        return
+      }
+    }
+
+    loginError.value = extractApiErrorMessage(
+      err,
+      status === 401
+        ? 'E-mail ou senha inválidos, ou usuário inativo.'
+        : 'Não foi possível conectar ao servidor de autenticação.',
+    )
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

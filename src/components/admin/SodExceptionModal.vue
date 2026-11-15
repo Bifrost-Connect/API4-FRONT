@@ -4,7 +4,7 @@
  * Exibido quando um usuário acumula permissões de Ingestão de Carga (Operador)
  * e Homologação/Aprovação (Gestor).
  */
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { FiAlertTriangle, FiShield, FiX, FiCheck } from 'vue-icons-plus/fi'
 
 const props = defineProps<{
@@ -22,9 +22,22 @@ const authorized = ref(false)
 const justification = ref(props.initialJustification || '')
 const touched = ref(false)
 
+const isJustificationValid = computed(() => justification.value.trim().length >= 10)
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      authorized.value = false
+      justification.value = props.initialJustification || ''
+      touched.value = false
+    }
+  },
+)
+
 const handleConfirm = () => {
   touched.value = true
-  if (!authorized.value || !justification.value.trim()) {
+  if (!authorized.value || !isJustificationValid.value) {
     return
   }
   emit('confirm', justification.value.trim())
@@ -96,8 +109,8 @@ const handleConfirm = () => {
             placeholder="Descreva formalmente a razão técnica ou operacional para conceder esta exceção (ex.: cobrir plantão de safra)..."
             data-testid="sod-justification-input"
           ></textarea>
-          <p v-if="touched && !justification.trim()" class="error-msg">
-            A justificativa formal é obrigatória para autorizar uma exceção SoD.
+          <p v-if="touched && !isJustificationValid" class="error-msg">
+            A justificativa formal é obrigatória (mínimo de 10 caracteres) para autorizar uma exceção SoD.
           </p>
         </div>
       </div>
@@ -114,7 +127,7 @@ const handleConfirm = () => {
         <button
           type="button"
           class="btn btn_danger"
-          :disabled="!authorized || !justification.trim()"
+          :disabled="!authorized || !isJustificationValid"
           data-testid="sod-confirm-btn"
           @click="handleConfirm"
         >

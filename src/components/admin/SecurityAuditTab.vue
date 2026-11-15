@@ -4,7 +4,7 @@
  * Trilha imutável de eventos: criação de contas, trocas de cargo, inativações,
  * concessão de exceções SoD e bloqueios de acesso 403.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import {
   FiShield,
   FiSearch,
@@ -15,32 +15,149 @@ import {
   FiLock,
 } from 'vue-icons-plus/fi'
 import type { SecurityEvent } from '@/mocks/user.mock'
+import { authStorage } from '@/services/storage/authStorage'
+import { userService } from '@/services/user'
 
 const props = defineProps<{
   events: SecurityEvent[]
 }>()
+
+const PAGE_SIZE = 20
 
 const searchQuery = ref('')
 const selectedTypeFilter = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const currentPage = ref(1)
-const totalPages = ref(1)
+const serverEvents = ref<SecurityEvent[] | null>(null)
+const serverTotalPages = ref(1)
 
-const filteredEvents = computed(() => {
-  return props.events.filter((ev) => {
+const isRealBackendSession = () => authStorage.getSession()?.isSimulated === false
+
+const ACTION_ALIAS_MAP: Record<string, string[]> = {
+  USUARIO_CRIADO: ['Criação de Conta'],
+  USUARIO_ATIVADO: ['Ativação de Conta'],
+  USUARIO_INATIVADO: ['Inativação de Conta'],
+  PERMISSAO_ALTERADA: ['Troca de Cargo'],
+  PERMISSAO_ALTERADA_COM_EXCECAO_SOD: ['Exceção SoD'],
+  SENHA_REDEFINIDA: ['Redefinição de Senha'],
+  ALERTA_SOD: ['Alerta', 'SoD'],
+  ACESSO_NEGADO_403: ['403'],
+}
+
+function parseEventDateYmd(timestamp: string): string | null {
+  if (!timestamp) return null
+  const brMatch = timestamp.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+  if (brMatch) {
+    return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`
+  }
+  const isoMatch = timestamp.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (isoMatch) {
+    return isoMatch[1] ?? null
+  }
+  const parsed = new Date(timestamp)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10)
+}
+
+async function fetchBackendEvents() {
+  if (!isRealBackendSession()) {
+    serverEvents.value = null
+    return
+  }
+  try {
+    const q = searchQuery.value.trim()
+    const usuarioId = /^\d+$/.test(q) ? Number(q) : undefined
+    const res = await userService.getSecurityEventsPagedAsync({
+      usuarioId,
+      acao: selectedTypeFilter.value || undefined,
+      de: dateFrom.value || undefined,
+      ate: dateTo.value || undefined,
+      page: currentPage.value - 1,
+      size: PAGE_SIZE,
+    })
+    serverEvents.value = res.items
+    serverTotalPages.value = Math.max(1, res.totalPages)
+  } catch {
+    serverEvents.value = null
+  }
+}
+
+onMounted(() => {
+  if (isRealBackendSession()) {
+    fetchBackendEvents()
+  }
+})
+
+watch([selectedTypeFilter, dateFrom, dateTo], () => {
+  currentPage.value = 1
+  if (isRealBackendSession()) {
+    fetchBackendEvents()
+  }
+})
+
+watch(searchQuery, () => {
+  currentPage.value = 1
+  if (isRealBackendSession() && /^\d*$/.test(searchQuery.value.trim())) {
+    fetchBackendEvents()
+  }
+})
+
+watch(currentPage, () => {
+  if (isRealBackendSession()) {
+    fetchBackendEvents()
+  }
+})
+
+const localFilteredAll = computed(() => {
+  const source = serverEvents.value !== null ? serverEvents.value : props.events
+  return source.filter((ev) => {
     const q = searchQuery.value.toLowerCase().trim()
     const matchesSearch =
       !q ||
       ev.action.toLowerCase().includes(q) ||
+      (ev.actionCode?.toLowerCase().includes(q) ?? false) ||
       ev.actorName.toLowerCase().includes(q) ||
       ev.actorEmail.toLowerCase().includes(q) ||
       ev.details.toLowerCase().includes(q)
 
-    const matchesType = !selectedTypeFilter.value || ev.action.includes(selectedTypeFilter.value)
+    const filterCode = selectedTypeFilter.value
+    let matchesType = !filterCode
+    if (filterCode) {
+      if (ev.actionCode === filterCode || ev.action.includes(filterCode)) {
+        matchesType = true
+      } else {
+        const aliases = ACTION_ALIAS_MAP[filterCode] || []
+        matchesType = aliases.some((alias) => ev.action.includes(alias))
+      }
+    }
 
-    return matchesSearch && matchesType
+    let matchesDate = true
+    if (dateFrom.value || dateTo.value) {
+      const ymd = parseEventDateYmd(ev.timestamp)
+      if (ymd) {
+        if (dateFrom.value && ymd < dateFrom.value) matchesDate = false
+        if (dateTo.value && ymd > dateTo.value) matchesDate = false
+      }
+    }
+
+    return matchesSearch && matchesType && matchesDate
   })
+})
+
+const totalPages = computed(() => {
+  if (serverEvents.value !== null) {
+    return serverTotalPages.value
+  }
+  return Math.max(1, Math.ceil(localFilteredAll.value.length / PAGE_SIZE))
+})
+
+const filteredEvents = computed(() => {
+  if (serverEvents.value !== null) {
+    return localFilteredAll.value
+  }
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return localFilteredAll.value.slice(start, start + PAGE_SIZE)
 })
 </script>
 

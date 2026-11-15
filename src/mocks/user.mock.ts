@@ -21,6 +21,9 @@ export interface SecurityEvent {
   action: string
   details: string
   severity: 'INFO' | 'WARNING' | 'DANGER'
+  actionCode?: string
+  ip?: string
+  userId?: number | null
 }
 
 export interface PermissionDefinition {
@@ -113,6 +116,7 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { modulo: 'MAPA', subpermissao: 'VISUALIZAR_CAMADAS' },
   { modulo: 'MAPA', subpermissao: 'VISUALIZAR_SOBREPOSICOES' },
   { modulo: 'MAPA', subpermissao: 'COMPARAR_SAFRAS' },
+  { modulo: 'MAPA', subpermissao: 'EDITAR' },
   // ANALISE_TERRITORIAL
   { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'EXECUTAR' },
   { modulo: 'ANALISE_TERRITORIAL', subpermissao: 'CALCULAR_SOBREPOSICAO' },

@@ -1,92 +1,71 @@
 <script setup lang="ts">
 /**
- * View de visualização e gerenciamento do perfil do usuário logado.
- * Atua puramente na camada de apresentação visual, delegando toda a
- * lógica de dados, persistência e validação ao profileService.
+ * View de visualização do perfil e sessão JWT do usuário logado.
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   FiUser,
-  FiMail,
   FiShield,
-  FiKey,
   FiCheckCircle,
-  FiAlertCircle,
   FiClock,
-  FiSave,
 } from 'vue-icons-plus/fi'
 import { profileService, type UserProfile } from '../services/profile'
+import { userService } from '../services/user'
+import { authStorage } from '../services/storage/authStorage'
 
-const profile = ref<UserProfile>(profileService.getProfile())
-const sessionPermissions = ref<string[]>([])
+const storedSession = ref(authStorage.getSession())
+const currentSessionUser = computed(() => userService.getCurrentUser())
 
-// Formulário de dados cadastrais
-const formName = ref('')
-const formEmail = ref('')
-const formCargo = ref('')
-const formDepartamento = ref('')
+const formatTimestamp = (ts?: number): string => {
+  if (!ts) return 'Sessão ativa'
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return 'Sessão ativa'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`
+}
 
-// Formulário de alteração de senha
-const currentPassword = ref('')
-const newPassword = ref('')
-const confirmPassword = ref('')
+const profile = computed<UserProfile>(() => {
+  const base = profileService.getProfile()
+  const activeUser = currentSessionUser.value
+  const stored = storedSession.value
+
+  const modeLabel = stored
+    ? stored.isSimulated
+      ? 'Modo Demonstração Offline'
+      : `Autenticado via JWT (expira ${formatTimestamp(stored.expiresAt)})`
+    : base.lastLogin
+
+  return {
+    ...base,
+    id: activeUser.id ?? base.id,
+    name: activeUser.name || stored?.name || base.name,
+    email: activeUser.email || stored?.email || base.email,
+    role: activeUser.role || stored?.role || base.role,
+    lastLogin: modeLabel,
+    status: 'Ativo',
+  }
+})
+
+const sessionPermissions = computed<string[]>(() => {
+  const activePerms = currentSessionUser.value.permissions
+  if (Array.isArray(activePerms) && activePerms.length > 0) {
+    return activePerms
+  }
+  return storedSession.value?.permissions || []
+})
 
 // Feedbacks visuais
 const profileSuccessMsg = ref('')
-const passwordSuccessMsg = ref('')
-const passwordErrorMsg = ref('')
-
-const syncFormWithProfile = () => {
-  profile.value = profileService.getProfile()
-  formName.value = profile.value.name
-  formEmail.value = profile.value.email
-  formCargo.value = profile.value.cargo
-  formDepartamento.value = profile.value.departamento
-}
 
 onMounted(() => {
-  syncFormWithProfile()
+  storedSession.value = authStorage.getSession()
 })
 
-const handleSaveProfile = () => {
-  const result = profileService.updateProfile({
-    name: formName.value,
-    email: formEmail.value,
-    cargo: formCargo.value,
-    departamento: formDepartamento.value,
-  })
-
-  if (result.success) {
-    profile.value = profileService.getProfile()
-    profileSuccessMsg.value = result.message
-    setTimeout(() => {
-      profileSuccessMsg.value = ''
-    }, 4000)
-  }
-}
-
-const handleChangePassword = () => {
-  passwordErrorMsg.value = ''
-  passwordSuccessMsg.value = ''
-
-  const result = profileService.changePassword({
-    currentPassword: currentPassword.value,
-    newPassword: newPassword.value,
-    confirmPassword: confirmPassword.value,
-  })
-
-  if (result.success) {
-    passwordSuccessMsg.value = result.message
-    currentPassword.value = ''
-    newPassword.value = ''
-    confirmPassword.value = ''
-    setTimeout(() => {
-      passwordSuccessMsg.value = ''
-    }, 4000)
-  } else {
-    passwordErrorMsg.value = result.message
-  }
-}
+// TODO: Aguardando endpoint no API4-BACK (atualização cadastral e alteração da própria senha pelo usuário logado)
+// const handleSaveProfile = () => { ... }
+// const handleChangePassword = () => { ... }
 </script>
 
 <template>

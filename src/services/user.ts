@@ -27,6 +27,9 @@ import type {
   CreateUserDto,
   UpdateUserDto,
   RecordSecurityEventDto,
+  UserListFilters,
+  SecurityEventFilters,
+  PaginatedResult,
 } from './access/AccessRepository'
 import {
   authStorage,
@@ -36,6 +39,8 @@ import {
 import { geojsonCache } from './storage/geojsonCache'
 import { uiPreferencesStorage } from './storage/uiPreferencesStorage'
 import { DuplicateEmailError } from './access/MockAccessRepository'
+import api from './api'
+import { mapBackendPermissionsToFront, mapBackendRoleToFront } from '@/utils/rbacAdapter'
 
 export { DuplicateEmailError }
 export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent }
@@ -148,11 +153,20 @@ const DEMO_USERS: Record<string, UserSession> = {
 // Sessão padrão inicial
 const defaultSession: UserSession = { ...DEMO_USERS.Operador! }
 
+function normalizeSessionId(userId: number | string | undefined): number | undefined {
+  if (typeof userId === 'number' && Number.isFinite(userId)) return userId
+  if (typeof userId === 'string') {
+    const parsed = Number(userId)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
 function resolveInitialSession(): UserSession {
   const stored = authStorage.getSession()
   if (stored) {
     return {
-      id: stored.userId,
+      id: normalizeSessionId(stored.userId),
       name: stored.name,
       email: stored.email,
       role: stored.role,
@@ -179,7 +193,7 @@ if (typeof window !== 'undefined') {
   authStorage.subscribeToStorageChanges((newSession) => {
     if (newSession) {
       currentUser.value = {
-        id: newSession.userId,
+        id: normalizeSessionId(newSession.userId),
         name: newSession.name,
         email: newSession.email,
         role: newSession.role,
@@ -229,7 +243,7 @@ export const userService = {
 
     const cur = currentUser.value
     authStorage.saveSession({
-      userId: cur.id,
+      userId: cur.id ?? 0,
       name: cur.name,
       email: cur.email || `${role.toLowerCase()}@georural.com.br`,
       role: cur.role,
@@ -242,6 +256,70 @@ export const userService = {
   },
 
   /**
+   * Inicia explicitamente uma sessão simulada offline para o perfil de demonstração informado.
+   */
+  loginDemoOffline(role: string): UserSession {
+    this.setCurrentUserRole(role)
+    return this.getCurrentUser()
+  },
+
+  /**
+   * Autentica o usuário no endpoint real POST /auth/login e persiste a sessão JWT (isSimulated: false).
+   */
+  async loginWithCredentials(email: string, senha: string): Promise<UserSession> {
+    interface LoginResponse {
+      token: string
+      tipo?: string
+      expira_em?: string
+      usuario: {
+        id: number
+        nome: string
+        email: string
+        perfil: string
+        permissoes: string[]
+      }
+    }
+
+    const res = await api.post<LoginResponse>('/auth/login', {
+      email: email.trim(),
+      senha,
+    })
+
+    const { token, expira_em, usuario } = res.data
+    const frontRole = mapBackendRoleToFront(usuario.perfil)
+    const frontPerms = mapBackendPermissionsToFront(usuario.permissoes, usuario.perfil)
+    const parsedExp = expira_em ? Date.parse(expira_em) : Number.NaN
+    const expiresAt = Number.isFinite(parsedExp) ? parsedExp : Date.now() + DEFAULT_SESSION_TTL_MS
+
+    const session: UserSession = {
+      id: usuario.id,
+      name: usuario.nome,
+      email: usuario.email,
+      role: frontRole,
+      roleId: frontRole,
+      permissions: frontPerms,
+      token,
+    }
+
+    currentUser.value = session
+
+    const storedSession: StoredAuthSession = {
+      userId: usuario.id,
+      name: usuario.nome,
+      email: usuario.email,
+      role: frontRole,
+      roleId: frontRole,
+      permissions: [...frontPerms],
+      loggedAt: Date.now(),
+      expiresAt,
+      isSimulated: false,
+    }
+
+    authStorage.saveSession(storedSession, { accessToken: token })
+    return session
+  },
+
+  /**
    * Atualiza os dados completos da sessão autenticada.
    */
   setCurrentUser(user: UserSession) {
@@ -251,7 +329,7 @@ export const userService = {
     }
 
     authStorage.saveSession({
-      userId: user.id,
+      userId: user.id ?? 0,
       name: user.name,
       email: user.email || `${user.role.toLowerCase()}@georural.com.br`,
       role: user.role,
@@ -290,8 +368,7 @@ export const userService = {
    * Verifica se o usuário autenticado possui perfil de Administrador.
    */
   isAdmin(): boolean {
-    const r = currentUser.value.role
-    return r === 'Administrador' || r === 'ADMIN'
+    return normalizeRoleKey(currentUser.value.role) === 'ADMIN'
   },
 
   /**
@@ -342,12 +419,12 @@ export const userService = {
   // -------------------------------------------------------------
 
   getUsers(): UserItem[] {
-    const repo = roleService.getRepo() as any
+    const repo = roleService.getMockRepo() as unknown as { users: UserItem[] }
     return repo.users
   },
 
-  async getUsersAsync(): Promise<UserItem[]> {
-    return roleService.getRepo().listUsers()
+  async getUsersAsync(filters?: UserListFilters): Promise<UserItem[]> {
+    return roleService.getRepo().listUsers(filters)
   },
 
   getUserById(id: number): UserItem | undefined {
@@ -367,16 +444,20 @@ export const userService = {
     sodException?: boolean
     sodJustification?: string
   }): UserItem {
-    const repo = roleService.getRepo() as any
+    const repo = roleService.getMockRepo() as unknown as {
+      users: UserItem[]
+      roles: RoleDef[]
+      recordSecurityEvent: (dto: RecordSecurityEventDto) => Promise<SecurityEvent>
+    }
     const emailNorm = data.email.trim().toLowerCase()
-    const duplicate = (repo.users as UserItem[]).some(
+    const duplicate = repo.users.some(
       (u) => u.email.trim().toLowerCase() === emailNorm,
     )
     if (duplicate) {
       throw new DuplicateEmailError(data.email)
     }
 
-    const roleDef = repo.roles.find((r: any) => r.id === data.role)
+    const roleDef = repo.roles.find((r) => r.id === data.role)
     const permissions = roleDef ? [...roleDef.permissions] : []
 
     const newUser: UserItem = {
@@ -428,8 +509,8 @@ export const userService = {
     const roleChanged = existing.role !== data.role
     let permissions = [...existing.permissions]
     if (roleChanged) {
-      const repo = roleService.getRepo() as any
-      const roleDef = repo.roles.find((r: any) => r.id === data.role)
+      const repo = roleService.getMockRepo() as unknown as { roles: RoleDef[] }
+      const roleDef = repo.roles.find((r) => r.id === data.role)
       permissions = roleDef ? [...roleDef.permissions] : []
     }
 
@@ -446,8 +527,7 @@ export const userService = {
     }
 
     if (roleChanged) {
-      const repo = roleService.getRepo() as any
-      repo.recordSecurityEvent({
+      roleService.getMockRepo().recordSecurityEvent({
         action: 'Troca de Cargo',
         details: `Alterou o papel do usuário ${users[idx]!.name} de ${existing.role} para ${data.role}.`,
         severity: 'INFO',
@@ -455,6 +535,19 @@ export const userService = {
     }
 
     return users[idx]!
+  },
+
+  async toggleUserStatusAsync(id: number, currentStatus?: 'Ativo' | 'Inativo', userEmail?: string): Promise<UserItem | null> {
+    const emailToCheck = userEmail || this.getUserById(id)?.email
+    if (
+      emailToCheck &&
+      currentUser.value.email &&
+      emailToCheck.toLowerCase() === currentUser.value.email.toLowerCase()
+    ) {
+      throw new Error('Você não pode inativar seu próprio acesso de Administrador.')
+    }
+    const targetAtivo = currentStatus ? currentStatus !== 'Ativo' : undefined
+    return roleService.getRepo().toggleUserStatus(id, targetAtivo)
   },
 
   toggleUserStatus(id: number): UserItem | null {
@@ -468,8 +561,7 @@ export const userService = {
 
     user.status = user.status === 'Ativo' ? 'Inativo' : 'Ativo'
 
-    const repo = roleService.getRepo() as any
-    repo.recordSecurityEvent({
+    roleService.getMockRepo().recordSecurityEvent({
       action: user.status === 'Ativo' ? 'Ativação de Conta' : 'Inativação de Conta',
       details: `${user.status === 'Ativo' ? 'Ativou' : 'Inativou'} o acesso do usuário ${user.name}.`,
       severity: user.status === 'Inativo' ? 'WARNING' : 'INFO',
@@ -478,13 +570,17 @@ export const userService = {
     return user
   },
 
+  async resetPasswordAsync(id: number, novaSenha: string): Promise<void> {
+    return roleService.getRepo().resetPassword(id, novaSenha)
+  },
+
+  // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
   updateUserPermissions(id: number, permissions: string[]): UserItem | null {
     const user = this.getUserById(id)
     if (!user) return null
     user.permissions = [...permissions]
 
-    const repo = roleService.getRepo() as any
-    if (typeof repo.persist === 'function') repo.persist()
+    roleService.getMockRepo().persist()
 
     if (currentUser.value.id === id) {
       currentUser.value.permissions = [...permissions]
@@ -494,15 +590,16 @@ export const userService = {
     return user
   },
 
+  // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
   resetPermissionsToRole(id: number): string[] {
     const user = this.getUserById(id)
     if (!user) return []
-    const repo = roleService.getRepo() as any
-    const roleDef = repo.roles.find((r: any) => r.id === user.role)
+    const repo = roleService.getMockRepo() as unknown as { roles: RoleDef[] }
+    const roleDef = repo.roles.find((r) => r.id === user.role)
     const defaults = roleDef?.permissions || []
     user.permissions = [...defaults]
 
-    if (typeof repo.persist === 'function') repo.persist()
+    roleService.getMockRepo().persist()
 
     if (currentUser.value.id === id) {
       currentUser.value.permissions = [...defaults]
@@ -521,8 +618,8 @@ export const userService = {
   },
 
   getRoleDefaultPermissions(role: SystemRole): string[] {
-    const repo = roleService.getRepo() as any
-    const found = repo.roles.find((r: any) => r.id === role)
+    const repo = roleService.getMockRepo() as unknown as { roles: RoleDef[] }
+    const found = repo.roles.find((r) => r.id === role)
     if (found) return found.permissions
     return (ROLE_DEFAULT_PERMISSIONS as Record<string, string[]>)[role] || []
   },
@@ -531,8 +628,14 @@ export const userService = {
   // Trilha de Auditoria de Segurança
   // -------------------------------------------------------------
 
-  async getSecurityEvents(): Promise<SecurityEvent[]> {
-    return roleService.getRepo().listSecurityEvents()
+  async getSecurityEvents(filters?: SecurityEventFilters): Promise<SecurityEvent[]> {
+    return roleService.getRepo().listSecurityEvents(filters)
+  },
+
+  async getSecurityEventsPagedAsync(
+    filters?: SecurityEventFilters,
+  ): Promise<PaginatedResult<SecurityEvent>> {
+    return roleService.getRepo().listSecurityEventsPaged(filters)
   },
 
   async recordSecurityEvent(dto: RecordSecurityEventDto): Promise<SecurityEvent> {

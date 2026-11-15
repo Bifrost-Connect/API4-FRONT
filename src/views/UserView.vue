@@ -30,6 +30,7 @@ import {
 } from '@/services/user'
 import { roleService } from '@/services/roles'
 import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
+import { extractApiErrorMessage } from '@/services/api'
 
 type AdminTab = 'colaboradores' | 'matriz' | 'auditoria'
 const activeTab = ref<AdminTab>('colaboradores')
@@ -71,6 +72,30 @@ const closeResetPasswordModal = () => {
 
 const handleResetPassword = async () => {
   resetPasswordError.value = ''
+  if (!resetTargetUser.value) return
+
+  if (!resetNewPassword.value || resetNewPassword.value.length < 8) {
+    resetPasswordError.value = 'A nova senha deve ter no mínimo 8 caracteres.'
+    return
+  }
+
+  if (resetNewPassword.value !== resetConfirmPassword.value) {
+    resetPasswordError.value = 'A nova senha e a confirmação não conferem.'
+    return
+  }
+
+  isResettingPassword.value = true
+  const targetName = resetTargetUser.value.name
+  try {
+    await userService.resetPasswordAsync(resetTargetUser.value.id, resetNewPassword.value)
+    closeResetPasswordModal()
+    showToast(`Senha de ${targetName} redefinida com sucesso!`)
+    await refreshData()
+  } catch (err: unknown) {
+    resetPasswordError.value = extractApiErrorMessage(err, 'Falha ao redefinir senha do colaborador.')
+  } finally {
+    isResettingPassword.value = false
+  }
 }
 
 // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
@@ -91,7 +116,7 @@ const availableRoleOptions = computed(() => {
 })
 
 const refreshData = async () => {
-  users.value = [...userService.getUsers()]
+  users.value = await userService.getUsersAsync()
   roles.value = await roleService.getRoles()
   allPermissions.value = userService.getAllPermissions()
   securityEvents.value = await userService.getSecurityEvents()
@@ -135,9 +160,14 @@ const handleSaveUser = async (data: {
   sodException?: boolean
   sodJustification?: string
 }) => {
+  if (data.sodException && (!data.sodJustification || data.sodJustification.trim().length < 10)) {
+    showToast('A justificativa de exceção SoD deve conter no mínimo 10 caracteres.', 'error')
+    return
+  }
+
   try {
     if (isEditingUser.value && selectedUserToEdit.value) {
-      const updated = userService.updateUser(selectedUserToEdit.value.id, {
+      const updated = await userService.updateUserAsync(selectedUserToEdit.value.id, {
         name: data.name,
         email: data.email,
         role: data.role,
@@ -165,31 +195,32 @@ const handleSaveUser = async (data: {
 
     isFormModalOpen.value = false
     await refreshData()
-  } catch (error: any) {
-    if (error instanceof DuplicateEmailError || error?.name === 'DuplicateEmailError') {
-      showToast(error.message, 'error')
+  } catch (error: unknown) {
+    if (error instanceof DuplicateEmailError || (error as { name?: string })?.name === 'DuplicateEmailError') {
+      showToast((error as Error).message, 'error')
     } else {
-      showToast(error?.message || 'Falha ao salvar dados do colaborador.', 'error')
+      showToast(extractApiErrorMessage(error, 'Falha ao salvar dados do colaborador.'), 'error')
     }
   }
 }
 
-const handleToggleUserStatus = (user: UserItem) => {
+const handleToggleUserStatus = async (user: UserItem) => {
   try {
-    const updated = userService.toggleUserStatus(user.id)
+    const updated = await userService.toggleUserStatusAsync(user.id, user.status, user.email)
     if (updated) {
       showToast(`Status de ${updated.name} alterado para ${updated.status}.`)
-      refreshData()
+      await refreshData()
     }
-  } catch (err: any) {
-    showToast(err?.message || 'Ação bloqueada pelas regras de segurança.', 'error')
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Ação bloqueada pelas regras de segurança.'), 'error')
   }
 }
 
 // -------------------------------------------------------------
 // Subpermissões Granulares por Usuário
+// TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
 // -------------------------------------------------------------
-
+/*
 const openPermissionsModal = (user: UserItem) => {
   permUser.value = user
   selectedPermissions.value = new Set(user.permissions)
@@ -246,6 +277,7 @@ const saveUserPermissions = () => {
   closePermissionsModal()
   refreshData()
 }
+*/
 
 // -------------------------------------------------------------
 // Ações de Roles (Aba 2)

@@ -62,20 +62,48 @@ const safeStorage = {
 }
 
 /**
- * Codifica objeto em formato Base64Url simulando um token JWT estruturado.
+ * Codifica string UTF-8 em formato Base64Url sem depender de APIs Node-only (Buffer).
  */
 function base64UrlEncode(str: string): string {
-  try {
-    if (typeof btoa !== 'undefined') {
-      return btoa(unescape(encodeURIComponent(str)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
+  if (typeof TextEncoder !== 'undefined' && typeof btoa !== 'undefined') {
+    const bytes = new TextEncoder().encode(str)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]!)
     }
-  } catch {
-    // Fallback manual simples
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   }
-  return Buffer.from(str, 'utf-8').toString('base64url')
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
+/**
+ * Decodifica string Base64Url para UTF-8 usando atob + Uint8Array/TextDecoder.
+ */
+export function base64UrlDecode(segment: string): string {
+  const base64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder().decode(bytes)
+  }
+  return decodeURIComponent(escape(binary))
+}
+
+export function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2 || !parts[1]) return null
+    return JSON.parse(base64UrlDecode(parts[1])) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 export const authStorage = {

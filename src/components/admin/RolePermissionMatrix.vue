@@ -1,45 +1,32 @@
 <script setup lang="ts">
 /**
  * Aba 2: Matriz de Perfis e Permissões - RBAC (Tarefas 4 e 9).
- * Matriz Módulos × Cargos com trava imutável de Read-Only do Auditor
- * e capacidade de criar, editar e excluir papéis customizados.
+ * Matriz Módulos × Cargos com trava imutável de Read-Only do Auditor.
  */
-import { ref, computed } from 'vue'
-import {
-  FiShield,
-  FiPlus,
-  FiTrash2,
-  FiCheck,
-  FiX,
-  FiLock,
-  FiInfo,
-  FiSave,
-} from 'vue-icons-plus/fi'
+import { computed } from 'vue'
+import { FiCheck, FiLock } from 'vue-icons-plus/fi'
 import type { RoleDef, PermissionDefinition } from '@/mocks/user.mock'
-import { isAuditorReadOnlyLocked, hasSoDConflict } from '@/utils/rbac'
-import SodExceptionModal from './SodExceptionModal.vue'
+import { isAuditorReadOnlyLocked } from '@/utils/rbac'
 
 const props = defineProps<{
   roles: RoleDef[]
   allPermissions: PermissionDefinition[]
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'create-role', role: { id: string; nome: string; descricao: string; permissions: string[] }): void
   (e: 'update-role', roleId: string, role: { nome: string; descricao: string; permissions: string[] }): void
   (e: 'delete-role', roleId: string): void
 }>()
 
-// Modal de Novo Cargo Customizado
-const isCreateRoleModalOpen = ref(false)
-const newRoleId = ref('')
-const newRoleName = ref('')
-const newRoleDesc = ref('')
-const newRolePermissions = ref<Set<string>>(new Set())
-const createRoleError = ref('')
-
-// Modal SoD para criação de cargo
-const isSodModalOpen = ref(false)
+// TODO: Aguardando endpoint no API4-BACK (CRUD de cargos customizados e mutação SoD de papéis)
+// const isCreateRoleModalOpen = ref(false)
+// const newRoleId = ref('')
+// const newRoleName = ref('')
+// const newRoleDesc = ref('')
+// const newRolePermissions = ref<Set<string>>(new Set())
+// const createRoleError = ref('')
+// const isSodModalOpen = ref(false)
 
 // Agrupa permissões por módulo
 const groupedPermissions = computed(() => {
@@ -63,55 +50,6 @@ const isPermissionLockedForRole = (role: RoleDef, permKey: string): boolean => {
     return isAuditorReadOnlyLocked(permKey)
   }
   return false
-}
-
-const openCreateRoleModal = () => {
-  newRoleId.value = ''
-  newRoleName.value = ''
-  newRoleDesc.value = ''
-  newRolePermissions.value = new Set()
-  createRoleError.value = ''
-  isCreateRoleModalOpen.value = true
-}
-
-const toggleNewRolePermission = (permKey: string) => {
-  const updated = new Set(newRolePermissions.value)
-  if (updated.has(permKey)) {
-    updated.delete(permKey)
-  } else {
-    updated.add(permKey)
-  }
-  newRolePermissions.value = updated
-}
-
-const submitCreateRole = () => {
-  if (!newRoleId.value.trim() || !newRoleName.value.trim()) {
-    createRoleError.value = 'Informe o identificador e o nome do cargo.'
-    return
-  }
-
-  const perms = Array.from(newRolePermissions.value)
-  if (hasSoDConflict(perms)) {
-    isSodModalOpen.value = true
-    return
-  }
-
-  finishCreateRole()
-}
-
-const finishCreateRole = () => {
-  emit('create-role', {
-    id: newRoleId.value.trim().toUpperCase(),
-    nome: newRoleName.value.trim(),
-    descricao: newRoleDesc.value.trim(),
-    permissions: Array.from(newRolePermissions.value),
-  })
-  isCreateRoleModalOpen.value = false
-}
-
-const onSodConfirm = () => {
-  isSodModalOpen.value = false
-  finishCreateRole()
 }
 </script>
 
