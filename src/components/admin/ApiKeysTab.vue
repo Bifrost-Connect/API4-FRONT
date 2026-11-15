@@ -2,9 +2,8 @@
 /**
  * Aba de Gestão de Chaves de API e Logs de Acesso Externo (US12).
  * Baseada nas migrations V39 (chaves_api) e V40 (log_acessos_api_externa) do API4-BACK.
- * Nota: Estados locais estáticos mínimos nesta etapa estrutural; integração completa via ApiKeyRepository na sequência.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   FiKey,
   FiPlus,
@@ -20,30 +19,10 @@ import {
   FiShield,
   FiClock,
 } from 'vue-icons-plus/fi'
-
-type ApiKeyStatus = 'ATIVA' | 'REVOGADA' | 'EXPIRADA'
-
-interface ApiKeyStub {
-  id: number
-  usuario_id: number
-  nome_parceiro: string
-  prefixo_chave: string
-  escopos: string[]
-  status: ApiKeyStatus
-  data_criacao: string
-  data_expiracao: string | null
-  data_revogacao: string | null
-  ultimo_uso_em: string | null
-}
-
-interface ExternalLogStub {
-  id: number
-  chave_api_id: number
-  rota_acessada: string
-  status_http: number
-  ip_origem: string
-  data_acesso: string
-}
+import { apiKeyService } from '@/services/apiKeyService'
+import { userService } from '@/services/user'
+import { extractApiErrorMessage } from '@/services/api'
+import type { ApiKeyRecord, ApiKeyStatus, ExternalApiAccessLog } from '@/types/apiKey'
 
 const AVAILABLE_SCOPES = [
   { code: 'CATALOGO_CONSULTAR', label: 'Consultar Catálogo de Bases' },
@@ -54,24 +33,12 @@ const AVAILABLE_SCOPES = [
   { code: 'ANALISE_EXECUTAR', label: 'Executar Análises Territoriais' },
 ]
 
-// Estados estáticos mínimos para renderização estrutural (substituídos pelo apiKeyService na etapa de lógica)
-const apiKeys = ref<ApiKeyStub[]>([
-  {
-    id: 1,
-    usuario_id: 6,
-    nome_parceiro: 'Secretaria Estadual de Meio Ambiente',
-    prefixo_chave: 'bf_live_8a92c1f0',
-    escopos: ['CATALOGO_CONSULTAR', 'MAPA_CONSULTAR', 'DOMINIO_CONSULTAR'],
-    status: 'ATIVA',
-    data_criacao: '2026-10-01T10:15:00Z',
-    data_expiracao: '2027-10-01T23:59:59Z',
-    data_revogacao: null,
-    ultimo_uso_em: '2026-11-15T14:20:00Z',
-  },
-])
+const canCreateKey = computed(() => userService.can('API:GERAR_CHAVE'))
+const canRevokeKey = computed(() => userService.can('API:REVOGAR_CHAVE'))
 
+const apiKeys = ref<ApiKeyRecord[]>([])
 const isLoading = ref(false)
-const isFallbackMode = ref(true)
+const isFallbackMode = apiKeyService.isFallbackMode
 const searchQuery = ref('')
 const statusFilter = ref<'' | ApiKeyStatus>('')
 
@@ -95,16 +62,29 @@ const secretCopied = ref(false)
 
 // Modal de Revogação
 const isRevokeModalOpen = ref(false)
-const revokeTargetKey = ref<ApiKeyStub | null>(null)
+const revokeTargetKey = ref<ApiKeyRecord | null>(null)
 const isRevoking = ref(false)
 
 // Modal de Logs Externos (V40)
 const isLogsModalOpen = ref(false)
-const logsTargetKey = ref<ApiKeyStub | null>(null)
-const externalLogs = ref<ExternalLogStub[]>([])
+const logsTargetKey = ref<ApiKeyRecord | null>(null)
+const externalLogs = ref<ExternalApiAccessLog[]>([])
 const isLoadingLogs = ref(false)
 const logRouteSearch = ref('')
 const logStatusGroup = ref<'' | '2xx' | '4xx' | '5xx'>('')
+
+const loadKeys = async () => {
+  isLoading.value = true
+  try {
+    apiKeys.value = await apiKeyService.listKeys()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void loadKeys()
+})
 
 const filteredKeys = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -168,8 +148,12 @@ const closeCreateModal = () => {
   isCreateModalOpen.value = false
 }
 
-const handleCreateKey = () => {
+const handleCreateKey = async () => {
   createError.value = ''
+  if (!canCreateKey.value) {
+    createError.value = 'Você não possui permissão para gerar chaves de API.'
+    return
+  }
   if (!createPartnerName.value.trim()) {
     createError.value = 'Informe o nome do parceiro ou sistema integrador.'
     return
@@ -178,7 +162,34 @@ const handleCreateKey = () => {
     createError.value = 'Selecione ao menos um escopo de acesso.'
     return
   }
-  isCreateModalOpen.value = false
+
+  isCreating.value = true
+  try {
+    const expirationIso = createExpirationDate.value
+      ? `${createExpirationDate.value}T23:59:59Z`
+      : null
+    const result = await apiKeyService.createKey({
+      nome_parceiro: createPartnerName.value.trim(),
+      escopos: [...createSelectedScopes.value],
+      data_expiracao: expirationIso,
+      usuario_id: userService.getCurrentUser().id,
+    })
+
+    isCreateModalOpen.value = false
+    generatedSecretData.value = {
+      nome_parceiro: result.key.nome_parceiro,
+      prefixo_chave: result.key.prefixo_chave,
+      escopos: [...result.key.escopos],
+      rawKey: result.rawSecret,
+    }
+    secretCopied.value = false
+    isSecretModalOpen.value = true
+    await loadKeys()
+  } catch (err: unknown) {
+    createError.value = extractApiErrorMessage(err, 'Falha ao gerar nova chave de API.')
+  } finally {
+    isCreating.value = false
+  }
 }
 
 const copyGeneratedSecret = async () => {
@@ -195,7 +206,7 @@ const closeSecretModal = () => {
   secretCopied.value = false
 }
 
-const openRevokeModal = (keyItem: ApiKeyStub) => {
+const openRevokeModal = (keyItem: ApiKeyRecord) => {
   revokeTargetKey.value = keyItem
   isRevokeModalOpen.value = true
 }
@@ -205,17 +216,31 @@ const closeRevokeModal = () => {
   revokeTargetKey.value = null
 }
 
-const handleConfirmRevoke = () => {
-  isRevokeModalOpen.value = false
-  revokeTargetKey.value = null
+const handleConfirmRevoke = async () => {
+  if (!revokeTargetKey.value || !canRevokeKey.value) return
+  isRevoking.value = true
+  try {
+    await apiKeyService.revokeKey(revokeTargetKey.value.id, userService.getCurrentUser().id)
+    isRevokeModalOpen.value = false
+    revokeTargetKey.value = null
+    await loadKeys()
+  } finally {
+    isRevoking.value = false
+  }
 }
 
-const openLogsModal = (keyItem: ApiKeyStub) => {
+const openLogsModal = async (keyItem: ApiKeyRecord) => {
   logsTargetKey.value = keyItem
   logRouteSearch.value = ''
   logStatusGroup.value = ''
   externalLogs.value = []
   isLogsModalOpen.value = true
+  isLoadingLogs.value = true
+  try {
+    externalLogs.value = await apiKeyService.listExternalLogs(keyItem.id)
+  } finally {
+    isLoadingLogs.value = false
+  }
 }
 
 const closeLogsModal = () => {
@@ -251,6 +276,7 @@ const closeLogsModal = () => {
           </span>
 
           <button
+            v-if="canCreateKey"
             type="button"
             class="btn-primary"
             data-testid="btn-new-api-key"
@@ -382,6 +408,7 @@ const closeLogsModal = () => {
                   </button>
 
                   <button
+                    v-if="canRevokeKey"
                     type="button"
                     class="btn-action btn-revoke"
                     data-testid="btn-revoke-api-key"

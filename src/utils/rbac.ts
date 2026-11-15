@@ -136,7 +136,7 @@ export const ROUTE_PERMISSIONS: Record<string, string | string[]> = {
     'BASES:HOMOLOGAR',
     'INGESTAO:VISUALIZAR_PROCESSAMENTO',
   ],
-  users: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR'],
+  users: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR', 'API:VISUALIZAR_CHAVES'],
 }
 
 /**
@@ -239,7 +239,7 @@ export const MENU_ITEMS: MenuItem[] = [
     label: 'Gerenciamento de usuários',
     to: '/users',
     icon: FiUsers,
-    permission: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR'],
+    permission: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR', 'API:VISUALIZAR_CHAVES'],
   },
 ]
 

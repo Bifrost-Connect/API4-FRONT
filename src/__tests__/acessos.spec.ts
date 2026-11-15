@@ -136,7 +136,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
 
-    it('exibe Dashboard, Catálogo, Mapa e Análise Territorial para o Gestor de Dados', () => {
+    it('exibe Dashboard, Catálogo, Mapa, Análise Territorial e Gestão de APIs para o Gestor de Dados', () => {
       userService.setCurrentUserRole('GESTOR')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
@@ -146,11 +146,11 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
       expect(labels).toContain('Comparação temporal')
+      expect(labels).toContain('Gerenciamento de usuários')
       expect(labels).not.toContain('Upload de carga')
-      expect(labels).not.toContain('Gerenciamento de usuários')
     })
 
-    it('exibe Catálogo de Bases, Mapa e Perfil para o Integrador Externo, ocultando Dashboard, Upload e Gestão', () => {
+    it('exibe Catálogo de Bases, Mapa, Perfil e Gestão de Chaves API para o Integrador Externo, ocultando Dashboard e Upload', () => {
       userService.setCurrentUserRole('INTEGRADOR_EXTERNO')
       const user = userService.getCurrentUser()
       const menu = getVisibleMenuItems(user)
@@ -159,9 +159,9 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Perfil do usuário')
+      expect(labels).toContain('Gerenciamento de usuários')
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Upload de carga')
-      expect(labels).not.toContain('Gerenciamento de usuários')
       expect(homeFor(user)).toBe('/catalogo')
     })
 

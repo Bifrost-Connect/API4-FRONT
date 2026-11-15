@@ -34,7 +34,27 @@ import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
 import { extractApiErrorMessage } from '@/services/api'
 
 type AdminTab = 'colaboradores' | 'matriz' | 'auditoria' | 'chaves-api'
-const activeTab = ref<AdminTab>('colaboradores')
+
+const hasPermission = (permissions: string[]) => userService.canAny(permissions)
+
+const canViewUsers = computed(() => hasPermission(['USUARIOS:VISUALIZAR']))
+const canViewRoles = computed(() => hasPermission(['ROLES:VISUALIZAR']))
+const canViewAudit = computed(
+  () =>
+    hasPermission(['AUDITORIA:VISUALIZAR']) &&
+    hasPermission(['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR']),
+)
+const canViewApiKeys = computed(() => hasPermission(['API:VISUALIZAR_CHAVES']))
+
+const resolveInitialTab = (): AdminTab => {
+  if (canViewUsers.value) return 'colaboradores'
+  if (canViewRoles.value) return 'matriz'
+  if (canViewAudit.value) return 'auditoria'
+  if (canViewApiKeys.value) return 'chaves-api'
+  return 'colaboradores'
+}
+
+const activeTab = ref<AdminTab>(resolveInitialTab())
 
 // Estados reativos
 const users = ref<UserItem[]>([])
@@ -117,13 +137,20 @@ const availableRoleOptions = computed(() => {
 })
 
 const refreshData = async () => {
-  users.value = await userService.getUsersAsync()
-  roles.value = await roleService.getRoles()
+  if (canViewUsers.value) {
+    users.value = await userService.getUsersAsync()
+  }
+  if (canViewRoles.value || canViewUsers.value) {
+    roles.value = await roleService.getRoles()
+  }
   allPermissions.value = userService.getAllPermissions()
-  securityEvents.value = await userService.getSecurityEvents()
+  if (canViewAudit.value) {
+    securityEvents.value = await userService.getSecurityEvents()
+  }
 }
 
 onMounted(async () => {
+  activeTab.value = resolveInitialTab()
   await refreshData()
 })
 
@@ -341,6 +368,7 @@ const handleDeleteRole = async (roleId: string) => {
     <!-- Navegação por Abas Especializadas -->
     <div class="tabs-nav" data-testid="admin-tabs-nav">
       <button
+        v-if="canViewUsers"
         type="button"
         class="tab-btn"
         :class="{ active: activeTab === 'colaboradores' }"
@@ -352,6 +380,7 @@ const handleDeleteRole = async (roleId: string) => {
       </button>
 
       <button
+        v-if="canViewRoles"
         type="button"
         class="tab-btn"
         :class="{ active: activeTab === 'matriz' }"
@@ -363,6 +392,7 @@ const handleDeleteRole = async (roleId: string) => {
       </button>
 
       <button
+        v-if="canViewAudit"
         type="button"
         class="tab-btn"
         :class="{ active: activeTab === 'auditoria' }"
@@ -374,6 +404,7 @@ const handleDeleteRole = async (roleId: string) => {
       </button>
 
       <button
+        v-if="canViewApiKeys"
         type="button"
         class="tab-btn"
         :class="{ active: activeTab === 'chaves-api' }"
@@ -387,7 +418,7 @@ const handleDeleteRole = async (roleId: string) => {
 
     <!-- Conteúdo da Aba 1: Colaboradores e Acessos (Tarefa 1 e 8) -->
     <UserManagementTab
-      v-if="activeTab === 'colaboradores'"
+      v-if="canViewUsers && activeTab === 'colaboradores'"
       :users="users"
       :available-roles="availableRoleOptions"
       :logged-in-admin-email="loggedInAdmin.email"
@@ -399,7 +430,7 @@ const handleDeleteRole = async (roleId: string) => {
 
     <!-- Conteúdo da Aba 2: Cargos e Permissões (Tarefas 4 e 9) -->
     <RolePermissionMatrix
-      v-else-if="activeTab === 'matriz'"
+      v-else-if="canViewRoles && activeTab === 'matriz'"
       :roles="roles"
       :all-permissions="allPermissions"
       @create-role="handleCreateRole"
@@ -408,12 +439,12 @@ const handleDeleteRole = async (roleId: string) => {
 
     <!-- Conteúdo da Aba 3: Auditoria de Segurança (Tarefa 3) -->
     <SecurityAuditTab
-      v-else-if="activeTab === 'auditoria'"
+      v-else-if="canViewAudit && activeTab === 'auditoria'"
       :events="securityEvents"
     />
 
     <!-- Conteúdo da Aba 4: Chaves de API e Logs Externos (US12) -->
-    <ApiKeysTab v-else-if="activeTab === 'chaves-api'" />
+    <ApiKeysTab v-else-if="canViewApiKeys && activeTab === 'chaves-api'" />
 
     <!-- Modal de Cadastro / Edição de Colaborador (Tarefas 2, 5 e 10) -->
     <UserFormModal

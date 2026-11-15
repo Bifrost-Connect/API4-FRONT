@@ -94,7 +94,7 @@ const router = createRouter({
       path: '/users',
       name: 'users',
       component: UserView,
-      meta: { permission: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR'] },
+      meta: { permission: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR', 'API:VISUALIZAR_CHAVES'] },
     },
     {
       path: '/acesso-negado',

@@ -157,4 +157,40 @@ describe('UserView - Redefinição de Senha e Fluxos Administrativos (US13)', ()
     expect(wrapper.text()).toContain('USUARIOS:VISUALIZAR')
     expect(wrapper.text()).toContain('Autenticado via JWT')
   })
+
+  it('exibe todas as 4 abas para ADMIN e inicia em Colaboradores e Acessos', async () => {
+    userService.setCurrentUserRole('ADMIN')
+    const wrapper = mount(UserView)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tab-colaboradores"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-matriz"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-auditoria"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-chaves-api"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-colaboradores"]').classes()).toContain('active')
+  })
+
+  it('para GESTOR e INTEGRADOR_EXTERNO exibe apenas a aba Chaves de API, abre nela e não dispara buscas administrativas restritas', async () => {
+    for (const role of ['GESTOR', 'INTEGRADOR_EXTERNO'] as const) {
+      vi.clearAllMocks()
+      const usersSpy = vi.spyOn(userService, 'getUsersAsync').mockResolvedValue([])
+      const rolesSpy = vi.spyOn(roleService, 'getRoles').mockResolvedValue([])
+      const eventsSpy = vi.spyOn(userService, 'getSecurityEvents').mockResolvedValue([])
+
+      userService.setCurrentUserRole(role)
+      const wrapper = mount(UserView)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="tab-colaboradores"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="tab-matriz"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="tab-auditoria"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="tab-chaves-api"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="tab-chaves-api"]').classes()).toContain('active')
+      expect(wrapper.find('[data-testid="api-keys-tab"]').exists()).toBe(true)
+
+      expect(usersSpy).not.toHaveBeenCalled()
+      expect(rolesSpy).not.toHaveBeenCalled()
+      expect(eventsSpy).not.toHaveBeenCalled()
+    }
+  })
 })

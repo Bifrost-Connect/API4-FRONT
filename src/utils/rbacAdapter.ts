@@ -220,6 +220,9 @@ export function mapBackendPermissionsToFront(
 
   if (frontRole === 'INTEGRADOR_EXTERNO') {
     result.delete('MAPA:COMPARAR_SAFRAS')
+  }
+
+  if (frontRole === 'ADMIN' || frontRole === 'GESTOR' || frontRole === 'INTEGRADOR_EXTERNO') {
     result.add('API:VISUALIZAR_CHAVES')
     result.add('API:GERAR_CHAVE')
     result.add('API:REVOGAR_CHAVE')

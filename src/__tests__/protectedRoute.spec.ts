@@ -165,10 +165,10 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
   })
 
   describe('Perfil Gestor de Dados (GESTOR)', () => {
-    it('bloqueia /users e /upload, permitindo /catalogo e /comparacao-temporal', async () => {
+    it('bloqueia /upload e permite /catalogo, /comparacao-temporal e /users (Chaves de API)', async () => {
       userService.setCurrentUserRole('GESTOR')
 
-      const forbiddenRoutes = ['/users', '/upload']
+      const forbiddenRoutes = ['/upload']
 
       for (const path of forbiddenRoutes) {
         await router.push('/profile')
@@ -186,15 +186,19 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
       await router.push('/comparacao-temporal')
       expect(router.currentRoute.value.name).toBe('comparacao-temporal')
       expect(router.currentRoute.value.path).toBe('/comparacao-temporal')
+
+      await router.push('/profile')
+      await router.push('/users')
+      expect(router.currentRoute.value.name).toBe('users')
+      expect(router.currentRoute.value.path).toBe('/users')
     })
   })
 
   describe('Perfil Integrador Externo (INTEGRADOR_EXTERNO)', () => {
-    it('bloqueia /users, /upload, /, /analise-territorial e /comparacao-temporal, permitindo /catalogo e /mapa', async () => {
+    it('bloqueia /upload, /, /analise-territorial e /comparacao-temporal, permitindo /catalogo, /mapa e /users (Chaves de API)', async () => {
       userService.setCurrentUserRole('INTEGRADOR_EXTERNO')
 
       const forbiddenRoutes = [
-        '/users',
         '/upload',
         '/',
         '/analise-territorial',
@@ -217,6 +221,11 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
       await router.push('/mapa')
       expect(router.currentRoute.value.name).toBe('mapa')
       expect(router.currentRoute.value.path).toBe('/mapa')
+
+      await router.push('/profile')
+      await router.push('/users')
+      expect(router.currentRoute.value.name).toBe('users')
+      expect(router.currentRoute.value.path).toBe('/users')
     })
   })
 })
