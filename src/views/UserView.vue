@@ -21,6 +21,7 @@ import UserManagementTab from '@/components/admin/UserManagementTab.vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import RolePermissionMatrix from '@/components/admin/RolePermissionMatrix.vue'
 import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
+import ApiKeysTab from '@/components/admin/ApiKeysTab.vue'
 import {
   userService,
   type UserItem,
@@ -32,7 +33,7 @@ import { roleService } from '@/services/roles'
 import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
 import { extractApiErrorMessage } from '@/services/api'
 
-type AdminTab = 'colaboradores' | 'matriz' | 'auditoria'
+type AdminTab = 'colaboradores' | 'matriz' | 'auditoria' | 'chaves-api'
 const activeTab = ref<AdminTab>('colaboradores')
 
 // Estados reativos
@@ -371,6 +372,17 @@ const handleDeleteRole = async (roleId: string) => {
         <FiClock size="16" />
         <span>Auditoria de Segurança</span>
       </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'chaves-api' }"
+        data-testid="tab-chaves-api"
+        @click="activeTab = 'chaves-api'"
+      >
+        <FiKey size="16" />
+        <span>Chaves de API</span>
+      </button>
     </div>
 
     <!-- Conteúdo da Aba 1: Colaboradores e Acessos (Tarefa 1 e 8) -->
@@ -399,6 +411,9 @@ const handleDeleteRole = async (roleId: string) => {
       v-else-if="activeTab === 'auditoria'"
       :events="securityEvents"
     />
+
+    <!-- Conteúdo da Aba 4: Chaves de API e Logs Externos (US12) -->
+    <ApiKeysTab v-else-if="activeTab === 'chaves-api'" />
 
     <!-- Modal de Cadastro / Edição de Colaborador (Tarefas 2, 5 e 10) -->
     <UserFormModal
