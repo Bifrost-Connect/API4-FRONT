@@ -18,6 +18,7 @@ import {
 import { profileService, type UserProfile } from '../services/profile'
 
 const profile = ref<UserProfile>(profileService.getProfile())
+const sessionPermissions = ref<string[]>([])
 
 // Formulário de dados cadastrais
 const formName = ref('')
@@ -140,131 +141,57 @@ const handleChangePassword = () => {
           <span>{{ profileSuccessMsg }}</span>
         </div>
 
-        <!-- Seção: Informações Pessoais -->
+        <!-- Seção: Informações da Sessão Autenticada -->
         <section class="card section-card">
           <div class="card-header">
-            <h3>Informações Cadastrais</h3>
-            <p>Atualize suas informações de identificação e departamento.</p>
+            <h3>Dados da Sessão Autenticada</h3>
+            <p>Informações vinculadas à sua conta e ao token JWT emitido pelo servidor.</p>
           </div>
 
+          <dl class="session-details-grid">
+            <div class="detail-item">
+              <dt>Nome Completo</dt>
+              <dd>{{ profile.name }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>E-mail Corporativo</dt>
+              <dd>{{ profile.email }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Perfil / Cargo</dt>
+              <dd>{{ profile.role }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Status da Conta</dt>
+              <dd>{{ profile.status }}</dd>
+            </div>
+          </dl>
+
+          <div v-if="sessionPermissions.length > 0" class="permissions-summary">
+            <h4>Permissões Ativas na Sessão ({{ sessionPermissions.length }})</h4>
+            <div class="permissions-chip-list">
+              <span v-for="perm in sessionPermissions" :key="perm" class="permission-chip">
+                {{ perm }}
+              </span>
+            </div>
+          </div>
+
+          <!-- TODO: Aguardando endpoint no API4-BACK (atualização cadastral pelo próprio usuário)
           <form @submit.prevent="handleSaveProfile" class="form-layout">
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label for="name" class="label">Nome Completo</label>
-                <div class="input-with-icon">
-                  <FiUser class="input-icon" size="16" />
-                  <input
-                    id="name"
-                    v-model="formName"
-                    type="text"
-                    class="input input-indented"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="email" class="label">E-mail Corporativo</label>
-                <div class="input-with-icon">
-                  <FiMail class="input-icon" size="16" />
-                  <input
-                    id="email"
-                    v-model="formEmail"
-                    type="email"
-                    class="input input-indented"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label for="cargo" class="label">Cargo</label>
-                <input id="cargo" v-model="formCargo" type="text" class="input" />
-              </div>
-
-              <div class="form-group">
-                <label for="depto" class="label">Departamento</label>
-                <input id="depto" v-model="formDepartamento" type="text" class="input" />
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn_primary">
-                <FiSave size="16" />
-                Salvar Alterações
-              </button>
-            </div>
+            ...
           </form>
+          -->
         </section>
 
-        <!-- Seção: Alterar Senha -->
+        <!-- TODO: Aguardando endpoint no API4-BACK (troca da própria senha pelo usuário logado; hoje apenas admin redefine via POST /api/admin/usuarios/{id}/redefinir-senha)
         <section class="card section-card">
           <div class="card-header">
             <h3>Segurança e Senha</h3>
             <p>Recomendamos o uso de senhas fortes com números e caracteres especiais.</p>
           </div>
-
-          <div v-if="passwordSuccessMsg" class="alert-banner alert-success">
-            <FiCheckCircle size="18" />
-            <span>{{ passwordSuccessMsg }}</span>
-          </div>
-          <div v-if="passwordErrorMsg" class="alert-banner alert-danger">
-            <FiAlertCircle size="18" />
-            <span>{{ passwordErrorMsg }}</span>
-          </div>
-
-          <form @submit.prevent="handleChangePassword" class="form-layout">
-            <div class="form-group">
-              <label for="cur-pass" class="label">Senha Atual</label>
-              <div class="input-with-icon">
-                <FiKey class="input-icon" size="16" />
-                <input
-                  id="cur-pass"
-                  v-model="currentPassword"
-                  type="password"
-                  class="input input-indented"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <div class="form-row two-cols">
-              <div class="form-group">
-                <label for="new-pass" class="label">Nova Senha</label>
-                <div class="input-with-icon">
-                  <FiKey class="input-icon" size="16" />
-                  <input
-                    id="new-pass"
-                    v-model="newPassword"
-                    type="password"
-                    class="input input-indented"
-                    placeholder="Mínimo 6 caracteres"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="confirm-pass" class="label">Confirmar Nova Senha</label>
-                <div class="input-with-icon">
-                  <FiKey class="input-icon" size="16" />
-                  <input
-                    id="confirm-pass"
-                    v-model="confirmPassword"
-                    type="password"
-                    class="input input-indented"
-                    placeholder="Repita a nova senha"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn_outline">Atualizar Senha</button>
-            </div>
-          </form>
+          ...
         </section>
+        -->
       </div>
     </div>
   </main>
@@ -313,6 +240,57 @@ const handleChangePassword = () => {
   .profile-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.session-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.detail-item {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-background, #0f172a);
+  border: 1px solid var(--color-border, #334155);
+}
+
+.detail-item dt {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #94a3b8);
+  margin-bottom: 4px;
+}
+
+.detail-item dd {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-heading, #f8fafc);
+}
+
+.permissions-summary h4 {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-heading, #f8fafc);
+  margin: 0 0 10px;
+}
+
+.permissions-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.permission-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: rgba(242, 101, 34, 0.14);
+  border: 1px solid rgba(242, 101, 34, 0.3);
+  color: var(--color-brand, #f26522);
 }
 
 .card {

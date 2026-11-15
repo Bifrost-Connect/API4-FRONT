@@ -117,15 +117,21 @@ const onSodConfirm = () => {
 
 <template>
   <div class="matrix-container" data-testid="role-permission-matrix">
-    <!-- Cabeçalho da Matriz com Botão de Novo Cargo -->
+    <!-- Cabeçalho da Matriz com Governança pelo Servidor -->
     <div class="matrix-header-bar">
       <div>
         <h3>Matriz de Permissões RBAC por Módulo</h3>
         <p class="subtitle">
-          Consulte e configure as permissões associadas a cada papel operacional do sistema GeoRural.
+          Consulte as permissões associadas a cada papel operacional governado pelo servidor GeoRural.
         </p>
       </div>
 
+      <span class="server-governance-pill">
+        <FiLock size="14" />
+        <span>Perfis governados pelo Back-end</span>
+      </span>
+
+      <!-- TODO: Aguardando endpoint no API4-BACK (CRUD de cargos customizados /roles)
       <button
         type="button"
         class="btn btn_primary btn-add-role"
@@ -135,6 +141,7 @@ const onSodConfirm = () => {
         <FiPlus size="16" />
         <span>Novo Cargo Customizado</span>
       </button>
+      -->
     </div>
 
     <!-- Tabela da Matriz -->
@@ -157,6 +164,7 @@ const onSodConfirm = () => {
                 </div>
                 <p class="role-desc">{{ role.descricao }}</p>
 
+                <!-- TODO: Aguardando endpoint no API4-BACK (exclusão de cargo customizado)
                 <button
                   v-if="!role.padrao"
                   type="button"
@@ -168,6 +176,7 @@ const onSodConfirm = () => {
                   <FiTrash2 size="13" />
                   <span>Excluir</span>
                 </button>
+                -->
               </div>
             </th>
           </tr>
@@ -225,107 +234,23 @@ const onSodConfirm = () => {
       </table>
     </div>
 
-    <!-- Modal de Criação de Cargo Customizado -->
+    <!-- TODO: Aguardando endpoint no API4-BACK (CRUD de cargos customizados /roles)
     <div
       v-if="isCreateRoleModalOpen"
       class="modal-backdrop"
       data-testid="create-role-modal"
       @click.self="isCreateRoleModalOpen = false"
     >
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <div class="modal-title-group">
-            <FiShield size="20" class="icon-brand" />
-            <h3>Criar Novo Cargo Customizado</h3>
-          </div>
-          <button type="button" class="btn-close" @click="isCreateRoleModalOpen = false">
-            <FiX size="18" />
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div v-if="createRoleError" class="alert alert-danger mb-3">
-            {{ createRoleError }}
-          </div>
-
-          <div class="form-group">
-            <label class="label">Identificador do Cargo (ID em Maiúsculas): *</label>
-            <input
-              v-model="newRoleId"
-              type="text"
-              class="input"
-              placeholder="Ex.: ANALISTA_SENIOR"
-              data-testid="input-new-role-id"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label">Nome Exibido do Cargo: *</label>
-            <input
-              v-model="newRoleName"
-              type="text"
-              class="input"
-              placeholder="Ex.: Analista Territorial Sênior"
-              data-testid="input-new-role-name"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label">Descrição da Finalidade:</label>
-            <input
-              v-model="newRoleDesc"
-              type="text"
-              class="input"
-              placeholder="Ex.: Responsável por cruzamentos analíticos e auditoria avançada"
-              data-testid="input-new-role-desc"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label">Selecione as Permissões Autorizadas:</label>
-            <div class="permissions-checklist">
-              <div
-                v-for="p in allPermissions"
-                :key="getPermKey(p)"
-                class="checklist-item"
-              >
-                <label class="check-label">
-                  <input
-                    type="checkbox"
-                    :checked="newRolePermissions.has(getPermKey(p))"
-                    @change="toggleNewRolePermission(getPermKey(p))"
-                  />
-                  <span><strong>{{ p.modulo }}</strong>: {{ p.subpermissao }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn_outline" @click="isCreateRoleModalOpen = false">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            class="btn btn_primary"
-            data-testid="btn-submit-new-role"
-            @click="submitCreateRole"
-          >
-            <FiSave size="15" />
-            <span>Criar Cargo</span>
-          </button>
-        </div>
-      </div>
+      ...
     </div>
 
-    <!-- Modal SoD caso crie cargo com acúmulo de funções -->
     <SodExceptionModal
       :is-open="isSodModalOpen"
       :user-name="newRoleName"
       @confirm="onSodConfirm"
       @cancel="isSodModalOpen = false"
     />
+    -->
   </div>
 </template>
 
@@ -346,6 +271,19 @@ const onSodConfirm = () => {
   border-radius: 10px;
   flex-wrap: wrap;
   gap: 14px;
+}
+
+.server-governance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #94a3b8);
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--color-border, #334155);
 }
 
 h3 {

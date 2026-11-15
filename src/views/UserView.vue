@@ -15,7 +15,7 @@ import {
   FiAlertCircle,
   FiX,
   FiCheck,
-  FiSave,
+  FiKey,
 } from 'vue-icons-plus/fi'
 import UserManagementTab from '@/components/admin/UserManagementTab.vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
@@ -48,12 +48,37 @@ const isFormModalOpen = ref(false)
 const isEditingUser = ref(false)
 const selectedUserToEdit = ref<UserItem | null>(null)
 
-// Modal de Permissões Granulares por Usuário
-const isPermModalOpen = ref(false)
-const permUser = ref<UserItem | null>(null)
-const selectedPermissions = ref<Set<string>>(new Set())
-const permModuleFilter = ref('')
-const permSearchFilter = ref('')
+// Modal de Redefinição de Senha (POST /api/admin/usuarios/{id}/redefinir-senha)
+const isResetModalOpen = ref(false)
+const resetTargetUser = ref<UserItem | null>(null)
+const resetNewPassword = ref('')
+const resetConfirmPassword = ref('')
+const resetPasswordError = ref('')
+const isResettingPassword = ref(false)
+
+const openResetPasswordModal = (user: UserItem) => {
+  resetTargetUser.value = user
+  resetNewPassword.value = ''
+  resetConfirmPassword.value = ''
+  resetPasswordError.value = ''
+  isResetModalOpen.value = true
+}
+
+const closeResetPasswordModal = () => {
+  isResetModalOpen.value = false
+  resetTargetUser.value = null
+}
+
+const handleResetPassword = async () => {
+  resetPasswordError.value = ''
+}
+
+// TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
+// const isPermModalOpen = ref(false)
+// const permUser = ref<UserItem | null>(null)
+// const selectedPermissions = ref<Set<string>>(new Set())
+// const permModuleFilter = ref('')
+// const permSearchFilter = ref('')
 
 const loggedInAdmin = computed(() => userService.getCurrentUser())
 
@@ -324,7 +349,7 @@ const handleDeleteRole = async (roleId: string) => {
       :logged-in-admin-email="loggedInAdmin.email"
       @create-user="openCreateUserModal"
       @edit-user="openEditUserModal"
-      @manage-permissions="openPermissionsModal"
+      @reset-password="openResetPasswordModal"
       @toggle-status="handleToggleUserStatus"
     />
 
@@ -354,112 +379,99 @@ const handleDeleteRole = async (roleId: string) => {
       @save="handleSaveUser"
     />
 
-    <!-- Modal de Gerenciamento Exclusivo de Subpermissões -->
+    <!-- Modal de Redefinição de Senha do Colaborador (US13) -->
+    <div
+      v-if="isResetModalOpen && resetTargetUser"
+      class="modal-backdrop"
+      data-testid="reset-password-modal"
+      @click.self="closeResetPasswordModal"
+    >
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <FiKey size="20" class="icon-brand" />
+            <div>
+              <h3>Redefinir Senha</h3>
+              <p class="subtitle">
+                Definir nova senha de acesso para <strong>{{ resetTargetUser.name }}</strong>
+              </p>
+            </div>
+          </div>
+          <button type="button" class="btn-close" aria-label="Fechar" @click="closeResetPasswordModal">
+            <FiX size="18" />
+          </button>
+        </div>
+
+        <form @submit.prevent="handleResetPassword">
+          <div class="modal-body">
+            <div v-if="resetPasswordError" class="alert-banner alert-danger reset-error" role="alert">
+              <FiAlertCircle size="16" />
+              <span>{{ resetPasswordError }}</span>
+            </div>
+
+            <div class="form-group">
+              <label for="reset-new-password" class="label">Nova Senha (mínimo 8 caracteres): *</label>
+              <input
+                id="reset-new-password"
+                v-model="resetNewPassword"
+                type="password"
+                name="novaSenha"
+                class="input"
+                autocomplete="new-password"
+                minlength="8"
+                required
+                data-testid="input-reset-new-password"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="reset-confirm-password" class="label">Confirmar Nova Senha: *</label>
+              <input
+                id="reset-confirm-password"
+                v-model="resetConfirmPassword"
+                type="password"
+                name="confirmarNovaSenha"
+                class="input"
+                autocomplete="new-password"
+                minlength="8"
+                required
+                data-testid="input-reset-confirm-password"
+              />
+            </div>
+
+            <p class="reset-hint">
+              Ao confirmar, todas as sessões ativas deste colaborador serão encerradas imediatamente.
+            </p>
+          </div>
+
+          <div class="modal-footer-wrapper reset-footer">
+            <button type="button" class="btn btn_outline" @click="closeResetPasswordModal">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="btn btn_primary"
+              :disabled="isResettingPassword"
+              data-testid="btn-confirm-reset-password"
+            >
+              <FiCheck size="16" />
+              <span>{{ isResettingPassword ? 'Salvando...' : 'Redefinir Senha' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
     <div
       v-if="isPermModalOpen && permUser"
       class="modal-backdrop"
       data-testid="permissions-modal"
       @click.self="closePermissionsModal"
     >
-      <div class="modal-dialog modal-lg">
-        <div class="modal-header">
-          <div class="modal-title-group">
-            <FiShield size="22" class="icon-brand" />
-            <div>
-              <h3>Gerenciar Permissões de {{ permUser.name }}</h3>
-              <p class="subtitle">
-                Cargo base: <strong>{{ permUser.role }}</strong> &bull; Personalize as capacidades deste usuário
-              </p>
-            </div>
-          </div>
-          <button type="button" class="btn-close" aria-label="Fechar" @click="closePermissionsModal">
-            <FiX size="18" />
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div class="perm-filters-row">
-            <input
-              v-model="permSearchFilter"
-              type="text"
-              class="input search-perm-input"
-              placeholder="Filtrar por nome da ação ou módulo..."
-            />
-            <select v-model="permModuleFilter" class="select select-module-filter">
-              <option value="">Todos os Módulos</option>
-              <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
-            </select>
-            <button
-              type="button"
-              class="btn btn_outline btn-reset-role"
-              @click="resetToRoleDefaults"
-            >
-              Restaurar Padrão do Cargo
-            </button>
-          </div>
-
-          <div class="permissions-table-wrapper">
-            <table class="perm-table">
-              <thead>
-                <tr>
-                  <th class="th-module">Módulo</th>
-                  <th class="th-subperm">Subpermissão</th>
-                  <th class="th-status">Status de Acesso</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="p in filteredPermissionDefs"
-                  :key="getPermKey(p)"
-                  :class="{ 'row-active': selectedPermissions.has(getPermKey(p)) }"
-                  @click="togglePermission(getPermKey(p))"
-                >
-                  <td class="cell-module">
-                    <span class="module-tag">{{ p.modulo }}</span>
-                  </td>
-                  <td class="cell-subperm">
-                    <code>{{ p.subpermissao }}</code>
-                  </td>
-                  <td class="cell-toggle">
-                    <button
-                      type="button"
-                      class="toggle-perm-btn"
-                      :class="selectedPermissions.has(getPermKey(p)) ? 'is-granted' : 'is-revoked'"
-                      @click.stop="togglePermission(getPermKey(p))"
-                    >
-                      <template v-if="selectedPermissions.has(getPermKey(p))">
-                        <FiCheck size="15" />
-                        <span>Permitido</span>
-                      </template>
-                      <template v-else>
-                        <FiX size="15" />
-                        <span>Sem Acesso</span>
-                      </template>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="modal-footer-wrapper">
-            <span class="summary-text">
-              Total concedido: <strong>{{ selectedPermissions.size }}</strong> de
-              {{ allPermissions.length }} subpermissões do sistema.
-            </span>
-            <div class="modal-footer-btns">
-              <button type="button" class="btn btn_outline" @click="closePermissionsModal">
-                Cancelar
-              </button>
-              <button type="button" class="btn btn_primary" @click="saveUserPermissions">
-                <FiSave size="16" />
-                <span>Salvar Permissões</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      ...
     </div>
+    -->
   </main>
 </template>
 
@@ -728,5 +740,35 @@ h3 {
 .modal-footer-btns {
   display: flex;
   gap: 10px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-heading, #f8fafc);
+}
+
+.reset-error {
+  margin-bottom: 14px;
+}
+
+.reset-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.reset-footer {
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  margin-top: 0;
 }
 </style>

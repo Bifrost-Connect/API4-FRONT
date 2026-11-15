@@ -29,6 +29,7 @@ const emit = defineEmits<{
   (e: 'create-user'): void
   (e: 'edit-user', user: UserItem): void
   (e: 'manage-permissions', user: UserItem): void
+  (e: 'reset-password', user: UserItem): void
   (e: 'toggle-status', user: UserItem): void
 }>()
 
@@ -144,6 +145,7 @@ const isSelf = (user: UserItem): boolean => {
 
     <!-- Tabela de Usuários -->
     <section class="card table-card">
+      <div tabindex="0" role="region" aria-label="Tabela de colaboradores" class="table-scroll-region">
       <DataTable :columns="columns" :data="paginatedUsers" row-key="id" :disable-expand="true">
         <template #cell-name="{ item }">
           <div class="user-cell">
@@ -197,7 +199,7 @@ const isSelf = (user: UserItem): boolean => {
 
         <template #cell-actions="{ item }">
           <div class="table-actions">
-            <!-- Gerenciar Subpermissões -->
+            <!-- TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
             <button
               type="button"
               class="btn-action permissions"
@@ -207,12 +209,24 @@ const isSelf = (user: UserItem): boolean => {
             >
               <FiKey size="14" />
             </button>
+            -->
 
-            <!-- Editar Dados do Usuário -->
+            <!-- Redefinir Senha do Usuário (POST /api/admin/usuarios/{id}/redefinir-senha) -->
+            <button
+              type="button"
+              class="btn-action reset-password"
+              title="Redefinir Senha do Colaborador"
+              data-testid="btn-action-reset-password"
+              @click.stop="$emit('reset-password', item)"
+            >
+              <FiKey size="14" />
+            </button>
+
+            <!-- Editar Cargo / Exceção SoD do Usuário -->
             <button
               type="button"
               class="btn-action edit"
-              title="Editar Dados do Usuário"
+              title="Editar Cargo e Permissões do Usuário"
               data-testid="btn-action-edit"
               @click.stop="$emit('edit-user', item)"
             >
@@ -241,6 +255,7 @@ const isSelf = (user: UserItem): boolean => {
           </div>
         </template>
       </DataTable>
+      </div>
 
       <div v-if="filteredUsers.length === 0" class="empty-state">
         <FiUsers size="36" />
@@ -542,8 +557,13 @@ const isSelf = (user: UserItem): boolean => {
   color: var(--color-heading, #f8fafc);
 }
 
-.btn-action.permissions:hover:not(:disabled) {
+.btn-action.permissions:hover:not(:disabled),
+.btn-action.reset-password:hover:not(:disabled) {
   color: #facc15;
+}
+
+.table-scroll-region {
+  overflow-x: auto;
 }
 
 .btn-action.status:hover:not(:disabled) {

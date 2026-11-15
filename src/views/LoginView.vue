@@ -12,6 +12,8 @@ const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
 const selectedRole = ref<string>(userService.getCurrentUser().role)
+const loginError = ref('')
+const isSubmitting = ref(false)
 
 const fillLogin = (role: string) => {
   selectedRole.value = role
@@ -86,37 +88,74 @@ const handleLogin = async () => {
   <div class="login-view">
     <div class="login-card">
       <h2>Login</h2>
-      <div class="form-group">
-        <label class="label">Email:</label>
-        <input type="text" class="input" v-model="email" />
+
+      <div v-if="loginError" class="login-error-banner" role="alert" data-testid="login-error-banner">
+        {{ loginError }}
       </div>
-      <div class="form-group">
-        <label class="label">Senha:</label>
-        <div class="password-input-wrapper">
+
+      <form class="login-form" @submit.prevent="handleLogin">
+        <div class="form-group">
+          <label for="login-email" class="label">Email:</label>
           <input
-            :type="showPassword ? 'text' : 'password'"
-            class="input password-input"
-            v-model="senha"
+            id="login-email"
+            v-model="email"
+            type="email"
+            name="email"
+            class="input"
+            autocomplete="username"
+            spellcheck="false"
+            autocapitalize="none"
+            enterkeyhint="next"
+            required
+            data-testid="login-email-input"
           />
-          <button
-            type="button"
-            class="btn-visualizar"
-            @click="showPassword = !showPassword"
-            title="Mostrar/Ocultar senha"
-          >
-            <AiOutlineEyeInvisible v-if="showPassword" size="20" />
-            <AiOutlineEye v-else size="20" />
-          </button>
         </div>
-      </div>
-      <button type="button" class="btn btn_primary" @click="handleLogin">Entrar</button>
+        <div class="form-group">
+          <label for="login-password" class="label">Senha:</label>
+          <div class="password-input-wrapper">
+            <input
+              id="login-password"
+              v-model="senha"
+              :type="showPassword ? 'text' : 'password'"
+              name="password"
+              class="input password-input"
+              autocomplete="current-password"
+              enterkeyhint="done"
+              required
+              data-testid="login-password-input"
+            />
+            <button
+              type="button"
+              class="btn-visualizar"
+              :aria-pressed="showPassword"
+              :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+              title="Mostrar/Ocultar senha"
+              @click="showPassword = !showPassword"
+            >
+              <AiOutlineEyeInvisible v-if="showPassword" size="20" />
+              <AiOutlineEye v-else size="20" />
+            </button>
+          </div>
+        </div>
+        <button
+          type="submit"
+          class="btn btn_primary"
+          :disabled="isSubmitting"
+          data-testid="login-submit-btn"
+        >
+          {{ isSubmitting ? 'Entrando...' : 'Entrar' }}
+        </button>
+      </form>
     </div>
 
     <div class="notice-card">
       <h3 class="aviso">Sistema em fase de testes</h3>
-      <p>Escolha um perfil de demonstração para abrir a área correspondente.</p>
+      <p>
+        Escolha um perfil de demonstração para preencher credenciais ou entrar em modo offline quando o back-end estiver indisponível.
+      </p>
       <div class="roles-container">
         <button
+          type="button"
           class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Operador' }"
           @click="fillLogin('Operador')"
@@ -124,6 +163,7 @@ const handleLogin = async () => {
           Entrar Operador
         </button>
         <button
+          type="button"
           class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Analista' }"
           @click="fillLogin('Analista')"
@@ -131,6 +171,7 @@ const handleLogin = async () => {
           Entrar Analista
         </button>
         <button
+          type="button"
           class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Auditor' }"
           @click="fillLogin('Auditor')"
@@ -138,6 +179,7 @@ const handleLogin = async () => {
           Entrar Auditor
         </button>
         <button
+          type="button"
           class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Gestor' }"
           @click="fillLogin('Gestor')"
@@ -145,6 +187,7 @@ const handleLogin = async () => {
           Entrar Gestor
         </button>
         <button
+          type="button"
           class="btn btn_outline"
           :class="{ 'role-selected': selectedRole === 'Administrador' }"
           @click="fillLogin('Administrador')"
@@ -189,6 +232,22 @@ const handleLogin = async () => {
   margin-bottom: 1.5rem;
   text-align: center;
   color: var(--color-heading);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-error-banner {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .form-group {

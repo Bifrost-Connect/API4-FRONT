@@ -22,6 +22,10 @@ const props = defineProps<{
 
 const searchQuery = ref('')
 const selectedTypeFilter = ref('')
+const dateFrom = ref('')
+const dateTo = ref('')
+const currentPage = ref(1)
+const totalPages = ref(1)
 
 const filteredEvents = computed(() => {
   return props.events.filter((ev) => {
@@ -61,12 +65,34 @@ const filteredEvents = computed(() => {
             <FiFilter size="14" class="select-icon" />
             <select v-model="selectedTypeFilter" class="select" data-testid="filter-audit-type">
               <option value="">Todas as Ações</option>
-              <option value="Criação">Criação de Contas</option>
-              <option value="Troca">Trocas de Cargo</option>
-              <option value="Inativação">Inativações</option>
-              <option value="SoD">Exceções SoD</option>
-              <option value="403">Bloqueios 403</option>
+              <option value="USUARIO_CRIADO">Criação de Contas</option>
+              <option value="PERMISSAO_ALTERADA">Trocas de Cargo</option>
+              <option value="PERMISSAO_ALTERADA_COM_EXCECAO_SOD">Alteração com Exceção SoD</option>
+              <option value="USUARIO_ATIVADO">Ativações de Conta</option>
+              <option value="USUARIO_INATIVADO">Inativações</option>
+              <option value="SENHA_REDEFINIDA">Redefinição de Senha</option>
+              <option value="ALERTA_SOD">Alertas SoD</option>
+              <option value="ACESSO_NEGADO_403">Bloqueios 403</option>
             </select>
+          </div>
+
+          <div class="date-range-group">
+            <label for="audit-date-from" class="date-label">De:</label>
+            <input
+              id="audit-date-from"
+              v-model="dateFrom"
+              type="date"
+              class="input date-input"
+              data-testid="audit-date-from"
+            />
+            <label for="audit-date-to" class="date-label">Até:</label>
+            <input
+              id="audit-date-to"
+              v-model="dateTo"
+              type="date"
+              class="input date-input"
+              data-testid="audit-date-to"
+            />
           </div>
         </div>
       </div>
@@ -74,7 +100,7 @@ const filteredEvents = computed(() => {
 
     <!-- Tabela da Trilha Imutável -->
     <div class="card table-card">
-      <div class="audit-table-wrap">
+      <div tabindex="0" role="region" aria-label="Logs de auditoria de segurança" class="audit-table-wrap">
         <table class="audit-table" data-testid="security-audit-table">
           <thead>
             <tr>
@@ -147,6 +173,30 @@ const filteredEvents = computed(() => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="filteredEvents.length > 0" class="audit-pagination-bar">
+        <span class="pagination-info">Página {{ currentPage }} de {{ totalPages }}</span>
+        <div class="pagination-controls">
+          <button
+            type="button"
+            class="btn-page"
+            :disabled="currentPage <= 1"
+            data-testid="audit-prev-page"
+            @click="currentPage--"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            class="btn-page"
+            :disabled="currentPage >= totalPages"
+            data-testid="audit-next-page"
+            @click="currentPage++"
+          >
+            Próxima
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -378,5 +428,60 @@ const filteredEvents = computed(() => {
 .empty-icon {
   margin-bottom: 8px;
   color: var(--color-text-muted, #64748b);
+}
+
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.date-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.date-input {
+  height: 40px;
+  padding: 0 10px;
+  background: var(--color-background, #0f172a);
+  border: 1px solid var(--color-border, #334155);
+  border-radius: 8px;
+  color: var(--color-heading, #f8fafc);
+  font-size: 0.82rem;
+}
+
+.audit-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border, #334155);
+}
+
+.pagination-info {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-page {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--color-background, #0f172a);
+  border: 1px solid var(--color-border, #334155);
+  color: var(--color-heading, #f8fafc);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-page:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

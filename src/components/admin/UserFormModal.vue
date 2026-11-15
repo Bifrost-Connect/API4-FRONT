@@ -208,12 +208,17 @@ const onSodConfirm = (justification: string) => {
                 type="text"
                 class="input input-with-icon"
                 :class="{ 'input-error': isSubmitted && errors.name }"
+                :readonly="isEditing"
                 placeholder="Ex.: Carlos Mendes"
                 data-testid="input-user-name"
               />
             </div>
             <p v-if="isSubmitted && errors.name" class="field-error" data-testid="error-user-name">
               <FiAlertCircle size="12" /> {{ errors.name }}
+            </p>
+            <!-- TODO: Aguardando endpoint no API4-BACK (edição cadastral de nome/e-mail via PUT /admin/usuarios/{id}) -->
+            <p v-else-if="isEditing" class="field-hint">
+              Dados cadastrais em modo somente leitura na edição de cargo/status.
             </p>
           </div>
 
@@ -230,6 +235,7 @@ const onSodConfirm = (justification: string) => {
                 type="email"
                 class="input input-with-icon"
                 :class="{ 'input-error': isSubmitted && errors.email }"
+                :readonly="isEditing"
                 placeholder="exemplo@georural.com.br"
                 data-testid="input-user-email"
               />
@@ -239,10 +245,11 @@ const onSodConfirm = (justification: string) => {
             </p>
           </div>
 
-          <!-- Senha Inicial / Temporária -->
-          <div class="form-group">
+          <!-- Senha Inicial / Temporária (apenas cadastro; redefinição usa ação dedicada) -->
+          <!-- TODO: Aguardando endpoint no API4-BACK para edição conjunta; use Redefinir Senha na tabela -->
+          <div v-if="!isEditing" class="form-group">
             <label for="form-password" class="label">
-              {{ isEditing ? 'Alterar Senha (Opcional):' : 'Senha Inicial Temporária: *' }}
+              Senha Inicial Temporária: <span class="required">*</span>
             </label>
             <div class="input-wrap">
               <FiLock class="field-icon" size="16" />
@@ -252,7 +259,8 @@ const onSodConfirm = (justification: string) => {
                 type="password"
                 class="input input-with-icon"
                 :class="{ 'input-error': isSubmitted && errors.password }"
-                :placeholder="isEditing ? 'Deixe em branco para manter a atual' : 'Ex.: GeoRural#2026'"
+                autocomplete="new-password"
+                placeholder="Ex.: GeoRural#2026"
                 data-testid="input-user-password"
               />
             </div>
