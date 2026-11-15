@@ -50,3 +50,17 @@ export interface ExternalLogFilters {
   search?: string
   statusGroup?: '' | '2xx' | '4xx' | '5xx'
 }
+
+export interface ApiKeyScopeOption {
+  code: string
+  label: string
+}
+
+export const API_KEY_AVAILABLE_SCOPES: readonly ApiKeyScopeOption[] = [
+  { code: 'CATALOGO_CONSULTAR', label: 'Consultar Catálogo de Bases' },
+  { code: 'MAPA_CONSULTAR', label: 'Consultar Camadas no Mapa' },
+  { code: 'LINHAGEM_CONSULTAR', label: 'Consultar Linhagem de Dados' },
+  { code: 'DOMINIO_CONSULTAR', label: 'Consultar Domínios Territoriais' },
+  { code: 'PUBLICACAO_CONSULTAR', label: 'Consultar Versões Publicadas' },
+  { code: 'ANALISE_EXECUTAR', label: 'Executar Análises Territoriais' },
+]

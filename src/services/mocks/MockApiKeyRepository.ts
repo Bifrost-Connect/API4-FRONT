@@ -6,7 +6,7 @@ import type {
   ExternalApiAccessLog,
   ExternalLogFilters,
 } from '@/types/apiKey'
-import type { ApiKeyRepository } from './ApiKeyRepository'
+import type { ApiKeyRepository } from '../apiKeys/ApiKeyRepository'
 
 const SEED_KEYS: ApiKeyRecord[] = [
   {

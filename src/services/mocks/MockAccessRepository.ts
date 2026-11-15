@@ -13,39 +13,25 @@ import type {
   CreateRoleDto,
   UpdateRoleDto,
   RecordSecurityEventDto,
-} from './AccessRepository'
+} from '../access/AccessRepository'
 import {
-  MOCK_USERS_LIST,
-  MOCK_ROLES,
   ALL_PERMISSIONS,
-  MOCK_SECURITY_EVENTS,
+  DuplicateEmailError,
+  StandardRoleProtectedError,
+  RoleInUseError,
   type UserItem,
   type RoleDef,
   type PermissionDefinition,
   type SecurityEvent,
-} from '@/mocks/user.mock'
+} from '@/types/access'
+import {
+  MOCK_USERS_LIST,
+  MOCK_ROLES,
+  MOCK_SECURITY_EVENTS,
+} from './user.mock'
 import { rbacStorage } from '../storage/rbacStorage'
 
-export class DuplicateEmailError extends Error {
-  constructor(email: string) {
-    super(`O e-mail "${email}" já está cadastrado no sistema.`)
-    this.name = 'DuplicateEmailError'
-  }
-}
-
-export class StandardRoleProtectedError extends Error {
-  constructor(roleId: string) {
-    super(`O papel padrão "${roleId}" não pode ser removido do sistema.`)
-    this.name = 'StandardRoleProtectedError'
-  }
-}
-
-export class RoleInUseError extends Error {
-  constructor(roleId: string, count: number) {
-    super(`O papel "${roleId}" está vinculado a ${count} usuário(s) e não pode ser excluído.`)
-    this.name = 'RoleInUseError'
-  }
-}
+export { DuplicateEmailError, StandardRoleProtectedError, RoleInUseError }
 
 export class MockAccessRepository implements AccessRepository {
   private users: UserItem[] = []

@@ -110,5 +110,17 @@ describe('User Service', () => {
     expect(session.role).toBe('Analista')
     expect(authStorage.getSession()?.isSimulated).toBe(true)
   })
+
+  it('delega resolução de perfil e preset de credenciais demo para o mockAuthService', () => {
+    expect(userService.resolveDemoRoleFromEmail('gestor@georural.com.br')).toBe('Gestor')
+    expect(userService.resolveDemoRoleFromEmail('inexistente@empresa.com')).toBeNull()
+
+    const preset = userService.getDemoCredentialPreset('Operador')
+    expect(preset).toEqual({
+      email: 'operador@georural.com.br',
+      password: expect.any(String),
+    })
+    expect(userService.getDemoCredentialPreset('Desconhecido')).toBeNull()
+  })
 })
 

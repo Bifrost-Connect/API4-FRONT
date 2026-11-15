@@ -129,36 +129,27 @@ const confirmPublishAndClose = async () => {
   isSubmitting.value = true
   publishError.value = null
   try {
-    if (/^\d+$/.test(String(props.details.id))) {
-      try {
-        await processService.registrarDecisaoGestor(props.details.id, {
-          gestorId: 1,
-          etapa: 'PUBLICACAO',
-          decisao: 'APROVADO',
-          parecer: 'Publicação oficial homologada pelo gestor.',
-        })
-      } catch (errApi) {
-        console.warn('Aviso: endpoint de decisão do gestor offline ou simulado:', errApi)
-      }
-    }
-
-    try {
-      await dashboardService.aprovarEFecharVersao(
-        {
-          id: String(props.details.id),
-          dataset: props.details.dataset,
-          stage: 'Publicação',
-          status: 'Fechado',
-          dateTime: props.details.dateTime,
-          source: props.details.source,
-          year: props.details.year,
-          epsg: props.details.epsg,
-        },
-        'Gestor',
-      )
-    } catch (e) {
-      console.warn('Aviso ao fechar versão via dashboardService:', e)
-    }
+    await processService.publishAndCloseVersion(
+      props.details.id,
+      {
+        gestorId: 1,
+        parecer: 'Publicação oficial homologada pelo gestor.',
+      },
+      () =>
+        dashboardService.aprovarEFecharVersao(
+          {
+            id: String(props.details.id),
+            dataset: props.details.dataset,
+            stage: 'Publicação',
+            status: 'Fechado',
+            dateTime: props.details.dateTime,
+            source: props.details.source,
+            year: props.details.year,
+            epsg: props.details.epsg,
+          },
+          'Gestor',
+        ),
+    )
 
     isApproved.value = true
     isRejected.value = false

@@ -9,6 +9,7 @@ import {
   type SpatialAnalysisRequest,
   type SpatialAnalysisResult,
 } from '../services/spatialAnalysis'
+import { getThemeColor } from '@/utils/themeTokens'
 
 const route = useRoute()
 const documents = ref<SpatialAnalysisDocument[]>([])
@@ -165,10 +166,10 @@ const addIntersectionPattern = () => {
   const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
   background.setAttribute('width', '8')
   background.setAttribute('height', '8')
-  background.setAttribute('fill', '#fef08a')
+  background.setAttribute('fill', getThemeColor('--map-layer-hatch-bg'))
   const hatch = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   hatch.setAttribute('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4')
-  hatch.setAttribute('stroke', '#ea580c')
+  hatch.setAttribute('stroke', getThemeColor('--map-layer-hatch-stroke'))
   hatch.setAttribute('stroke-width', '1.5')
   pattern.append(background, hatch)
   defs.append(pattern)
@@ -195,7 +196,12 @@ const updateMapLayers = async () => {
       if (requestId !== mapRequestSequence) return
       addLayer(
         L.geoJSON(geometry, {
-          style: { color: '#15803d', weight: 2, fillColor: '#22c55e', fillOpacity: 0.16 },
+          style: {
+            color: getThemeColor('--map-layer-car-stroke'),
+            weight: 2,
+            fillColor: getThemeColor('--map-layer-car-fill'),
+            fillOpacity: 0.16,
+          },
           onEachFeature: (feature, layer) => {
             layer.bindTooltip(selectedCar.value?.name ?? 'Imóvel CAR')
             if (selectedCar.value) {
@@ -214,11 +220,11 @@ const updateMapLayers = async () => {
         )
         if (requestId !== mapRequestSequence) return
         const colors: Record<SpatialAnalysisDocument['category'], string> = {
-          CAR: '#15803d',
-          ALERTA: '#dc2626',
-          APP: '#7c3aed',
-          RESERVA_LEGAL: '#c2410c',
-          TERRA_INDIGENA: '#0f766e',
+          CAR: getThemeColor('--map-layer-car-stroke'),
+          ALERTA: getThemeColor('--map-layer-restriction-stroke'),
+          APP: getThemeColor('--map-layer-app'),
+          RESERVA_LEGAL: getThemeColor('--map-layer-reserva'),
+          TERRA_INDIGENA: getThemeColor('--map-layer-indigena'),
         }
         const color = colors[restriction.category]
         addLayer(
@@ -252,9 +258,9 @@ const updateMapLayers = async () => {
           intersectionCollection,
           {
             style: {
-              color: '#c2410c',
+              color: getThemeColor('--map-layer-intersection-stroke'),
               weight: 2,
-              fillColor: '#facc15',
+              fillColor: getThemeColor('--map-layer-intersection-fill'),
               fillOpacity: 0.62,
               dashArray: '3 3',
             },

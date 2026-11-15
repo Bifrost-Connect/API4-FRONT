@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Feature, FeatureCollection } from 'geojson'
 import { featureIdentifier, synchronizeCameras } from '@/utils/comparacao'
+import { getThemeColor } from '@/utils/themeTokens'
 
 const props = defineProps<{
   layersA: FeatureCollection | null
@@ -39,12 +40,20 @@ let resizeObserver: ResizeObserver | undefined
 let disposed = false
 let renderSequence = 0
 
-const colors = { NOVO_ALERTA: '#dc2626', REDUCAO_ALERTA: '#15803d', MANTIDO: '#d6a217' }
+const colors = {
+  NOVO_ALERTA: getThemeColor('--map-layer-restriction-stroke'),
+  REDUCAO_ALERTA: getThemeColor('--map-layer-car-stroke'),
+  MANTIDO: getThemeColor('--map-layer-delta-kept'),
+}
 function style(feature: Feature | undefined, side: number): L.PathOptions {
   const selected =
     !!feature && !!props.selectedId && featureIdentifier(feature) === props.selectedId
   return {
-    color: selected ? '#f26522' : side === 0 ? '#2563eb' : '#7c3aed',
+    color: selected
+      ? getThemeColor('--vis-brand-orange')
+      : side === 0
+        ? getThemeColor('--map-layer-compare-a')
+        : getThemeColor('--map-layer-compare-b'),
     weight: selected ? 5 : 2,
     fillOpacity: selected ? 0.42 : 0.18,
   }
@@ -102,7 +111,9 @@ function updateDelta() {
         deltaLayers[side] = L.geoJSON(undefined, {
           interactive: false,
           style: (feature) => ({
-            color: colors[feature?.properties?.classe as keyof typeof colors] ?? '#64748b',
+            color:
+              colors[feature?.properties?.classe as keyof typeof colors] ??
+              getThemeColor('--map-layer-neutral'),
             weight: 2,
             fillOpacity: 0.5,
           }),

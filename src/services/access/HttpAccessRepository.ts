@@ -15,13 +15,13 @@ import type {
 } from './AccessRepository'
 import {
   ALL_PERMISSIONS,
+  DuplicateEmailError,
   type UserItem,
   type RoleDef,
   type PermissionDefinition,
   type SecurityEvent,
-} from '@/mocks/user.mock'
+} from '@/types/access'
 import api, { ApiError } from '@/services/api'
-import { DuplicateEmailError } from './MockAccessRepository'
 import {
   extractPerfilIdMap,
   mapBackendAuditLogToSecurityEvent,

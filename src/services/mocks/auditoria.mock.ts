@@ -2,12 +2,7 @@
  * @file Fixtures para testes automatizados.
  */
 
-import type {
-  ProcessLogDetails,
-  ProcessStageCheck,
-  ProcessAnalyticsRow,
-  QuarantineRecord,
-} from './process.mock'
+import type { ProcessLogDetails } from './process.mock'
 import { validationChecksOk, treatmentChecksOk, analyticsDataOk } from './process.mock'
 
 export interface ProcessVersion extends ProcessLogDetails {

@@ -8,7 +8,7 @@ import {
   type RoleDef,
   type SecurityEvent,
   type UserItem,
-} from '@/mocks/user.mock'
+} from '@/types/access'
 import { isAuditorReadOnlyLocked } from '@/utils/rbac'
 
 export interface BackendRolePermissionRow {

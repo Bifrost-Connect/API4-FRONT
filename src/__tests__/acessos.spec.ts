@@ -11,15 +11,14 @@ import UserManagementTab from '@/components/admin/UserManagementTab.vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
 import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
-import { userService, type UserItem } from '@/services/user'
-import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
+import { userService, DuplicateEmailError, type UserItem } from '@/services/user'
 import {
   hasSoDConflict,
   isAuditorReadOnlyLocked,
   homeFor,
   getVisibleMenuItems,
 } from '@/utils/rbac'
-import { ROLE_DEFAULT_PERMISSIONS } from '@/mocks/user.mock'
+import { ROLE_DEFAULT_PERMISSIONS } from '@/types/access'
 
 const storageMock = (() => {
   let store: Record<string, string> = {}

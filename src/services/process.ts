@@ -3,7 +3,14 @@
  * Todas as requisições utilizam a API REST do backend (/processos/*, /calculos/*).
  */
 import api from './api'
-import { mapStage, mapStatus } from './dashboard'
+import { dashboardService, mapStage, mapStatus } from './dashboard'
+import { uploadService } from './upload'
+import { authStorage } from './storage/authStorage'
+import { mockProcessService } from './mocks/mockProcessService'
+
+function isSimulatedSession(): boolean {
+  return authStorage.getSession()?.isSimulated !== false
+}
 
 /** Item de checklist retornado pela API para as etapas de Validação e Tratamento */
 export interface ProcessStageCheck {
@@ -39,7 +46,7 @@ export interface ProcessLogDetails {
   dataSource?: 'API' | 'DEMONSTRACAO'
   dataset: string
   stage: string
-  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Falhou' | 'Fechado'
+  status: 'Concluída' | 'Em andamento' | 'Aguardando validação' | 'Em quarentena' | 'Falhou' | 'Fechado'
   dateTime: string
   layerName: string
   source: string
@@ -62,6 +69,7 @@ export interface ProcessLogDetails {
   validationChecks?: ProcessStageCheck[]
   treatmentChecks?: ProcessStageCheck[]
   analyticsData?: ProcessAnalyticsRow[]
+  quarantineRecords?: QuarantineRecord[]
 }
 
 export interface ProcessTraceability {
@@ -84,92 +92,92 @@ export const processService = {
    * API esperada: GET /api/processes/{id}
    */
   async getProcessDetails(id: string): Promise<ProcessLogDetails> {
-    try {
-      const res = await api.get(`/processos/${id}`)
-      if (res.data) {
-        res.data.dataSource = 'API'
-        res.data.stage = mapStage(res.data.stage)
-        res.data.status = mapStatus(res.data.status)
-        const baseURL = api.defaults.baseURL || 'http://localhost:8080'
-        res.data.originalFileUrl = `${baseURL}/carga/download/${id}`
+    const res = await api.get(`/processos/${id}`)
+    if (res.data) {
+      res.data.dataSource = 'API'
+      res.data.stage = mapStage(res.data.stage)
+      res.data.status = mapStatus(res.data.status)
+      const baseURL = api.defaults.baseURL || 'http://localhost:8080'
+      res.data.originalFileUrl = `${baseURL}/carga/download/${id}`
 
-        if (res.data.logs && typeof res.data.logs === 'object') {
-          const normalizedLogs: Record<string, string[]> = {}
-          for (const [key, val] of Object.entries(res.data.logs)) {
-            const mappedKey = mapStage(key)
-            normalizedLogs[mappedKey] = [
-              ...(normalizedLogs[mappedKey] || []),
-              ...(Array.isArray(val) ? (val as string[]) : []),
-            ]
-          }
-          res.data.logs = normalizedLogs
+      if (res.data.logs && typeof res.data.logs === 'object') {
+        const normalizedLogs: Record<string, string[]> = {}
+        for (const [key, val] of Object.entries(res.data.logs)) {
+          const mappedKey = mapStage(key)
+          normalizedLogs[mappedKey] = [
+            ...(normalizedLogs[mappedKey] || []),
+            ...(Array.isArray(val) ? (val as string[]) : []),
+          ]
         }
+        res.data.logs = normalizedLogs
+      }
 
-        if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
-          res.data.validationChecks = mockactive ? validationChecksOk : []
-        }
-        if (!res.data.treatmentChecks || res.data.treatmentChecks.length === 0) {
-          res.data.treatmentChecks = mockactive ? treatmentChecksOk(res.data.epsg || 'EPSG:4674') : []
-        }
-        // Integração com cálculo analítico real do backend (/carga/{id}/calculos - US06)
-        if (!res.data.analyticsData || res.data.analyticsData.length === 0) {
-          if (/^\d+$/.test(id)) {
-            try {
-              const calculosRes = await api.get(`/carga/${id}/calculos`)
-              const calculos = calculosRes.data
-              if (calculos && calculos.areaTotalHectares !== undefined) {
-                const totalAppHa = calculos.totaisPorCategoria?.APP?.hectares ?? 0
-                const qtdApp = calculos.totaisPorCategoria?.APP?.quantidade ?? 0
-                const totalRlHa = calculos.totaisPorCategoria?.RESERVA_LEGAL?.hectares ?? 0
-                const qtdRl = calculos.totaisPorCategoria?.RESERVA_LEGAL?.quantidade ?? 0
-                const totalAlertaHa = calculos.totaisPorCategoria?.ALERTA?.hectares ?? 0
-                const qtdAlerta = calculos.totaisPorCategoria?.ALERTA?.quantidade ?? 0
+      if (!res.data.validationChecks || res.data.validationChecks.length === 0) {
+        res.data.validationChecks = isSimulatedSession()
+          ? mockProcessService.getDefaultValidationChecks()
+          : []
+      }
+      if (!res.data.treatmentChecks || res.data.treatmentChecks.length === 0) {
+        res.data.treatmentChecks = isSimulatedSession()
+          ? mockProcessService.getDefaultTreatmentChecks(res.data.epsg || 'EPSG:4674')
+          : []
+      }
+      // Integração com cálculo analítico real do backend (/carga/{id}/calculos - US06)
+      if (!res.data.analyticsData || res.data.analyticsData.length === 0) {
+        if (/^\d+$/.test(id)) {
+          try {
+            const calculosRes = await api.get(`/carga/${id}/calculos`)
+            const calculos = calculosRes.data
+            if (calculos && calculos.areaTotalHectares !== undefined) {
+              const totalAppHa = calculos.totaisPorCategoria?.APP?.hectares ?? 0
+              const qtdApp = calculos.totaisPorCategoria?.APP?.quantidade ?? 0
+              const totalRlHa = calculos.totaisPorCategoria?.RESERVA_LEGAL?.hectares ?? 0
+              const qtdRl = calculos.totaisPorCategoria?.RESERVA_LEGAL?.quantidade ?? 0
+              const totalAlertaHa = calculos.totaisPorCategoria?.ALERTA?.hectares ?? 0
+              const qtdAlerta = calculos.totaisPorCategoria?.ALERTA?.quantidade ?? 0
 
-                res.data.analyticsData = [
-                  {
-                    param: 'Cálculo de Área Total Contínua',
-                    result: `${Number(calculos.areaTotalHectares).toLocaleString('pt-BR')} ha`,
-                    reference: `${calculos.poligonosCalculados || 0} feição(ões)`,
-                    status: 'success',
-                    statusLabel: 'Calculado',
-                  },
-                  {
-                    param: 'Proporção de Reserva Legal',
-                    result: `${totalRlHa} ha (${qtdRl} cruzamento(s))`,
-                    reference: 'Camada de Referência INCRA/INCAR',
-                    status: qtdRl > 0 ? 'success' : 'warning',
-                    statusLabel: qtdRl > 0 ? 'Regular' : 'Não identificada',
-                  },
-                  {
-                    param: 'Área de APP Hídrica',
-                    result: `${totalAppHa} ha (${qtdApp} interseção(ões))`,
-                    reference: 'Art. 4º — Lei 12.651/2012',
-                    status: 'success',
-                    statusLabel: qtdApp > 0 ? 'Conforme' : 'Sem sobreposição',
-                  },
-                  {
-                    param: 'Sobreposição com Áreas Embargadas / Alertas',
-                    result: `${totalAlertaHa} ha (${qtdAlerta} alerta(s))`,
-                    reference: 'Cadastro IBAMA / INPE',
-                    status: qtdAlerta > 0 ? 'danger' : 'success',
-                    statusLabel: qtdAlerta > 0 ? 'Alerta Crítico' : 'Sem alertas',
-                  },
-                ]
-              } else {
-                res.data.analyticsData = []
-              }
-            } catch {
+              res.data.analyticsData = [
+                {
+                  param: 'Cálculo de Área Total Contínua',
+                  result: `${Number(calculos.areaTotalHectares).toLocaleString('pt-BR')} ha`,
+                  reference: `${calculos.poligonosCalculados || 0} feição(ões)`,
+                  status: 'success',
+                  statusLabel: 'Calculado',
+                },
+                {
+                  param: 'Proporção de Reserva Legal',
+                  result: `${totalRlHa} ha (${qtdRl} cruzamento(s))`,
+                  reference: 'Camada de Referência INCRA/INCAR',
+                  status: qtdRl > 0 ? 'success' : 'warning',
+                  statusLabel: qtdRl > 0 ? 'Regular' : 'Não identificada',
+                },
+                {
+                  param: 'Área de APP Hídrica',
+                  result: `${totalAppHa} ha (${qtdApp} interseção(ões))`,
+                  reference: 'Art. 4º — Lei 12.651/2012',
+                  status: 'success',
+                  statusLabel: qtdApp > 0 ? 'Conforme' : 'Sem sobreposição',
+                },
+                {
+                  param: 'Sobreposição com Áreas Embargadas / Alertas',
+                  result: `${totalAlertaHa} ha (${qtdAlerta} alerta(s))`,
+                  reference: 'Cadastro IBAMA / INPE',
+                  status: qtdAlerta > 0 ? 'danger' : 'success',
+                  statusLabel: qtdAlerta > 0 ? 'Alerta Crítico' : 'Sem alertas',
+                },
+              ]
+            } else {
               res.data.analyticsData = []
             }
-          } else {
+          } catch {
             res.data.analyticsData = []
           }
+        } else {
+          res.data.analyticsData = []
         }
       }
-      return res.data
-    } catch (err) {
-      throw err
     }
+    return res.data
   },
 
   async getTraceability(id: string | number): Promise<ProcessTraceability> {
@@ -191,10 +199,8 @@ export const processService = {
       const res = await api.post(`/processos/${id}/processar`, null, { params })
       return res.data
     } catch (err: any) {
-      if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, simulando retorno de início de processamento')
-      await delay(500)
-      return { success: true }
+      if (!isSimulatedSession()) throw err.response?.data || err
+      return mockProcessService.simulateProcessStart(id)
     }
   },
 
@@ -203,10 +209,8 @@ export const processService = {
       const res = await api.get(`/processos/${id}/log-espacial`)
       return res.data
     } catch (err: any) {
-      if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, simulando log espacial vazio')
-      await delay(300)
-      return { type: 'FeatureCollection', features: [] }
+      if (!isSimulatedSession()) throw err.response?.data || err
+      return mockProcessService.simulateSpatialLog()
     }
   },
 
@@ -219,37 +223,14 @@ export const processService = {
       parecer?: string
     },
   ): Promise<any> {
-    const salvarLocal = () => {
-      const decisaoObj = {
-        id: Date.now(),
-        processoId: id,
-        gestorId: payload.gestorId,
-        gestorNome: 'Gestor',
-        etapa: payload.etapa,
-        decisao: payload.decisao,
-        parecer: payload.parecer,
-        dataDecisao: new Date().toISOString(),
-      }
-      try {
-        const raw = localStorage.getItem(`api4_decisoes_${id}`)
-        const list = raw ? JSON.parse(raw) : []
-        list.unshift(decisaoObj)
-        localStorage.setItem(`api4_decisoes_${id}`, JSON.stringify(list))
-      } catch {
-        // ignore storage error
-      }
-    }
-
     try {
       const cleanId = encodeURIComponent(String(id))
       const res = await api.post(`/carga/${cleanId}/decisao-gestor`, payload)
-      salvarLocal()
+      mockProcessService.saveMockDecision(id, payload)
       return res.data
     } catch (err: any) {
-      if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, simulando decisão do gestor')
-      await delay(400)
-      salvarLocal()
+      if (!isSimulatedSession()) throw err.response?.data || err
+      mockProcessService.saveMockDecision(id, payload)
       return { sucesso: true, processoId: id, ...payload }
     }
   },
@@ -263,10 +244,8 @@ export const processService = {
       const res = await api.post(`/carga/${id}/alocar-auditor`, { auditorId, gestorId })
       return res.data
     } catch (err: any) {
-      if (!mockactive) throw err.response?.data || err
-      console.warn('API indisponível, simulando alocação de auditor')
-      await delay(300)
-      return { sucesso: true, processoId: id, auditorId }
+      if (!isSimulatedSession()) throw err.response?.data || err
+      return mockProcessService.simulateAuditorAllocation(id, auditorId)
     }
   },
 
@@ -284,7 +263,7 @@ export const processService = {
 
   async getDecisoesGestor(id: string | number): Promise<Array<{
     id: number
-    processoId: number
+    processoId: number | string
     gestorId: number
     gestorNome?: string
     etapa: 'VALIDACAO' | 'TRATAMENTO' | 'PUBLICACAO'
@@ -292,13 +271,7 @@ export const processService = {
     parecer?: string
     dataDecisao: string
   }>> {
-    let localList: any[] = []
-    try {
-      const raw = localStorage.getItem(`api4_decisoes_${id}`)
-      if (raw) localList = JSON.parse(raw)
-    } catch {
-      // ignore storage error
-    }
+    const localList = mockProcessService.getMockDecisions(id)
 
     try {
       const cleanId = encodeURIComponent(String(id))
@@ -308,8 +281,118 @@ export const processService = {
         return localList.length > 0 ? localList : res.data
       }
       return localList
-    } catch (err: any) {
+    } catch {
       return localList
     }
+  },
+
+  async signalQuarantineReprocess(id: string | number): Promise<{ simulated: boolean }> {
+    const numericId = Number(String(id).replace(/\D/g, ''))
+    try {
+      if (numericId) {
+        await uploadService.notificarOperadorQuarentena(numericId)
+      } else {
+        await dashboardService.requestAuditor(String(id))
+      }
+      return { simulated: false }
+    } catch {
+      await mockProcessService.simulateSignalOperatorReprocess(id)
+      return { simulated: true }
+    }
+  },
+
+  async exportQuarantineReport(
+    id: string | number,
+    format: 'csv' | 'json',
+    records: QuarantineRecord[],
+  ): Promise<{ blob: Blob; filename: string; isOfficial: boolean }> {
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new Error('Não foi possível exportar: o relatório de motivos de rejeição está vazio para esta carga.')
+    }
+
+    const numericId = Number(String(id).replace(/\D/g, ''))
+    if (format === 'csv' && numericId) {
+      try {
+        const blob = await uploadService.exportarRejeicoesCsv(numericId)
+        return {
+          blob,
+          filename: `rejeicoes_carga_${numericId}.csv`,
+          isOfficial: true,
+        }
+      } catch {
+        // Fallback para geração local simulada
+      }
+    }
+
+    const fallbackExport = mockProcessService.buildQuarantineExportBlob(id, format, records)
+    return {
+      ...fallbackExport,
+      isOfficial: false,
+    }
+  },
+
+  async reprocessQuarantineLoad(id: string | number, file: File): Promise<{ simulated: boolean }> {
+    const numericId = Number(String(id).replace(/\D/g, ''))
+    const targetId = numericId || id
+    mockProcessService.clearMockDecisions(targetId)
+
+    try {
+      if (numericId) {
+        await uploadService.reprocessarCarga(numericId, file)
+      }
+      return { simulated: false }
+    } catch {
+      await mockProcessService.simulateReprocessLoad(targetId, file)
+      return { simulated: true }
+    }
+  },
+
+  async cancelQuarantineLoad(id: string | number, justification: string): Promise<{ simulated: boolean }> {
+    const numericId = Number(String(id).replace(/\D/g, ''))
+    try {
+      if (numericId) {
+        await uploadService.cancelarCarga(numericId, justification)
+      }
+      return { simulated: false }
+    } catch {
+      await mockProcessService.simulateCancelLoad(id, justification)
+      return { simulated: true }
+    }
+  },
+
+  async publishAndCloseVersion(
+    id: string | number,
+    payload: { gestorId: number; parecer?: string },
+    closeVersionFn: () => Promise<unknown>,
+  ): Promise<{ simulated: boolean }> {
+    let simulated = false
+
+    if (/^\d+$/.test(String(id))) {
+      try {
+        await this.registrarDecisaoGestor(id, {
+          gestorId: payload.gestorId,
+          etapa: 'PUBLICACAO',
+          decisao: 'APROVADO',
+          parecer: payload.parecer,
+        })
+      } catch {
+        mockProcessService.saveMockDecision(id, {
+          gestorId: payload.gestorId,
+          etapa: 'PUBLICACAO',
+          decisao: 'APROVADO',
+          parecer: payload.parecer,
+        })
+        simulated = true
+      }
+    }
+
+    try {
+      await closeVersionFn()
+    } catch {
+      await mockProcessService.simulatePublishAndClose(id, payload)
+      simulated = true
+    }
+
+    return { simulated }
   },
 }

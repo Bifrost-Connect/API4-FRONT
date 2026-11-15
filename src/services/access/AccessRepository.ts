@@ -9,7 +9,7 @@ import type {
   RoleDef,
   PermissionDefinition,
   SecurityEvent,
-} from '@/mocks/user.mock'
+} from '@/types/access'
 
 export interface PaginatedResult<T> {
   items: T[]

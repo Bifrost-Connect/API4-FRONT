@@ -1,14 +1,16 @@
 import { ref } from 'vue'
 import { authStorage } from '@/services/storage/authStorage'
-import type {
-  ApiKeyFilters,
-  ApiKeyRecord,
-  CreateApiKeyDto,
-  CreateApiKeyResult,
-  ExternalApiAccessLog,
-  ExternalLogFilters,
+import {
+  API_KEY_AVAILABLE_SCOPES,
+  type ApiKeyFilters,
+  type ApiKeyRecord,
+  type ApiKeyScopeOption,
+  type CreateApiKeyDto,
+  type CreateApiKeyResult,
+  type ExternalApiAccessLog,
+  type ExternalLogFilters,
 } from '@/types/apiKey'
-import { MockApiKeyRepository } from './apiKeys/MockApiKeyRepository'
+import { MockApiKeyRepository } from './mocks/MockApiKeyRepository'
 import { HttpApiKeyRepository } from './apiKeys/HttpApiKeyRepository'
 
 const mockRepo = new MockApiKeyRepository()
@@ -70,6 +72,10 @@ async function withRepositoryFallback<T>(
 
 export const apiKeyService = {
   isFallbackMode,
+
+  getAvailableScopes(): ApiKeyScopeOption[] {
+    return API_KEY_AVAILABLE_SCOPES.map((scope) => ({ ...scope }))
+  },
 
   resetMockData(): void {
     mockRepo.reset()

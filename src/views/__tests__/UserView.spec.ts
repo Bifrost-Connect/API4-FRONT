@@ -6,7 +6,7 @@ import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
 import ProfileView from '../ProfileView.vue'
 import { userService } from '@/services/user'
 import { roleService } from '@/services/roles'
-import { MOCK_ROLES, MOCK_USERS_LIST, MOCK_SECURITY_EVENTS } from '@/mocks/user.mock'
+import { MOCK_ROLES, MOCK_USERS_LIST, MOCK_SECURITY_EVENTS } from '@/services/mocks/user.mock'
 import { authStorage } from '@/services/storage/authStorage'
 
 const storageMock = (() => {

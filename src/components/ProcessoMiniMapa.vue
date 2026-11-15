@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { mapService } from '../services/map'
 import { useRouter } from 'vue-router'
+import { getThemeColor } from '@/utils/themeTokens'
 
 const props = withDefaults(
   defineProps<{
@@ -81,11 +82,12 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
 
   let totalArea = 0
 
+  const brandColor = getThemeColor('--color-brand')
   geoJsonLayer = L.geoJSON(geojson, {
     style: {
-      color: '#f26522',
+      color: brandColor,
       weight: 2,
-      fillColor: '#f26522',
+      fillColor: brandColor,
       fillOpacity: 0.35,
     },
     onEachFeature: (feature, layer) => {

@@ -20,21 +20,10 @@ const isSubmitting = ref(false)
 const fillLogin = (role: string) => {
   selectedRole.value = role
   usedDemoRole.value = role
-  email.value = `${role.toLowerCase()}@georural.com.br`
-  senha.value = 'Troca123'
+  const preset = userService.getDemoCredentialPreset(role)
+  email.value = preset?.email ?? ''
+  senha.value = preset?.password ?? ''
   loginError.value = ''
-}
-
-const resolveDemoRoleFromEmail = (emailLower: string): string | null => {
-  if (emailLower === 'operador@georural.com.br') return 'Operador'
-  if (emailLower === 'analista@georural.com.br') return 'Analista'
-  if (emailLower === 'auditor@georural.com.br') return 'Auditor'
-  if (emailLower === 'gestor@georural.com.br') return 'Gestor'
-  if (emailLower === 'administrador@georural.com.br' || emailLower === 'admin@georural.com.br') {
-    return 'Administrador'
-  }
-  if (emailLower === 'integrador@georural.com.br') return 'Integrador'
-  return null
 }
 
 const redirectAfterLogin = (user: UserSession) => {
@@ -99,11 +88,19 @@ const handleLogin = async () => {
 
     if (!isRejectedCredential && isBackendUnavailable) {
       const emailLower = trimmedEmail.toLowerCase()
-      const matchesFilledDemo =
-        usedDemoRole.value && emailLower === `${usedDemoRole.value.toLowerCase()}@georural.com.br`
-      const demoRole = matchesFilledDemo ? usedDemoRole.value : resolveDemoRoleFromEmail(emailLower)
+      const filledPreset = usedDemoRole.value
+        ? userService.getDemoCredentialPreset(usedDemoRole.value)
+        : null
+      const matchesFilledDemo = !!filledPreset && emailLower === filledPreset.email.toLowerCase()
+      const demoRole = matchesFilledDemo
+        ? usedDemoRole.value
+        : userService.resolveDemoRoleFromEmail(emailLower)
+      const rolePreset = demoRole ? userService.getDemoCredentialPreset(demoRole) : null
 
-      if (demoRole && (matchesFilledDemo || senha.value === 'Troca123')) {
+      if (
+        demoRole &&
+        (matchesFilledDemo || (rolePreset !== null && senha.value === rolePreset.password))
+      ) {
         const demoUser = userService.loginDemoOffline(demoRole)
         redirectAfterLogin(demoUser)
         return

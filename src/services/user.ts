@@ -5,9 +5,9 @@
 
 import { ref } from 'vue'
 import {
-  MOCK_AVAILABLE_ROLES,
   ALL_PERMISSIONS,
   ROLE_DEFAULT_PERMISSIONS,
+  DuplicateEmailError,
   type UserItem,
   type SystemRole,
   type StandardRole,
@@ -15,13 +15,22 @@ import {
   type PermissionDefinition,
   type RoleOption,
   type SecurityEvent,
-} from '../mocks/user.mock'
+  type UserSession,
+} from '@/types/access'
+import { MOCK_AVAILABLE_ROLES } from './mocks/user.mock'
+import {
+  DEMO_USERS,
+  createDemoOfflineSession,
+  getDefaultDemoSession,
+  getDemoCredentialPreset,
+  resolveDemoRoleFromEmail,
+  resolveLegacyDemoSession,
+} from './mocks/mockAuthService'
 import { roleService } from './roles'
 import {
   can as checkCan,
   canAny as checkCanAny,
   normalizeRoleKey,
-  type SessionUser,
 } from '@/utils/rbac'
 import type {
   CreateUserDto,
@@ -38,120 +47,15 @@ import {
 } from './storage/authStorage'
 import { geojsonCache } from './storage/geojsonCache'
 import { uiPreferencesStorage } from './storage/uiPreferencesStorage'
-import { DuplicateEmailError } from './access/MockAccessRepository'
 import api from './api'
 import { mapBackendPermissionsToFront, mapBackendRoleToFront } from '@/utils/rbacAdapter'
 
 export { DuplicateEmailError }
-export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent }
+export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent, UserSession }
 export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | 'Integrador' | string
 
-export type UserSession = SessionUser & {
-  email?: string
-  token?: string
-}
-
-const DEMO_USERS: Record<string, UserSession> = {
-  Operador: {
-    id: 3,
-    name: 'João Silva',
-    email: 'operador@georural.com.br',
-    role: 'Operador',
-    roleId: 'OPERADOR_DADOS',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS || [])],
-  },
-  OPERADOR_DADOS: {
-    id: 3,
-    name: 'João Silva',
-    email: 'operador@georural.com.br',
-    role: 'Operador',
-    roleId: 'OPERADOR_DADOS',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS || [])],
-  },
-  Auditor: {
-    id: 4,
-    name: 'Daniel Natan',
-    email: 'auditor@georural.com.br',
-    role: 'Auditor',
-    roleId: 'AUDITOR',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.AUDITOR || [])],
-  },
-  AUDITOR: {
-    id: 4,
-    name: 'Daniel Natan',
-    email: 'auditor@georural.com.br',
-    role: 'Auditor',
-    roleId: 'AUDITOR',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.AUDITOR || [])],
-  },
-  Analista: {
-    id: 2,
-    name: 'Mariana Duarte',
-    email: 'analista@georural.com.br',
-    role: 'Analista',
-    roleId: 'ANALISTA',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ANALISTA || [])],
-  },
-  ANALISTA: {
-    id: 2,
-    name: 'Mariana Duarte',
-    email: 'analista@georural.com.br',
-    role: 'Analista',
-    roleId: 'ANALISTA',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ANALISTA || [])],
-  },
-  Administrador: {
-    id: 1,
-    name: 'Carlos Mendes',
-    email: 'admin@georural.com.br',
-    role: 'Administrador',
-    roleId: 'ADMIN',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ADMIN || [])],
-  },
-  ADMIN: {
-    id: 1,
-    name: 'Carlos Mendes',
-    email: 'admin@georural.com.br',
-    role: 'Administrador',
-    roleId: 'ADMIN',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.ADMIN || [])],
-  },
-  Gestor: {
-    id: 5,
-    name: 'Fernando Rocha',
-    email: 'gestor@georural.com.br',
-    role: 'Gestor',
-    roleId: 'GESTOR',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.GESTOR || [])],
-  },
-  GESTOR: {
-    id: 5,
-    name: 'Fernando Rocha',
-    email: 'gestor@georural.com.br',
-    role: 'Gestor',
-    roleId: 'GESTOR',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.GESTOR || [])],
-  },
-  Integrador: {
-    id: 6,
-    name: 'Sistema Integrador',
-    email: 'integrador@georural.com.br',
-    role: 'INTEGRADOR_EXTERNO',
-    roleId: 'INTEGRADOR_EXTERNO',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO || [])],
-  },
-  INTEGRADOR_EXTERNO: {
-    id: 6,
-    name: 'Sistema Integrador',
-    email: 'integrador@georural.com.br',
-    role: 'INTEGRADOR_EXTERNO',
-    roleId: 'INTEGRADOR_EXTERNO',
-    permissions: [...(ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO || [])],
-  },
-}
-
 // Sessão padrão inicial
-const defaultSession: UserSession = { ...DEMO_USERS.Operador! }
+const defaultSession: UserSession = getDefaultDemoSession()
 
 function normalizeSessionId(userId: number | string | undefined): number | undefined {
   if (typeof userId === 'number' && Number.isFinite(userId)) return userId
@@ -178,13 +82,14 @@ function resolveInitialSession(): UserSession {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const legacyRole = window.localStorage.getItem('api4-demo-role')
-      if (legacyRole && DEMO_USERS[legacyRole]) {
-        return { ...DEMO_USERS[legacyRole] }
+      const legacySession = resolveLegacyDemoSession(legacyRole)
+      if (legacySession) {
+        return legacySession
       }
     }
   } catch {}
 
-  return { ...defaultSession }
+  return getDefaultDemoSession()
 }
 
 const currentUser = ref<UserSession>(resolveInitialSession())
@@ -222,30 +127,13 @@ export const userService = {
    * automático de permissões e sincronização em localStorage.
    */
   setCurrentUserRole(role: string) {
-    const demo = DEMO_USERS[role]
-    if (demo) {
-      currentUser.value = {
-        ...demo,
-        permissions: [...demo.permissions],
-      }
-    } else {
-      const key = normalizeRoleKey(role)
-      const perms = (ROLE_DEFAULT_PERMISSIONS as Record<string, string[]>)[key] || []
-      currentUser.value = {
-        id: Date.now(),
-        name: `Usuário (${role})`,
-        email: `${role.toLowerCase()}@georural.com.br`,
-        role,
-        roleId: key,
-        permissions: [...perms],
-      }
-    }
+    currentUser.value = createDemoOfflineSession(role)
 
     const cur = currentUser.value
     authStorage.saveSession({
       userId: cur.id ?? 0,
       name: cur.name,
-      email: cur.email || `${role.toLowerCase()}@georural.com.br`,
+      email: cur.email || '',
       role: cur.role,
       roleId: cur.roleId || normalizeRoleKey(role),
       permissions: [...cur.permissions],
@@ -261,6 +149,14 @@ export const userService = {
   loginDemoOffline(role: string): UserSession {
     this.setCurrentUserRole(role)
     return this.getCurrentUser()
+  },
+
+  resolveDemoRoleFromEmail(email: string): string | null {
+    return resolveDemoRoleFromEmail(email)
+  },
+
+  getDemoCredentialPreset(role: string) {
+    return getDemoCredentialPreset(role)
   },
 
   /**
@@ -331,7 +227,7 @@ export const userService = {
     authStorage.saveSession({
       userId: user.id ?? 0,
       name: user.name,
-      email: user.email || `${user.role.toLowerCase()}@georural.com.br`,
+      email: user.email || getDemoCredentialPreset(user.role)?.email || '',
       role: user.role,
       roleId: user.roleId || normalizeRoleKey(user.role),
       permissions: [...currentUser.value.permissions],

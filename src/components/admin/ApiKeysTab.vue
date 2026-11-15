@@ -24,14 +24,7 @@ import { userService } from '@/services/user'
 import { extractApiErrorMessage } from '@/services/api'
 import type { ApiKeyRecord, ApiKeyStatus, ExternalApiAccessLog } from '@/types/apiKey'
 
-const AVAILABLE_SCOPES = [
-  { code: 'CATALOGO_CONSULTAR', label: 'Consultar Catálogo de Bases' },
-  { code: 'MAPA_CONSULTAR', label: 'Consultar Camadas no Mapa' },
-  { code: 'LINHAGEM_CONSULTAR', label: 'Consultar Linhagem de Dados' },
-  { code: 'DOMINIO_CONSULTAR', label: 'Consultar Domínios Territoriais' },
-  { code: 'PUBLICACAO_CONSULTAR', label: 'Consultar Versões Publicadas' },
-  { code: 'ANALISE_EXECUTAR', label: 'Executar Análises Territoriais' },
-]
+const AVAILABLE_SCOPES = apiKeyService.getAvailableScopes()
 
 const canCreateKey = computed(() => userService.can('API:GERAR_CHAVE'))
 const canRevokeKey = computed(() => userService.can('API:REVOGAR_CHAVE'))

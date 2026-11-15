@@ -5,7 +5,7 @@
  */
 import { computed } from 'vue'
 import { FiCheck, FiLock } from 'vue-icons-plus/fi'
-import type { RoleDef, PermissionDefinition } from '@/mocks/user.mock'
+import type { RoleDef, PermissionDefinition } from '@/types/access'
 import { isAuditorReadOnlyLocked } from '@/utils/rbac'
 
 const props = defineProps<{

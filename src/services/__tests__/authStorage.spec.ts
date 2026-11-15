@@ -6,7 +6,7 @@ import {
   type StoredAuthSession,
 } from '../storage/authStorage'
 import { rbacStorage, CURRENT_RBAC_SEED_VERSION } from '../storage/rbacStorage'
-import { MockAccessRepository } from '../access/MockAccessRepository'
+import { MockAccessRepository } from '../mocks/MockAccessRepository'
 import api from '../api'
 
 const storageMock = (() => {

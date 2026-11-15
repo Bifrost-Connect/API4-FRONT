@@ -14,7 +14,7 @@ import {
   FiUser,
   FiLock,
 } from 'vue-icons-plus/fi'
-import type { SecurityEvent } from '@/mocks/user.mock'
+import type { SecurityEvent } from '@/types/access'
 import { authStorage } from '@/services/storage/authStorage'
 import { userService } from '@/services/user'
 

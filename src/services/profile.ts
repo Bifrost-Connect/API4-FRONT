@@ -3,7 +3,7 @@
  * Centraliza regras de atualização de perfil e regras de alteração de senha.
  */
 import { ref } from 'vue'
-import { MOCK_USER_PROFILE, type UserProfileMock } from '../mocks/profile.mock'
+import { MOCK_USER_PROFILE, type UserProfileMock } from './mocks/profile.mock'
 import { userService } from './user'
 
 export type UserProfile = UserProfileMock

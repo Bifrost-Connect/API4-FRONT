@@ -2,7 +2,7 @@
  * @file Fixtures para testes automatizados.
  */
 
-import type { DashboardSummary, ProcessLog, Page, ProcessoMetricasResponse, DashboardData } from '../dashboard'
+import type { ProcessLog, Page, ProcessoMetricasResponse, DashboardData } from '../dashboard'
 
 export const mockProcessosPage: Page<ProcessLog> = {
   content: [

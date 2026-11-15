@@ -17,7 +17,7 @@ import {
   FiAlertTriangle,
 } from 'vue-icons-plus/fi'
 import DataTable, { type Column } from '../DataTable.vue'
-import type { UserItem, RoleOption } from '@/mocks/user.mock'
+import type { UserItem, RoleOption } from '@/types/access'
 
 const props = defineProps<{
   users: UserItem[]

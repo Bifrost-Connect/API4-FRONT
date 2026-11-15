@@ -144,8 +144,8 @@ const buildBaseLayersFromGeoJson = (geojson: any) => {
             `<div style="font-size: 0.85rem; line-height: 1.4;">
               <strong style="color: ${color}; font-size: 0.95rem;">${title}</strong><br />
               ${details.join('<br />')}
-              ${props.processoId ? `<div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px;">
-                <a href="/processo/${props.processoId}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
+              ${props.processoId ? `<div style="margin-top: 8px; border-top: 1px solid var(--color-border); padding-top: 4px;">
+                <a href="/processo/${props.processoId}" style="color: var(--color-accent-link); text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
               </div>` : ''}
             </div>`
           )

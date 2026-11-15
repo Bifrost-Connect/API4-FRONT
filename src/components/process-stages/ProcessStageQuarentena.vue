@@ -11,8 +11,6 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
 import { processService } from '../../services/process'
-import { dashboardService } from '../../services/dashboard'
-import { uploadService } from '../../services/upload'
 
 const props = withDefaults(
   defineProps<{
@@ -81,22 +79,15 @@ const signalStatus = ref<'idle' | 'loading' | 'signaled'>('idle')
 const signalOperatorReprocess = async () => {
   signalStatus.value = 'loading'
   toastError.value = null
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  try {
-    if (numericId) {
-      await uploadService.notificarOperadorQuarentena(numericId)
-    } else {
-      await dashboardService.requestAuditor(props.details.id)
-    }
-    signalStatus.value = 'signaled'
-    showSuccessToast(
-      `Sinalização operacional enviada ao Operador para reprocessamento da carga ${props.details.id}.`,
-    )
-  } catch {
-    // Fallback local da flag operacional caso o backend esteja offline
-    signalStatus.value = 'signaled'
+  const result = await processService.signalQuarantineReprocess(props.details.id)
+  signalStatus.value = 'signaled'
+  if (result.simulated) {
     showSuccessToast(
       `Flag de aviso operacional ativada para reprocessamento da carga ${props.details.id}.`,
+    )
+  } else {
+    showSuccessToast(
+      `Sinalização operacional enviada ao Operador para reprocessamento da carga ${props.details.id}.`,
     )
   }
 }
@@ -111,51 +102,24 @@ const exportQuarantine = async (format: 'csv' | 'json') => {
     return
   }
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (format === 'csv' && numericId) {
-    try {
-      const blob = await uploadService.exportarRejeicoesCsv(numericId)
-      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `rejeicoes_carga_${numericId}.csv`
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        URL.revokeObjectURL(url)
-        showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
-        return
-      }
-    } catch {
-      // Fallback para os registros locais em memória
-    }
-  }
-
-  let content = ''
-  let mimeType = ''
-  if (format === 'csv') {
-    content =
-      'ID,Motivo,Etapa,Data\n' +
-      records
-        .map((r) => `${r.recordId},"${r.motivo}",${r.etapaOrigem},${r.dataRejeicao}`)
-        .join('\n')
-    mimeType = 'text/csv;charset=utf-8'
-  } else {
-    content = JSON.stringify(records, null, 2)
-    mimeType = 'application/json;charset=utf-8'
-  }
+  const { blob, filename, isOfficial } = await processService.exportQuarantineReport(
+    props.details.id,
+    format,
+    records,
+  )
 
   if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-    const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `rejeicoes_${props.details.id}.${format}`
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
+    if (isOfficial) {
+      showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
+    }
   }
 }
 
@@ -198,30 +162,15 @@ const confirmReprocess = async () => {
   selectedFile.value = null
   reprocessNote.value = ''
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (numericId) {
-    try {
-      localStorage.removeItem(`api4_decisoes_${numericId}`)
-    } catch {
-      // ignore storage error
-    }
-    try {
-      await uploadService.reprocessarCarga(numericId, fileToUpload)
-      emit('reload')
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location) {
-          window.location.reload()
-        }
-      }, 700)
-    } catch (e: any) {
-      console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location) {
-          window.location.reload()
-        }
-      }, 700)
-    }
+  const { simulated } = await processService.reprocessQuarantineLoad(props.details.id, fileToUpload)
+  if (!simulated) {
+    emit('reload')
   }
+  setTimeout(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.reload()
+    }
+  }, 700)
 }
 
 // Tarefa 8: Modal de Cancelar / Invalidar Carga com justificativa obrigatória e aviso de preservação de Hash
@@ -242,14 +191,7 @@ const confirmCancelLoad = async () => {
   )
   cancelJustification.value = ''
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (numericId) {
-    try {
-      await uploadService.cancelarCarga(numericId, justification)
-    } catch (e: any) {
-      console.warn('Erro ao chamar endpoint de cancelamento, simulando localmente:', e)
-    }
-  }
+  await processService.cancelQuarantineLoad(props.details.id, justification)
 }
 </script>
 

@@ -1,9 +1,81 @@
 /**
- * @file Fixtures e dados simulados para gerenciamento de usuários, papéis e permissões.
+ * Contratos de domínio, constantes canônicas e erros de Controle de Acesso (RBAC).
  */
 
-export type StandardRole = 'ADMIN' | 'OPERADOR_DADOS' | 'ANALISTA' | 'AUDITOR' | 'GESTOR' | 'INTEGRADOR_EXTERNO'
+export type StandardRole =
+  | 'ADMIN'
+  | 'OPERADOR_DADOS'
+  | 'ANALISTA'
+  | 'AUDITOR'
+  | 'GESTOR'
+  | 'INTEGRADOR_EXTERNO'
+
 export type SystemRole = StandardRole | (string & {})
+
+export const ALL_MODULES = [
+  'USUARIOS',
+  'ROLES',
+  'BASES',
+  'INGESTAO',
+  'QUARENTENA',
+  'MAPA',
+  'ANALISE_TERRITORIAL',
+  'INDICADORES',
+  'AUDITORIA',
+  'EXPORTACAO',
+  'API',
+] as const
+
+export type ModuleKey = (typeof ALL_MODULES)[number] | (string & {})
+
+export const ALL_SUB_PERMISSIONS = [
+  'VISUALIZAR',
+  'CRIAR',
+  'EDITAR',
+  'DESATIVAR',
+  'EXCLUIR',
+  'ATRIBUIR_ROLE',
+  'ATRIBUIR_PERMISSAO',
+  'GERENCIAR_PERMISSOES',
+  'EDITAR_METADADOS',
+  'CONSULTAR_CATALOGO',
+  'HOMOLOGAR',
+  'UPLOAD',
+  'VISUALIZAR_PROCESSAMENTO',
+  'REPROCESSAR',
+  'CANCELAR',
+  'ENVIAR',
+  'CORRIGIR',
+  'DESCARTAR',
+  'VISUALIZAR_CAMADAS',
+  'VISUALIZAR_SOBREPOSICOES',
+  'COMPARAR_SAFRAS',
+  'EXECUTAR',
+  'CALCULAR_SOBREPOSICAO',
+  'CONSULTAR_RESULTADO',
+  'SALVAR_RESULTADO',
+  'CALCULAR',
+  'BLOQUEAR_VERSAO',
+  'DESBLOQUEAR_VERSAO',
+  'RASTREAR_ORIGEM',
+  'VISUALIZAR_VERSOES',
+  'VISUALIZAR_HASH',
+  'VISUALIZAR_LOGS',
+  'VISUALIZAR_PROCESSAMENTOS',
+  'VISUALIZAR_ALTERACOES',
+  'CSV',
+  'GEOJSON',
+  'VISUALIZAR_CHAVES',
+  'GERAR_CHAVE',
+  'REVOGAR_CHAVE',
+] as const
+
+export type SubPermissionKey = (typeof ALL_SUB_PERMISSIONS)[number] | (string & {})
+
+export interface PermissionDefinition {
+  modulo: ModuleKey
+  subpermissao: SubPermissionKey
+}
 
 export interface RoleDef {
   id: string
@@ -26,11 +98,6 @@ export interface SecurityEvent {
   userId?: number | null
 }
 
-export interface PermissionDefinition {
-  modulo: string
-  subpermissao: string
-}
-
 export interface UserItem {
   id: number
   name: string
@@ -51,34 +118,15 @@ export interface RoleOption {
   desc: string
 }
 
-export const MOCK_AVAILABLE_ROLES: RoleOption[] = [
-  { value: 'ADMIN', label: 'ADMIN', desc: 'Gerenciamento de usuários, roles e permissões.' },
-  {
-    value: 'OPERADOR_DADOS',
-    label: 'OPERADOR_DADOS',
-    desc: 'Entrada, processamento e controle de qualidade dos dados.',
-  },
-  {
-    value: 'ANALISTA',
-    label: 'ANALISTA',
-    desc: 'Consulta, análise territorial, mapas e indicadores.',
-  },
-  {
-    value: 'AUDITOR',
-    label: 'AUDITOR',
-    desc: 'Auditoria, histórico e rastreabilidade dos dados.',
-  },
-  {
-    value: 'GESTOR',
-    label: 'GESTOR',
-    desc: 'Governança, homologação, exportação e integrações.',
-  },
-  {
-    value: 'INTEGRADOR_EXTERNO',
-    label: 'INTEGRADOR_EXTERNO',
-    desc: 'Consumo externo de catálogo, mapas e exportação via API.',
-  },
-]
+export interface UserSession {
+  id?: number
+  name: string
+  email?: string
+  role: string
+  roleId?: string
+  permissions: string[]
+  token?: string
+}
 
 // Catálogo completo de módulos e subpermissões do GeoRural
 export const ALL_PERMISSIONS: PermissionDefinition[] = [
@@ -144,6 +192,8 @@ export const ALL_PERMISSIONS: PermissionDefinition[] = [
   { modulo: 'API', subpermissao: 'GERAR_CHAVE' },
   { modulo: 'API', subpermissao: 'REVOGAR_CHAVE' },
 ]
+
+export const PERMISSION_CATALOG = ALL_PERMISSIONS
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<StandardRole, string[]> = {
   ADMIN: [
@@ -251,146 +301,23 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<StandardRole, string[]> = {
   ],
 }
 
-export const MOCK_USERS_LIST: UserItem[] = [
-  {
-    id: 1,
-    name: 'Carlos Mendes',
-    email: 'carlos.mendes@georural.com.br',
-    role: 'ADMIN',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ADMIN],
-    department: 'Gestão Territorial',
-    status: 'Ativo',
-    lastLogin: '05/11/2026 14:32',
-  },
-  {
-    id: 2,
-    name: 'Mariana Duarte',
-    email: 'mariana.duarte@georural.com.br',
-    role: 'ANALISTA',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ANALISTA, 'EXPORTACAO:CSV'],
-    department: 'Inteligência Espacial',
-    status: 'Ativo',
-    lastLogin: '05/11/2026 11:15',
-  },
-  {
-    id: 3,
-    name: 'Lucas Silveira',
-    email: 'lucas.silveira@georural.com.br',
-    role: 'OPERADOR_DADOS',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS],
-    department: 'Operações de Ingestão',
-    status: 'Ativo',
-    lastLogin: '04/11/2026 18:20',
-  },
-  {
-    id: 4,
-    name: 'Patrícia Souza',
-    email: 'patricia.souza@georural.com.br',
-    role: 'AUDITOR',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.AUDITOR],
-    department: 'Compliance e Qualidade',
-    status: 'Ativo',
-    lastLogin: '03/11/2026 09:45',
-  },
-  {
-    id: 5,
-    name: 'Fernando Rocha',
-    email: 'fernando.rocha@georural.com.br',
-    role: 'GESTOR',
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
-    department: 'Diretoria de Governança',
-    status: 'Inativo',
-    lastLogin: '20/10/2026 16:10',
-  },
-]
+export class DuplicateEmailError extends Error {
+  constructor(email: string) {
+    super(`O e-mail "${email}" já está cadastrado no sistema.`)
+    this.name = 'DuplicateEmailError'
+  }
+}
 
-export const MOCK_ROLES: RoleDef[] = [
-  {
-    id: 'ADMIN',
-    nome: 'ADMIN',
-    descricao: 'Gerenciamento de usuários, roles e permissões.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ADMIN],
-  },
-  {
-    id: 'OPERADOR_DADOS',
-    nome: 'OPERADOR_DADOS',
-    descricao: 'Entrada, processamento e controle de qualidade dos dados.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS],
-  },
-  {
-    id: 'ANALISTA',
-    nome: 'ANALISTA',
-    descricao: 'Consulta, análise territorial, mapas e indicadores.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.ANALISTA],
-  },
-  {
-    id: 'AUDITOR',
-    nome: 'AUDITOR',
-    descricao: 'Auditoria, histórico e rastreabilidade dos dados.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.AUDITOR],
-  },
-  {
-    id: 'GESTOR',
-    nome: 'GESTOR',
-    descricao: 'Governança, homologação, exportação e integrações.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
-  },
-  {
-    id: 'INTEGRADOR_EXTERNO',
-    nome: 'INTEGRADOR_EXTERNO',
-    descricao: 'Consumo externo de catálogo, mapas e exportação via API.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO],
-  },
-]
+export class StandardRoleProtectedError extends Error {
+  constructor(roleId: string) {
+    super(`O papel padrão "${roleId}" não pode ser removido do sistema.`)
+    this.name = 'StandardRoleProtectedError'
+  }
+}
 
-export const MOCK_SECURITY_EVENTS: SecurityEvent[] = [
-  {
-    id: 1,
-    timestamp: '08/11/2026 14:10',
-    actorEmail: 'carlos.mendes@georural.com.br',
-    actorName: 'Carlos Mendes',
-    action: 'Criação de Conta',
-    details: 'Cadastrou o usuário Patrícia Souza com papel AUDITOR.',
-    severity: 'INFO',
-  },
-  {
-    id: 2,
-    timestamp: '08/11/2026 11:30',
-    actorEmail: 'carlos.mendes@georural.com.br',
-    actorName: 'Carlos Mendes',
-    action: 'Troca de Cargo',
-    details: 'Alterou o papel de Mariana Duarte para ANALISTA.',
-    severity: 'INFO',
-  },
-  {
-    id: 3,
-    timestamp: '07/11/2026 16:45',
-    actorEmail: 'carlos.mendes@georural.com.br',
-    actorName: 'Carlos Mendes',
-    action: 'Inativação de Conta',
-    details: 'Inativou o acesso de Fernando Rocha (Diretoria de Governança).',
-    severity: 'WARNING',
-  },
-  {
-    id: 4,
-    timestamp: '06/11/2026 10:20',
-    actorEmail: 'carlos.mendes@georural.com.br',
-    actorName: 'Carlos Mendes',
-    action: 'Exceção SoD Concedida',
-    details: 'Autorizou acúmulo de Ingestão e Homologação para usuário emergencial. Justificativa: Cobrir plantão de safra.',
-    severity: 'DANGER',
-  },
-]
-
-// Mantém compatibilidade com testes legados
-export const mockCurrentUser = {
-  id: 1,
-  name: 'João Silva',
-  role: 'Operador',
+export class RoleInUseError extends Error {
+  constructor(roleId: string, count: number) {
+    super(`O papel "${roleId}" está vinculado a ${count} usuário(s) e não pode ser excluído.`)
+    this.name = 'RoleInUseError'
+  }
 }

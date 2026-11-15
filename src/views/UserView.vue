@@ -24,13 +24,13 @@ import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
 import ApiKeysTab from '@/components/admin/ApiKeysTab.vue'
 import {
   userService,
+  DuplicateEmailError,
   type UserItem,
   type RoleDef,
   type PermissionDefinition,
   type SecurityEvent,
 } from '@/services/user'
 import { roleService } from '@/services/roles'
-import { DuplicateEmailError } from '@/services/access/MockAccessRepository'
 import { extractApiErrorMessage } from '@/services/api'
 
 type AdminTab = 'colaboradores' | 'matriz' | 'auditoria' | 'chaves-api'

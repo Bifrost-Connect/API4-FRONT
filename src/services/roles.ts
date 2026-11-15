@@ -5,8 +5,8 @@
  */
 
 import { ref } from 'vue'
-import type { RoleDef } from '@/mocks/user.mock'
-import { MockAccessRepository } from './access/MockAccessRepository'
+import type { RoleDef } from '@/types/access'
+import { MockAccessRepository } from './mocks/MockAccessRepository'
 import { HttpAccessRepository } from './access/HttpAccessRepository'
 import type { AccessRepository, CreateRoleDto, UpdateRoleDto } from './access/AccessRepository'
 import { authStorage } from './storage/authStorage'

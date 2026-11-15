@@ -14,7 +14,7 @@ import {
   FiCheck,
   FiAlertCircle,
 } from 'vue-icons-plus/fi'
-import type { UserItem, RoleOption } from '@/mocks/user.mock'
+import type { UserItem, RoleOption } from '@/types/access'
 import { roleService } from '@/services/roles'
 import { hasSoDConflict } from '@/utils/rbac'
 import SodExceptionModal from './SodExceptionModal.vue'

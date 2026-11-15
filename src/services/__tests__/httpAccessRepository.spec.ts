@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import api from '@/services/api'
 import { HttpAccessRepository } from '../access/HttpAccessRepository'
-import { DuplicateEmailError } from '../access/MockAccessRepository'
+import { DuplicateEmailError } from '@/types/access'
 
 vi.mock('@/services/api', () => ({
   default: {

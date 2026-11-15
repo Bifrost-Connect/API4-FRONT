@@ -4,7 +4,7 @@
  * de segurança não se percam após recarregar a página (F5), mantendo versionamento de seed.
  */
 
-import type { UserItem, RoleDef, SecurityEvent } from '@/mocks/user.mock'
+import type { UserItem, RoleDef, SecurityEvent } from '@/types/access'
 
 export const RBAC_STORAGE_KEYS = {
   USERS: 'api4_rbac_users',

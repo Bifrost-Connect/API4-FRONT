@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import api, { ApiError } from '@/services/api'
 import { authStorage } from '@/services/storage/authStorage'
-import { MockApiKeyRepository } from '@/services/apiKeys/MockApiKeyRepository'
+import { MockApiKeyRepository } from '@/services/mocks/MockApiKeyRepository'
 import { HttpApiKeyRepository } from '@/services/apiKeys/HttpApiKeyRepository'
 import { apiKeyService } from '@/services/apiKeyService'
+import { API_KEY_AVAILABLE_SCOPES } from '@/types/apiKey'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/api')>()
@@ -339,5 +340,11 @@ describe('apiKeyService (roteamento Mock vs HTTP e fallback automático)', () =>
       new ApiError({ response: { status: 403, data: { erro: 'Acesso negado' } } }),
     )
     await expect(apiKeyService.revokeKey(1)).rejects.toThrow('Acesso negado')
+  })
+
+  it('expõe o catálogo de escopos disponíveis via getAvailableScopes', () => {
+    const scopes = apiKeyService.getAvailableScopes()
+    expect(scopes).toEqual(API_KEY_AVAILABLE_SCOPES)
+    expect(scopes.some((s) => s.code === 'CATALOGO_CONSULTAR')).toBe(true)
   })
 })
