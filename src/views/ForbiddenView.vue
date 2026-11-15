@@ -69,25 +69,25 @@ const goHome = () => {
 .forbidden-card {
   max-width: 540px;
   width: 100%;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 40px 32px;
   text-align: center;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .forbidden-icon-wrap {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--color-danger, #ef4444);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .badge-status-403 {
@@ -98,28 +98,28 @@ const goHome = () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger, #ef4444);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
   margin-bottom: 16px;
 }
 
 h1 {
   font-size: 1.6rem;
   font-weight: 800;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   margin: 0 0 12px;
 }
 
 .description {
   font-size: 0.92rem;
   line-height: 1.5;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   margin: 0 0 24px;
 }
 
 .description strong {
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .security-notice {
@@ -128,9 +128,9 @@ h1 {
   gap: 10px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--color-border, #334155);
-  color: var(--color-text-muted, #94a3b8);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
   font-size: 0.78rem;
   line-height: 1.4;
   text-align: left;
@@ -139,7 +139,7 @@ h1 {
 
 .notice-icon {
   flex-shrink: 0;
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
 }
 
 .actions {
@@ -155,8 +155,8 @@ h1 {
   font-size: 0.9rem;
   font-weight: 700;
   border-radius: 8px;
-  background: var(--color-brand, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
   border: none;
   cursor: pointer;
   transition: opacity 150ms ease, transform 150ms ease;

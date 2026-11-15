@@ -143,7 +143,7 @@ const handleConfirm = () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -155,10 +155,10 @@ const handleConfirm = () => {
 .modal-dialog {
   max-width: 580px;
   width: 100%;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -167,7 +167,7 @@ const handleConfirm = () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title-group {
@@ -180,8 +180,8 @@ const handleConfirm = () => {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,19 +192,19 @@ h3 {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .subtitle {
   margin: 2px 0 0;
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .btn-close {
   background: transparent;
   border: none;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -220,9 +220,9 @@ h3 {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
   font-size: 0.85rem;
   line-height: 1.4;
   margin-bottom: 16px;
@@ -234,22 +234,22 @@ h3 {
 }
 
 .alert-banner-danger strong {
-  color: #fca5a5;
+  color: var(--badge-danger-text);
   display: block;
   margin-bottom: 4px;
 }
 
 .alert-banner-danger p {
   margin: 0;
-  color: #fecaca;
+  color: var(--color-text);
 }
 
 .audit-warning-box {
   padding: 10px 14px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   border-radius: 6px;
-  color: #fbbf24;
+  color: var(--badge-warning-text);
   font-size: 0.8rem;
   margin-bottom: 20px;
 }
@@ -264,8 +264,8 @@ h3 {
 
 .checkbox-group {
   padding: 12px;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
@@ -280,45 +280,45 @@ h3 {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #ef4444;
+  accent-color: var(--color-danger);
 }
 
 .checkbox-text {
   font-size: 0.86rem;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .form-label {
   display: block;
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   margin-bottom: 6px;
 }
 
 .required {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 6px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
   font-size: 0.86rem;
   resize: vertical;
   outline: none;
 }
 
 .textarea:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 2px var(--badge-danger-bg);
 }
 
 .error-msg {
-  color: #ef4444;
+  color: var(--badge-danger-text);
   font-size: 0.78rem;
   margin: 4px 0 0;
 }
@@ -328,13 +328,13 @@ h3 {
   justify-content: flex-end;
   gap: 12px;
   padding: 14px 24px;
-  border-top: 1px solid var(--color-border, #334155);
-  background: rgba(15, 23, 42, 0.3);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
 }
 
 .btn_danger {
-  background: #dc2626;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 8px 18px;
   border-radius: 6px;
@@ -344,6 +344,10 @@ h3 {
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.btn_danger:hover:not(:disabled) {
+  background: var(--color-danger-hover);
 }
 
 .btn_danger:disabled {

@@ -658,7 +658,7 @@ const lineageTree = computed(() => {
   padding: 0.55rem 0.75rem;
   border-radius: 6px;
   background: var(--color-surface);
-  border-left: 3px solid var(--vis-brand-orange, #f26522);
+  border-left: 3px solid var(--color-brand);
 }
 
 .lineage-node--ok {
@@ -677,7 +677,7 @@ const lineageTree = computed(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand);
   margin-top: 6px;
   flex-shrink: 0;
 }

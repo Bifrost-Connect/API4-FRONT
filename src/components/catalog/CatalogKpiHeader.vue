@@ -106,17 +106,17 @@ withDefaults(
   gap: 14px;
   padding: 14px 18px;
   border-radius: 10px;
-  border: 1px solid var(--vis-c-divider-dark-2, #334155);
-  background: var(--vis-c-dark-soft, #1e293b);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   min-height: 82px;
 }
 
 .kpi-card:hover {
   transform: translateY(-2px);
-  border-color: var(--vis-brand-orange, #f26522);
-  box-shadow: 0 6px 16px rgba(242, 101, 34, 0.18);
+  border-color: var(--color-brand);
+  box-shadow: var(--shadow-brand);
 }
 
 .kpi-icon-wrapper {
@@ -130,23 +130,23 @@ withDefaults(
 }
 
 .total-icon {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .prontas-icon {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .processamento-icon {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
 }
 
 .congeladas-icon {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  background: var(--badge-editor-bg);
+  color: var(--badge-editor-text);
 }
 
 .kpi-content {
@@ -160,14 +160,14 @@ withDefaults(
   font-size: 1.75rem;
   font-weight: 800;
   line-height: 1.1;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   letter-spacing: -0.02em;
 }
 
 .kpi-label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--vis-c-text-light-2, #94a3b8);
+  color: var(--color-text-muted);
   margin-top: 4px;
   line-height: 1.3;
   white-space: normal;

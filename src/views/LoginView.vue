@@ -259,7 +259,7 @@ const handleLogin = async () => {
   background-color: var(--color-surface);
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .login-card {
@@ -281,9 +281,9 @@ const handleLogin = async () => {
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  border: 1px solid var(--badge-danger-border);
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
   font-size: 0.85rem;
   font-weight: 500;
 }

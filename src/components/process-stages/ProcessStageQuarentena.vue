@@ -667,8 +667,8 @@ const confirmCancelLoad = async () => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background-color: var(--vis-brand-orange, #f26522);
-  color: white;
+  background-color: var(--color-brand);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.55rem 1.1rem;
   border-radius: 6px;
@@ -690,8 +690,8 @@ const confirmCancelLoad = async () => {
 }
 
 .btn-danger {
-  background: var(--badge-danger-text);
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.55rem 1.1rem;
   border-radius: 6px;
@@ -777,7 +777,7 @@ const confirmCancelLoad = async () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;

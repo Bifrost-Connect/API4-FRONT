@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
 
 .btn-ver-mapa:hover {
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 .mini-mapa-canvas {
@@ -305,8 +305,8 @@ onBeforeUnmount(() => {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(242, 101, 34, 0.2);
-  border-top-color: var(--vis-brand-orange, #f26522);
+  border: 3px solid var(--color-brand-soft-strong);
+  border-top-color: var(--color-brand);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

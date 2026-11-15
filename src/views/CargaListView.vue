@@ -1201,8 +1201,8 @@ const closeDrawer = () => {
 .view-mode-toggle {
   display: inline-flex;
   align-items: center;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 3px;
   gap: 3px;
@@ -1215,7 +1215,7 @@ const closeDrawer = () => {
   padding: 6px 14px;
   border: none;
   background: transparent;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   border-radius: 6px;
   font-size: 0.82rem;
   font-weight: 700;
@@ -1224,13 +1224,13 @@ const closeDrawer = () => {
 }
 
 .btn-view-mode:hover {
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .btn-view-mode.active {
-  background: var(--vis-brand-orange, #f26522);
-  color: white;
-  box-shadow: 0 2px 8px rgba(242, 101, 34, 0.35);
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  box-shadow: var(--shadow-brand);
 }
 
 /* Linha de Busca e Toggle de Prontas */
@@ -1253,7 +1253,7 @@ const closeDrawer = () => {
 .search-icon {
   position: absolute;
   left: 14px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -1261,18 +1261,18 @@ const closeDrawer = () => {
   width: 100%;
   height: 42px;
   padding: 0 14px 0 42px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-text, #f8fafc);
+  color: var(--color-text);
   font-size: 0.88rem;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: var(--vis-brand-orange, #f26522);
-  box-shadow: 0 0 0 2px rgba(242, 101, 34, 0.2);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-ring);
 }
 
 /* Switch de Toggle Rápido */
@@ -1282,8 +1282,8 @@ const closeDrawer = () => {
   gap: 10px;
   height: 42px;
   padding: 0 14px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
   user-select: none;
@@ -1291,7 +1291,7 @@ const closeDrawer = () => {
 }
 
 .toggle-prontas-label:hover {
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .toggle-checkbox {
@@ -1303,7 +1303,7 @@ const closeDrawer = () => {
 .toggle-switch {
   width: 38px;
   height: 22px;
-  background: #475569;
+  background: var(--color-border-hover);
   border-radius: 999px;
   position: relative;
   transition: background 180ms ease;
@@ -1317,14 +1317,14 @@ const closeDrawer = () => {
   left: 3px;
   width: 16px;
   height: 16px;
-  background: white;
+  background: var(--color-brand-contrast);
   border-radius: 50%;
   transition: transform 180ms ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .toggle-checkbox:checked + .toggle-switch {
-  background: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand);
 }
 
 .toggle-checkbox:checked + .toggle-switch::after {
@@ -1334,7 +1334,7 @@ const closeDrawer = () => {
 .toggle-text {
   font-size: 0.84rem;
   font-weight: 600;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   white-space: nowrap;
 }
 
@@ -1368,8 +1368,8 @@ const closeDrawer = () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--vis-c-dark, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 6px 10px;
   min-width: 0;
@@ -1378,7 +1378,7 @@ const closeDrawer = () => {
 
 .filter-field:hover,
 .filter-field:focus-within {
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .filter-field label {
@@ -1386,7 +1386,7 @@ const closeDrawer = () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
@@ -1394,7 +1394,7 @@ const closeDrawer = () => {
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   font-weight: 600;
   outline: none;
@@ -1404,12 +1404,12 @@ const closeDrawer = () => {
 }
 
 .filter-select option {
-  background: var(--vis-c-dark, #0f172a);
-  color: #f8fafc;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .extra-filters-divider {
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
   margin: 0 14px 4px;
 }
 
@@ -1432,9 +1432,9 @@ const closeDrawer = () => {
 .results-badge {
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--color-text-muted, #94a3b8);
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   padding: 4px 10px;
   border-radius: 6px;
 }
@@ -1457,17 +1457,17 @@ const closeDrawer = () => {
 .page-size-wrapper label {
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
 .sort-select {
   height: 36px;
   padding: 0 10px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.82rem;
   font-weight: 600;
   outline: none;
@@ -1477,12 +1477,12 @@ const closeDrawer = () => {
 
 .sort-select:hover,
 .sort-select:focus {
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .sort-select option {
-  background: var(--vis-c-dark, #0f172a);
-  color: #f8fafc;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Grade de Cards */
@@ -1621,13 +1621,13 @@ const closeDrawer = () => {
 
 .btn-card-map {
   background: transparent;
-  border-color: var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 
 .btn-card-map:hover:not(:disabled) {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .btn-card-compare:hover:not(:disabled),
@@ -1679,7 +1679,7 @@ button:disabled {
 }
 
 .table-row-item:hover td {
-  background: rgba(242, 101, 34, 0.04);
+  background: var(--color-brand-soft);
 }
 
 .td-id {
@@ -1732,8 +1732,8 @@ button:disabled {
 }
 
 .btn-action-map:hover:not(:disabled) {
-  background: var(--vis-brand-orange);
-  color: white;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 /* Badges de Situação Padronizados */
@@ -1748,39 +1748,39 @@ button:disabled {
 }
 
 .badge-status-concluida {
-  background: var(--badge-success-bg, rgba(34, 197, 94, 0.15));
-  color: var(--badge-success-text, #4ade80);
-  border: 1px solid var(--badge-success-border, rgba(34, 197, 94, 0.4));
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge-status-andamento {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .badge-status-quarentena {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
-  border: 1px solid rgba(234, 179, 8, 0.4);
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .badge-status-ressalva {
-  background: rgba(249, 115, 22, 0.15);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.4);
+  background: var(--badge-orange-bg);
+  color: var(--badge-orange-text);
+  border: 1px solid var(--badge-orange-border);
 }
 
 .badge-status-falhou {
-  background: var(--badge-danger-bg, rgba(239, 68, 68, 0.15));
-  color: var(--badge-danger-text, #f87171);
-  border: 1px solid var(--badge-danger-border, rgba(239, 68, 68, 0.4));
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .badge-status-default {
-  background: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
 /* Estados */

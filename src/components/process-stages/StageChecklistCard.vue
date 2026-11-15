@@ -345,7 +345,7 @@ const emit = defineEmits<{
 
 .btn-warning:hover {
   background-color: var(--badge-warning-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 </style>
 

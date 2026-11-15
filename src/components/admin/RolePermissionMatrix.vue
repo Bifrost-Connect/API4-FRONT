@@ -204,8 +204,8 @@ const isPermissionLockedForRole = (role: RoleDef, permKey: string): boolean => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   flex-wrap: wrap;
   gap: 14px;
@@ -219,22 +219,22 @@ const isPermissionLockedForRole = (role: RoleDef, permKey: string): boolean => {
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-text-muted, #94a3b8);
-  background: rgba(148, 163, 184, 0.12);
-  border: 1px solid var(--color-border, #334155);
+  color: var(--color-text-muted);
+  background: var(--badge-neutral-bg);
+  border: 1px solid var(--color-border);
 }
 
 h3 {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .subtitle {
   margin: 4px 0 0;
   font-size: 0.82rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .btn-add-role {
@@ -249,8 +249,8 @@ h3 {
 
 .matrix-table-wrap {
   overflow-x: auto;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -263,13 +263,13 @@ h3 {
 .matrix-table th,
 .matrix-table td {
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .th-module {
   text-align: left;
-  background: var(--color-background, #0f172a);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-surface-soft);
+  color: var(--color-heading);
   font-weight: 700;
   min-width: 220px;
   position: sticky;
@@ -279,7 +279,7 @@ h3 {
 
 .th-role {
   text-align: center;
-  background: var(--color-background, #0f172a);
+  background: var(--color-surface-soft);
   min-width: 160px;
 }
 
@@ -301,8 +301,8 @@ h3 {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.15);
-  color: #f8fafc;
+  background: var(--badge-neutral-bg);
+  color: var(--color-heading);
 }
 
 .badge-custom {
@@ -310,14 +310,14 @@ h3 {
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .role-desc {
   font-size: 0.7rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   margin: 0;
   line-height: 1.2;
 }
@@ -329,29 +329,29 @@ h3 {
   padding: 2px 8px;
   margin-top: 4px;
   font-size: 0.7rem;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--badge-danger-text);
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .btn-delete-role:hover {
-  background: #ef4444;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
 }
 
 .tr-module-heading td {
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--color-surface-soft);
   padding: 8px 14px;
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
   font-size: 0.78rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .td-perm-name {
-  background: var(--color-surface, #1e293b);
+  background: var(--color-surface);
   position: sticky;
   left: 0;
   z-index: 1;
@@ -359,7 +359,7 @@ h3 {
 
 .perm-key {
   font-weight: 600;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.8rem;
 }
 
@@ -374,12 +374,12 @@ h3 {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(34, 197, 94, 0.18);
-  color: #22c55e;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .badge-perm-denied {
-  color: var(--color-text-muted, #475569);
+  color: var(--color-text-muted);
   font-size: 1.2rem;
 }
 
@@ -389,21 +389,21 @@ h3 {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.15);
-  color: #64748b;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
   font-size: 0.68rem;
   font-weight: 600;
-  border: 1px dashed #475569;
+  border: 1px dashed var(--color-border-hover);
 }
 
 .lock-icon {
-  color: #94a3b8;
+  color: var(--color-text-muted);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -418,8 +418,8 @@ h3 {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -429,7 +429,7 @@ h3 {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title-group {
@@ -439,13 +439,13 @@ h3 {
 }
 
 .icon-brand {
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
 }
 
 .btn-close {
   background: transparent;
   border: none;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   cursor: pointer;
 }
 
@@ -457,10 +457,10 @@ h3 {
 .permissions-checklist {
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--color-border, #334155);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 8px 12px;
-  background: var(--color-background, #0f172a);
+  background: var(--color-background);
 }
 
 .checklist-item {
@@ -472,7 +472,7 @@ h3 {
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   cursor: pointer;
 }
 
@@ -481,6 +481,6 @@ h3 {
   justify-content: flex-end;
   gap: 12px;
   padding: 14px 20px;
-  border-top: 1px solid var(--color-border, #334155);
+  border-top: 1px solid var(--color-border);
 }
 </style>

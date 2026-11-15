@@ -776,10 +776,10 @@ const closeLogsModal = () => {
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-card {
@@ -801,13 +801,13 @@ const closeLogsModal = () => {
 }
 
 .header-icon {
-  color: #4f46e5;
+  color: var(--color-brand);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .danger-icon {
-  color: #dc2626;
+  color: var(--color-danger);
   flex-shrink: 0;
 }
 
@@ -815,13 +815,13 @@ const closeLogsModal = () => {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-heading);
 }
 
 .header-subtitle {
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .header-actions {
@@ -842,9 +842,9 @@ const closeLogsModal = () => {
 }
 
 .mode-pill-fallback {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .filter-card {
@@ -874,7 +874,7 @@ const closeLogsModal = () => {
   left: 0.875rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -882,11 +882,18 @@ const closeLogsModal = () => {
 .select {
   width: 100%;
   padding: 0.575rem 0.875rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   font-size: 0.875rem;
-  color: #0f172a;
-  background: #ffffff;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-ring);
 }
 
 .search-input {
@@ -903,7 +910,7 @@ const closeLogsModal = () => {
   left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #64748b;
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -930,22 +937,22 @@ const closeLogsModal = () => {
 
 .apikeys-table th,
 .logs-table th {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
   font-weight: 600;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
 }
 
 .apikeys-table td,
 .logs-table td {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #1e293b;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
   vertical-align: middle;
 }
 
@@ -956,14 +963,14 @@ const closeLogsModal = () => {
 }
 
 .partner-name {
-  color: #0f172a;
+  color: var(--color-heading);
   font-weight: 600;
 }
 
 .partner-meta,
 .date-muted {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .dates-cell {
@@ -976,8 +983,9 @@ const closeLogsModal = () => {
 
 .prefix-code,
 .route-code {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  border: 1px solid var(--color-border);
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
   font-size: 0.8125rem;
@@ -994,8 +1002,9 @@ const closeLogsModal = () => {
   display: inline-block;
   padding: 0.18rem 0.5rem;
   border-radius: 9999px;
-  background: #eef2ff;
-  color: #4338ca;
+  background: var(--badge-primary-bg);
+  color: var(--badge-primary-text);
+  border: 1px solid var(--badge-primary-border);
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -1012,27 +1021,30 @@ const closeLogsModal = () => {
 
 .badge-active,
 .http-2xx {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .badge-revoked,
 .http-5xx {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .badge-expired,
 .http-4xx {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border: 1px solid var(--badge-warning-border);
 }
 
 .last-used-text {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: #475569;
+  color: var(--color-text-muted);
   font-size: 0.8125rem;
   white-space: nowrap;
 }
@@ -1059,64 +1071,67 @@ const closeLogsModal = () => {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-primary {
-  background: #4f46e5;
-  color: #ffffff;
-  border: 1px solid #4f46e5;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  border: 1px solid var(--color-brand);
   padding: 0.575rem 1rem;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #4338ca;
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
 }
 
 .btn-secondary {
-  background: #ffffff;
-  color: #334155;
-  border: 1px solid #cbd5e1;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   padding: 0.575rem 1rem;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
+  border-color: var(--color-border-hover);
 }
 
 .btn-danger {
-  background: #dc2626;
-  color: #ffffff;
-  border: 1px solid #dc2626;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
+  border: 1px solid var(--color-danger);
   padding: 0.575rem 1rem;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
+  background: var(--color-danger-hover);
+  border-color: var(--color-danger-hover);
 }
 
 .btn-action {
   padding: 0.375rem 0.65rem;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: 0.78rem;
 }
 
 .btn-logs:hover:not(:disabled) {
-  border-color: #6366f1;
-  color: #4338ca;
-  background: #eef2ff;
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
 }
 
 .btn-revoke {
-  color: #b91c1c;
-  border-color: #fecaca;
+  color: var(--badge-danger-text);
+  border-color: var(--badge-danger-border);
 }
 
 .btn-revoke:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #ef4444;
+  background: var(--badge-danger-bg);
+  border-color: var(--color-danger);
 }
 
 .btn-action:disabled,
@@ -1129,13 +1144,13 @@ const closeLogsModal = () => {
 .empty-state {
   text-align: center;
   padding: 2rem 1rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1144,13 +1159,14 @@ const closeLogsModal = () => {
 }
 
 .modal-dialog {
-  background: #ffffff;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 35px rgba(15, 23, 42, 0.25);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-dialog-sm {
@@ -1166,7 +1182,7 @@ const closeLogsModal = () => {
   align-items: flex-start;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title-group {
@@ -1179,27 +1195,27 @@ const closeLogsModal = () => {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-heading);
 }
 
 .modal-subtitle {
   margin: 0.2rem 0 0;
   font-size: 0.8125rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .btn-close {
   background: transparent;
   border: none;
-  color: #64748b;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 6px;
 }
 
 .btn-close:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-surface-soft);
+  color: var(--color-heading);
 }
 
 .modal-body {
@@ -1214,8 +1230,8 @@ const closeLogsModal = () => {
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
 }
 
 .form-group {
@@ -1227,16 +1243,16 @@ const closeLogsModal = () => {
 .form-group label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-heading);
 }
 
 .field-hint {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .scopes-fieldset {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 0.875rem 1rem;
   margin: 0;
@@ -1246,7 +1262,7 @@ const closeLogsModal = () => {
   padding: 0 0.4rem;
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--color-heading);
 }
 
 .scopes-checkbox-grid {
@@ -1261,13 +1277,13 @@ const closeLogsModal = () => {
   align-items: flex-start;
   gap: 0.5rem;
   padding: 0.55rem 0.7rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
 }
 
 .scope-checkbox-card:hover {
-  background: #f8fafc;
+  background: var(--color-surface-soft);
 }
 
 .scope-checkbox-text {
@@ -1278,12 +1294,12 @@ const closeLogsModal = () => {
 
 .scope-checkbox-text strong {
   font-size: 0.78rem;
-  color: #0f172a;
+  color: var(--color-heading);
 }
 
 .scope-checkbox-text small {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .alert-danger-box {
@@ -1292,9 +1308,9 @@ const closeLogsModal = () => {
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
   font-size: 0.85rem;
 }
 
@@ -1304,9 +1320,9 @@ const closeLogsModal = () => {
   gap: 0.75rem;
   padding: 0.875rem 1rem;
   border-radius: 10px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
+  color: var(--badge-warning-text);
   font-size: 0.85rem;
 }
 
@@ -1321,8 +1337,9 @@ const closeLogsModal = () => {
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
-  background: #0f172a;
-  color: #f8fafc;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
+  border: 1px solid var(--color-border);
 }
 
 .secret-value {
@@ -1340,19 +1357,19 @@ const closeLogsModal = () => {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.82rem;
-  color: #475569;
+  color: var(--color-text-muted);
 }
 
 .confirm-text {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-heading);
   font-size: 0.925rem;
 }
 
 .confirm-note {
   margin: 0;
   font-size: 0.82rem;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .sr-only {

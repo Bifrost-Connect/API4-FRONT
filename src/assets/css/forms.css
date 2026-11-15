@@ -15,7 +15,7 @@
 }
 .input:focus {
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(242, 101, 34, 0.15);
+  box-shadow: 0 0 0 3px var(--color-brand-ring);
 }
 .input::placeholder {
   color: var(--color-text-muted);

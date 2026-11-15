@@ -190,7 +190,7 @@ onMounted(() => {
 .eyebrow {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--vis-brand-orange, #e67e22);
+  color: var(--color-brand);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 4px;
@@ -204,7 +204,7 @@ onMounted(() => {
 }
 
 .page-description {
-  color: var(--color-text-muted, #718096);
+  color: var(--color-text-muted);
   font-size: 0.95rem;
 }
 
@@ -231,14 +231,14 @@ onMounted(() => {
 .detail-item {
   padding: 12px 14px;
   border-radius: 8px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
 }
 
 .detail-item dt {
   font-size: 0.74rem;
   font-weight: 600;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 
@@ -246,13 +246,13 @@ onMounted(() => {
   margin: 0;
   font-size: 0.92rem;
   font-weight: 600;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .permissions-summary h4 {
   font-size: 0.86rem;
   font-weight: 700;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   margin: 0 0 10px;
 }
 
@@ -267,17 +267,17 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 600;
-  background: rgba(242, 101, 34, 0.14);
-  border: 1px solid rgba(242, 101, 34, 0.3);
-  color: var(--color-brand, #f26522);
+  background: var(--badge-primary-bg);
+  border: 1px solid var(--badge-primary-border);
+  color: var(--badge-primary-text);
 }
 
 .card {
-  background: var(--color-surface, #ffffff);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .user-summary-card {
@@ -299,12 +299,12 @@ onMounted(() => {
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: var(--color-background-soft, #f7fafc);
-  color: var(--vis-brand-orange, #e67e22);
+  background: var(--color-background-soft);
+  color: var(--color-brand);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid var(--vis-brand-orange, #e67e22);
+  border: 3px solid var(--color-brand);
   margin-bottom: 10px;
 }
 
@@ -318,28 +318,33 @@ onMounted(() => {
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #edf2f7;
-  color: #4a5568;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border: 1px solid var(--badge-neutral-border);
 }
 
 .role-badge.administrador {
-  background: #feebc8;
-  color: #c05621;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border-color: var(--badge-warning-border);
 }
 
 .role-badge.analista {
-  background: #e2e8f0;
-  color: #2b6cb0;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border-color: var(--badge-info-border);
 }
 
 .role-badge.auditor {
-  background: #fed7d7;
-  color: #9b2c2c;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border-color: var(--badge-danger-border);
 }
 
 .role-badge.operador {
-  background: #c6f6d5;
-  color: #22543d;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border-color: var(--badge-success-border);
 }
 
 .user-display-name {
@@ -351,13 +356,13 @@ onMounted(() => {
 
 .user-display-email {
   font-size: 0.88rem;
-  color: var(--color-text-muted, #718096);
+  color: var(--color-text-muted);
 }
 
 .card-divider {
   width: 100%;
   border: 0;
-  border-top: 1px solid var(--color-border, #e2e8f0);
+  border-top: 1px solid var(--color-border);
   margin: 20px 0;
 }
 
@@ -380,7 +385,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-text-muted, #718096);
+  color: var(--color-text-muted);
 }
 
 .meta-val {
@@ -389,7 +394,7 @@ onMounted(() => {
 }
 
 .meta-val.status-active {
-  color: #38a169;
+  color: var(--badge-success-text);
 }
 
 .profile-content {
@@ -413,7 +418,7 @@ onMounted(() => {
 
 .card-header p {
   font-size: 0.86rem;
-  color: var(--color-text-muted, #718096);
+  color: var(--color-text-muted);
 }
 
 .form-layout {
@@ -455,7 +460,7 @@ onMounted(() => {
 .input-icon {
   position: absolute;
   left: 12px;
-  color: var(--color-text-muted, #a0aec0);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -480,14 +485,14 @@ onMounted(() => {
 }
 
 .alert-success {
-  background-color: #f0fff4;
-  color: #276749;
-  border: 1px solid #c6f6d5;
+  background-color: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .alert-danger {
-  background-color: #fff5f5;
-  color: #9b2c2c;
-  border: 1px solid #fed7d7;
+  background-color: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border: 1px solid var(--badge-danger-border);
 }
 </style>

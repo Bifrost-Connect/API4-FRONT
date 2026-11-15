@@ -530,7 +530,7 @@ const currentComponent = computed(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-drawer);
   border-left: 1px solid var(--color-border);
   animation: slideIn 0.25s ease;
   z-index: 10;
@@ -668,9 +668,9 @@ const currentComponent = computed(() => {
 }
 
 .audit-toggle-btn.btn-active {
-  background: var(--vis-brand-orange);
-  border-color: var(--vis-brand-orange);
-  color: #fff;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .audit-icon {
@@ -687,13 +687,13 @@ const currentComponent = computed(() => {
   font-size: 0.72rem;
   padding: 0 6px;
   border-radius: 999px;
-  background: var(--vis-brand-orange);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .audit-toggle-btn.btn-active .audit-count-badge {
-  background: #fff;
-  color: var(--vis-brand-orange);
+  background: var(--color-brand-contrast);
+  color: var(--color-brand);
 }
 
 .closed-version-banner {

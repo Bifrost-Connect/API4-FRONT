@@ -16,7 +16,7 @@ const props = defineProps<{
   height: 300px;
   width: 100%;
   border-radius: 8px;
-  background: var(--color-surface-soft, #f4f4f4);
+  background: var(--color-surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;

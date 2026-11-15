@@ -306,15 +306,15 @@ const onApply = () => {
 .category-tab-btn.active {
   background: var(--color-brand);
   border-color: var(--color-brand);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 /* Container de filtros */
 .card-filters {
-  background: var(--color-surface, #1e293b);
+  background: var(--color-surface);
   border-radius: 10px;
-  border: 1px solid var(--color-border, #334155);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
@@ -342,24 +342,24 @@ const onApply = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--color-border, #334155);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 6px 12px;
-  background: var(--vis-c-dark, #0f172a);
+  background: var(--color-surface-soft);
   min-width: 0;
   transition: border-color 150ms ease;
 }
 
 .filter-item:hover,
 .filter-item:focus-within {
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .filter-item label {
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -384,7 +384,7 @@ const onApply = () => {
   border: none;
   background: transparent;
   outline: none;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   font-weight: 600;
   padding: 2px 0;
@@ -392,8 +392,8 @@ const onApply = () => {
 }
 
 .input-inline option {
-  background: var(--vis-c-dark, #0f172a);
-  color: #f8fafc;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .filter-actions {
@@ -405,9 +405,9 @@ const onApply = () => {
 .btn-filter {
   height: 100%;
   min-height: 40px;
-  border: 1px solid var(--vis-brand-orange, #f26522);
-  color: #fff;
-  background: var(--vis-brand-orange, #f26522);
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand-contrast);
+  background: var(--color-brand);
   font-weight: 800;
   font-size: 0.82rem;
   letter-spacing: 0.06em;
@@ -418,9 +418,9 @@ const onApply = () => {
 }
 
 .btn-filter:hover {
-  background: #ea580c;
-  border-color: #ea580c;
-  box-shadow: 0 4px 12px rgba(242, 101, 34, 0.25);
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
+  box-shadow: var(--shadow-brand);
 }
 </style>
 

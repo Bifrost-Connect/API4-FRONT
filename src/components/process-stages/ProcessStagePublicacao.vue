@@ -632,9 +632,9 @@ const goToMap = () => {
 
 .closed-version-banner {
   padding: 12px 16px;
-  color: #713f12;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
+  color: var(--badge-warning-text);
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 700;
@@ -772,10 +772,10 @@ const goToMap = () => {
   align-items: center;
   gap: 2rem;
   background: var(--color-surface);
-  border: 2px solid var(--vis-brand-orange, #f26522);
+  border: 2px solid var(--color-brand);
   border-radius: 12px;
   padding: 1.75rem 2rem;
-  box-shadow: 0 4px 20px rgba(242, 101, 34, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .action-content {
@@ -789,8 +789,8 @@ const goToMap = () => {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: rgba(242, 101, 34, 0.1);
-  color: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -856,7 +856,7 @@ const goToMap = () => {
 
 .review-textarea:focus {
   outline: none;
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .review-actions {
@@ -1012,8 +1012,8 @@ const goToMap = () => {
 }
 
 .btn-primary {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .btn-primary:hover {
@@ -1029,7 +1029,7 @@ const goToMap = () => {
 
 .btn-outline-danger:hover {
   background: var(--badge-danger-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 .btn-ghost {
@@ -1082,7 +1082,7 @@ const goToMap = () => {
 
 .btn-warning-outline:hover {
   background: var(--badge-warning-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 /* ═══ ESTILOS US07: Exportação Oficial, Selo Bloqueado e Modais ═══ */
@@ -1167,7 +1167,7 @@ const goToMap = () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   display: grid;
   place-items: center;
   z-index: 9999;
@@ -1175,11 +1175,11 @@ const goToMap = () => {
 }
 
 .modal-dialog {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 520px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -1283,7 +1283,7 @@ const goToMap = () => {
 
 .form-textarea:focus {
   outline: none;
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .error-text {
@@ -1361,8 +1361,8 @@ const goToMap = () => {
 }
 
 .btn-confirm-rejection {
-  background: #dc2626;
-  color: white;
+  background: var(--color-danger-hover);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.6rem 1.25rem;
   border-radius: 6px;
@@ -1377,8 +1377,8 @@ const goToMap = () => {
 }
 
 .btn-confirm-publish {
-  background: #059669;
-  color: white;
+  background: var(--color-success-hover);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.6rem 1.25rem;
   border-radius: 6px;

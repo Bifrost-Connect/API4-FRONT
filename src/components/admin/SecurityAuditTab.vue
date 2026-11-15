@@ -328,8 +328,8 @@ const filteredEvents = computed(() => {
 
 .filter-card {
   padding: 16px 20px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -352,7 +352,7 @@ const filteredEvents = computed(() => {
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -360,16 +360,16 @@ const filteredEvents = computed(() => {
   width: 100%;
   padding-left: 40px;
   height: 40px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   outline: none;
 }
 
 .search-input:focus {
-  border-color: var(--color-brand, #f26522);
+  border-color: var(--color-brand);
 }
 
 .filter-selects {
@@ -387,17 +387,17 @@ const filteredEvents = computed(() => {
 .select-icon {
   position: absolute;
   left: 12px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
 .select {
   height: 40px;
   padding: 0 12px 0 34px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   outline: none;
   cursor: pointer;
@@ -406,8 +406,8 @@ const filteredEvents = computed(() => {
 .table-card {
   padding: 0;
   overflow: hidden;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -424,12 +424,12 @@ const filteredEvents = computed(() => {
 .audit-table th,
 .audit-table td {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .audit-table th {
-  background: var(--color-background, #0f172a);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-surface-soft);
+  color: var(--color-heading);
   font-weight: 700;
   text-align: left;
 }
@@ -438,13 +438,13 @@ const filteredEvents = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   font-size: 0.8rem;
   white-space: nowrap;
 }
 
 .time-icon {
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .actor-cell {
@@ -457,8 +457,8 @@ const filteredEvents = computed(() => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -467,13 +467,13 @@ const filteredEvents = computed(() => {
 .actor-name {
   display: block;
   font-size: 0.84rem;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .actor-email {
   display: block;
   font-size: 0.74rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .action-badge {
@@ -484,31 +484,31 @@ const filteredEvents = computed(() => {
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 700;
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .badge-sod {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #ef4444;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
 }
 
 .badge-403 {
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #f59e0b;
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
+  color: var(--badge-warning-text);
 }
 
 .badge-warn {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
+  background: var(--badge-orange-bg);
+  color: var(--badge-orange-text);
 }
 
 .details-text {
   margin: 0;
   font-size: 0.82rem;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   line-height: 1.4;
 }
 
@@ -522,29 +522,29 @@ const filteredEvents = computed(() => {
 }
 
 .sev-info {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .sev-warn {
-  background: rgba(245, 158, 11, 0.15);
-  color: #facc15;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
 }
 
 .sev-danger {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .empty-cell {
   text-align: center;
   padding: 48px 16px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .empty-icon {
   margin-bottom: 8px;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
 }
 
 .date-range-group {
@@ -556,16 +556,16 @@ const filteredEvents = computed(() => {
 
 .date-label {
   font-size: 0.78rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .date-input {
   height: 40px;
   padding: 0 10px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.82rem;
 }
 
@@ -574,12 +574,12 @@ const filteredEvents = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-top: 1px solid var(--color-border, #334155);
+  border-top: 1px solid var(--color-border);
 }
 
 .pagination-info {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .pagination-controls {
@@ -590,9 +590,9 @@ const filteredEvents = computed(() => {
 .btn-page {
   padding: 6px 12px;
   border-radius: 6px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
   font-size: 0.8rem;
   cursor: pointer;
 }

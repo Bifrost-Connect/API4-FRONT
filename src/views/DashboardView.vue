@@ -651,8 +651,8 @@ const requestAuditor = async (item: ProcessLog) => {
   display: inline-block;
   text-decoration: none;
   letter-spacing: 0.03em;
-  background-color: var(--vis-brand-orange, #f26522);
-  color: white;
+  background-color: var(--color-brand);
+  color: var(--color-brand-contrast);
   border: none;
   border-radius: 9999px;
   padding: 0.85rem 2rem;
@@ -662,7 +662,7 @@ const requestAuditor = async (item: ProcessLog) => {
   transition:
     opacity 0.2s,
     transform 0.1s;
-  box-shadow: 0 4px 6px rgba(242, 101, 34, 0.3);
+  box-shadow: var(--shadow-brand);
   animation: uploadPulse 2.8s ease-in-out infinite;
 }
 
@@ -675,10 +675,10 @@ const requestAuditor = async (item: ProcessLog) => {
 @keyframes uploadPulse {
   0%,
   100% {
-    box-shadow: 0 4px 6px rgba(242, 101, 34, 0.3);
+    box-shadow: var(--shadow-brand);
   }
   50% {
-    box-shadow: 0 7px 20px rgba(242, 101, 34, 0.48);
+    box-shadow: var(--shadow-brand-strong);
   }
 }
 
@@ -749,7 +749,7 @@ const requestAuditor = async (item: ProcessLog) => {
 .expanded-stepper {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--vis-brand-orange, #f26522);
+  border-left: 3px solid var(--color-brand);
   border-radius: 8px;
   padding: 1rem 1rem 0.25rem;
   margin: 0.5rem 0 0.75rem;
@@ -800,9 +800,9 @@ const requestAuditor = async (item: ProcessLog) => {
   font-size: 0.82rem;
   font-weight: 600;
   border-radius: 20px;
-  background: var(--color-surface, #f8f9fa);
-  color: var(--color-text-muted, #6c757d);
-  border: 1px solid var(--color-border, #dee2e6);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
 }
 
 .expanded-details-title {
@@ -817,9 +817,9 @@ const requestAuditor = async (item: ProcessLog) => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--color-success, #28a745);
-  color: #fff;
-  border: 1px solid var(--color-success, #28a745);
+  background: var(--color-success);
+  color: var(--color-brand-contrast);
+  border: 1px solid var(--color-success);
   font-weight: 700;
   letter-spacing: 0.04em;
   padding: 0.6rem 1.25rem;
@@ -835,8 +835,8 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .btn_action_audit {
-  border: 1px solid var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
   background: transparent;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -849,8 +849,8 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .btn_action_audit:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .btn_action_editor {
@@ -872,7 +872,7 @@ const requestAuditor = async (item: ProcessLog) => {
 
 .btn_action_editor:hover {
   background: var(--badge-editor-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 .btn_action_notify {
@@ -893,8 +893,8 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .btn_action_notify:hover:not(:disabled) {
-  background: var(--vis-c-danger, #ef4444);
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
 }
 
 .btn_action_notify:disabled {
@@ -903,7 +903,7 @@ const requestAuditor = async (item: ProcessLog) => {
 }
 
 .auditor-error {
-  color: var(--vis-c-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .alert-warning {
@@ -980,7 +980,7 @@ const requestAuditor = async (item: ProcessLog) => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -995,7 +995,7 @@ const requestAuditor = async (item: ProcessLog) => {
   border-radius: 12px;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: modalScale 0.25s ease-out;
 }

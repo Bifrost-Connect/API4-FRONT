@@ -44,13 +44,13 @@
       <h3 class="mt-4 mb-2">Tons Escuros (Dark)</h3>
       <div class="color-grid">
         <div class="color-box" style="background: var(--vis-c-dark)">
-          <span style="color: white">--vis-c-dark</span>
+          <span style="color: var(--vis-c-text-light-1)">--vis-c-dark</span>
         </div>
         <div class="color-box" style="background: var(--vis-c-dark-soft)">
-          <span style="color: white">--vis-c-dark-soft</span>
+          <span style="color: var(--vis-c-text-light-1)">--vis-c-dark-soft</span>
         </div>
         <div class="color-box" style="background: var(--vis-c-dark-mute)">
-          <span style="color: white">--vis-c-dark-mute</span>
+          <span style="color: var(--vis-c-text-light-1)">--vis-c-dark-mute</span>
         </div>
       </div>
 
@@ -381,11 +381,11 @@ section h2 {
   padding: 1rem;
   font-weight: 500;
   font-size: 0.85rem;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  color: var(--color-brand-contrast);
+  box-shadow: var(--shadow-sm);
 }
 .color-box span {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px var(--color-overlay);
 }
 .color-box[style*='--vis-c-light'] span {
   text-shadow: none;

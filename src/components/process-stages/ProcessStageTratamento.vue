@@ -119,8 +119,8 @@ const overallStatus = computed(() => {
 .card-locked {
   padding: 3rem 2rem;
   text-align: center;
-  background: rgba(239, 68, 68, 0.02);
-  border: 1px dashed rgba(239, 68, 68, 0.3);
+  background: var(--badge-danger-bg);
+  border: 1px dashed var(--badge-danger-border);
   border-radius: 12px;
 }
 
@@ -133,7 +133,7 @@ const overallStatus = computed(() => {
 }
 
 .locked-icon {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .locked-body h4 {

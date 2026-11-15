@@ -146,7 +146,7 @@ const handleRowClick = (item: any, event: Event) => {
 
 .expanded-content-wrapper {
   padding: 1.5rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .empty-state {

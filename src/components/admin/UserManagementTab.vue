@@ -305,8 +305,8 @@ const isSelf = (user: UserItem): boolean => {
 
 .filter-card {
   padding: 16px 20px;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -329,7 +329,7 @@ const isSelf = (user: UserItem): boolean => {
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
@@ -337,16 +337,16 @@ const isSelf = (user: UserItem): boolean => {
   width: 100%;
   padding-left: 40px;
   height: 40px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   outline: none;
 }
 
 .search-input:focus {
-  border-color: var(--color-brand, #f26522);
+  border-color: var(--color-brand);
 }
 
 .filter-selects {
@@ -365,17 +365,17 @@ const isSelf = (user: UserItem): boolean => {
 .select-icon {
   position: absolute;
   left: 12px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
 .select {
   height: 40px;
   padding: 0 12px 0 34px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   font-size: 0.85rem;
   outline: none;
   cursor: pointer;
@@ -396,8 +396,8 @@ const isSelf = (user: UserItem): boolean => {
 .table-card {
   padding: 0;
   overflow: hidden;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
@@ -411,8 +411,8 @@ const isSelf = (user: UserItem): boolean => {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -422,19 +422,19 @@ const isSelf = (user: UserItem): boolean => {
 }
 
 .avatar-admin {
-  background: rgba(242, 101, 34, 0.2);
-  color: var(--color-brand, #f26522);
+  background: var(--badge-primary-bg);
+  color: var(--badge-primary-text);
 }
 
 .user-cell-name {
   display: block;
   font-size: 0.88rem;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .badge-current-user {
   font-size: 0.72rem;
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
   font-weight: 700;
   margin-left: 4px;
 }
@@ -442,7 +442,7 @@ const isSelf = (user: UserItem): boolean => {
 .user-cell-email {
   display: block;
   font-size: 0.78rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .role-badge {
@@ -452,39 +452,39 @@ const isSelf = (user: UserItem): boolean => {
   font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
 }
 
 .role-badge.admin {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .role-badge.operador_dados {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
 }
 
 .role-badge.analista {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .role-badge.auditor {
-  background: rgba(234, 179, 8, 0.15);
-  color: #facc15;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
 }
 
 .role-badge.gestor {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  background: var(--badge-editor-bg);
+  color: var(--badge-editor-text);
 }
 
 .dept-text,
 .date-text {
   font-size: 0.84rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .sod-badge {
@@ -493,15 +493,15 @@ const isSelf = (user: UserItem): boolean => {
   gap: 5px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #ef4444;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
   font-size: 0.74rem;
   font-weight: 700;
 }
 
 .sod-none {
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-size: 0.85rem;
 }
 
@@ -516,13 +516,13 @@ const isSelf = (user: UserItem): boolean => {
 }
 
 .status-pill.ativo {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .status-pill.inativo {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .status-dot {
@@ -542,9 +542,9 @@ const isSelf = (user: UserItem): boolean => {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  border: 1px solid var(--color-border, #334155);
-  background: var(--color-surface, #1e293b);
-  color: var(--color-text-muted, #94a3b8);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -553,13 +553,13 @@ const isSelf = (user: UserItem): boolean => {
 }
 
 .btn-action:hover:not(:disabled) {
-  border-color: var(--color-brand, #f26522);
-  color: var(--color-heading, #f8fafc);
+  border-color: var(--color-brand);
+  color: var(--color-heading);
 }
 
 .btn-action.permissions:hover:not(:disabled),
 .btn-action.reset-password:hover:not(:disabled) {
-  color: #facc15;
+  color: var(--badge-warning-text);
 }
 
 .table-scroll-region {
@@ -567,7 +567,7 @@ const isSelf = (user: UserItem): boolean => {
 }
 
 .btn-action.status:hover:not(:disabled) {
-  color: #ef4444;
+  color: var(--badge-danger-text);
 }
 
 .btn-action:disabled,
@@ -581,7 +581,7 @@ const isSelf = (user: UserItem): boolean => {
   flex-direction: column;
   align-items: center;
   padding: 48px 16px;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   gap: 12px;
 }
 
@@ -590,14 +590,14 @@ const isSelf = (user: UserItem): boolean => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-top: 1px solid var(--color-border, #334155);
+  border-top: 1px solid var(--color-border);
   flex-wrap: wrap;
   gap: 12px;
 }
 
 .pagination-info {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .pagination-controls {
@@ -609,9 +609,9 @@ const isSelf = (user: UserItem): boolean => {
 .btn-page {
   padding: 6px 12px;
   border-radius: 6px;
-  background: var(--color-background, #0f172a);
-  border: 1px solid var(--color-border, #334155);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-heading);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -623,6 +623,6 @@ const isSelf = (user: UserItem): boolean => {
 
 .page-number {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 </style>

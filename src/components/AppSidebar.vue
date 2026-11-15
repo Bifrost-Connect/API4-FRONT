@@ -89,7 +89,7 @@ const handleLogout = async () => {
   display: grid;
   place-items: center;
   background: var(--vis-brand-orange);
-  color: white;
+  color: var(--color-brand-contrast);
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -154,8 +154,8 @@ const handleLogout = async () => {
 .navigation-link:hover,
 .login-link:hover,
 .navigation-link-active {
-  color: white;
-  background: rgba(242, 101, 34, 0.16);
+  color: var(--color-brand-contrast);
+  background: var(--color-brand-soft-strong);
   border-left-color: var(--vis-brand-orange);
 }
 

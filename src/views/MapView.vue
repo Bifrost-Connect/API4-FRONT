@@ -527,7 +527,7 @@ onBeforeUnmount(() => {
           <div
             v-if="baseLayers.length === 0 && locations.length === 0"
             class="empty-locations-state"
-            style="padding: 1.5rem 0.5rem; text-align: center; color: var(--vis-c-text-dark-2); font-size: 0.82rem;"
+            style="padding: 1.5rem 0.5rem; text-align: center; color: var(--color-text-muted); font-size: 0.82rem;"
           >
             Nenhuma base oficial cadastrada ainda.
           </div>
@@ -667,8 +667,8 @@ h2 {
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 1rem;
-  background: rgba(242, 101, 34, 0.12);
-  border: 1px solid rgba(242, 101, 34, 0.35);
+  background: var(--badge-primary-bg);
+  border: 1px solid var(--badge-primary-border);
   border-radius: 6px;
   font-size: 0.88rem;
   color: var(--color-heading);
@@ -676,8 +676,8 @@ h2 {
 
 .btn-clear-filter {
   background: transparent;
-  border: 1px solid var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.25rem 0.6rem;
@@ -687,8 +687,8 @@ h2 {
 }
 
 .btn-clear-filter:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .locate-button {
@@ -761,7 +761,7 @@ h2 {
   min-height: 28px;
   display: grid;
   place-items: center;
-  color: white;
+  color: var(--color-brand-contrast);
   background: var(--color-brand);
   border-radius: 50%;
   font-size: 0.8rem;
@@ -786,7 +786,7 @@ h2 {
 .btn-quick-toggle {
   background: transparent;
   border: none;
-  color: var(--vis-brand-orange, #f26522);
+  color: var(--color-brand);
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
@@ -805,7 +805,7 @@ h2 {
 .base-layer-card {
   padding: 8px 10px;
   border-radius: 6px;
-  background: var(--color-surface-soft, rgba(0, 0, 0, 0.03));
+  background: var(--color-surface-soft);
   border: 1px solid var(--color-border);
   transition: all 0.2s ease;
   margin-bottom: 6px;
@@ -836,7 +836,7 @@ h2 {
 .base-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: var(--vis-brand-orange, #f26522);
+  accent-color: var(--color-brand);
   cursor: pointer;
 }
 
@@ -863,8 +863,8 @@ h2 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
   pointer-events: none;
   transition: transform 0.15s ease;
 }
@@ -912,7 +912,7 @@ h2 {
 }
 
 .btn-zoom-target:hover {
-  color: var(--vis-brand-orange, #f26522);
+  color: var(--color-brand);
 }
 
 .location-item {
@@ -1040,15 +1040,15 @@ h2 {
 }
 
 .cache-badge.cache-hit {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
 }
 
 .cache-badge.cache-miss {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
 }
 
 .btn-refresh-cache {

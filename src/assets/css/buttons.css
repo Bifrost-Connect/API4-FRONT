@@ -53,9 +53,9 @@
 }
 
 .btn:hover:not(:disabled) {
-  color: #ffffff; /* Texto branco no hover */
+  color: var(--color-brand-contrast); /* Texto branco no hover */
   border-color: var(--color-brand);
-  box-shadow: 0 4px 15px rgba(242, 101, 34, 0.3);
+  box-shadow: var(--shadow-brand);
 }
 
 .btn:hover:not(:disabled)::before {
@@ -81,7 +81,7 @@
 }
 .btn_success:hover:not(:disabled) {
   border-color: var(--vis-c-success);
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  box-shadow: var(--shadow-success);
 }
 
 /* Variação Danger */
@@ -94,7 +94,7 @@
 }
 .btn_recuse:hover:not(:disabled) {
   border-color: var(--vis-c-danger);
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+  box-shadow: var(--shadow-danger);
 }
 
 /* Variação Outline (mesmo comportamento base) */
@@ -107,5 +107,5 @@
 }
 .btn_outline:hover:not(:disabled) {
   border-color: var(--color-brand);
-  color: #ffffff;
+  color: var(--color-brand-contrast);
 }

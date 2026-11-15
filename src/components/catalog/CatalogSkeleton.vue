@@ -57,9 +57,9 @@ withDefaults(
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
-    rgba(148, 163, 184, 0.12) 25%,
-    rgba(148, 163, 184, 0.24) 50%,
-    rgba(148, 163, 184, 0.12) 75%
+    var(--color-surface-soft) 25%,
+    var(--color-border) 50%,
+    var(--color-surface-soft) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -88,8 +88,8 @@ withDefaults(
   gap: 16px;
   padding: 18px 20px;
   border-radius: 12px;
-  border: 1px solid var(--vis-c-divider-dark-2, #334155);
-  background: var(--vis-c-dark-soft, #1e293b);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .skeleton-circle {
@@ -141,8 +141,8 @@ withDefaults(
 .skeleton-catalog-card {
   padding: 20px;
   border-radius: 12px;
-  border: 1px solid var(--vis-c-divider-dark-2, #334155);
-  background: var(--vis-c-dark-soft, #1e293b);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -177,7 +177,7 @@ withDefaults(
   gap: 10px;
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  border-top: 1px solid var(--color-border);
 }
 
 .skeleton-btn {
@@ -187,8 +187,8 @@ withDefaults(
 }
 
 .skeleton-table-wrapper {
-  background: var(--vis-c-dark-soft, #1e293b);
-  border: 1px solid var(--vis-c-divider-dark-2, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -205,6 +205,6 @@ withDefaults(
 
 .skeleton-table-row {
   padding: 8px 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  border-top: 1px solid var(--color-border);
 }
 </style>

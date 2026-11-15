@@ -569,20 +569,20 @@ const handleDeleteRole = async (roleId: string) => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
   margin: 0 0 4px;
 }
 
 h1 {
   font-size: 1.6rem;
   font-weight: 800;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
   margin: 0 0 6px;
 }
 
 .page-description {
   font-size: 0.88rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -597,15 +597,15 @@ h1 {
 }
 
 .alert-success {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #4ade80;
+  background: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
+  color: var(--badge-success-text);
 }
 
 .alert-danger {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
+  color: var(--badge-danger-text);
 }
 
 .btn-toast-close {
@@ -621,7 +621,7 @@ h1 {
 .tabs-nav {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 4px;
 }
 
@@ -633,7 +633,7 @@ h1 {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
@@ -641,19 +641,19 @@ h1 {
 }
 
 .tab-btn:hover {
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .tab-btn.active {
-  color: var(--color-brand, #f26522);
-  border-bottom-color: var(--color-brand, #f26522);
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand);
 }
 
 /* Modal de Permissões */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.75);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -665,10 +665,10 @@ h1 {
 .modal-dialog {
   max-width: 600px;
   width: 100%;
-  background: var(--color-surface, #1e293b);
-  border: 1px solid var(--color-border, #334155);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -681,7 +681,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title-group {
@@ -691,26 +691,26 @@ h1 {
 }
 
 .icon-brand {
-  color: var(--color-brand, #f26522);
+  color: var(--color-brand);
 }
 
 h3 {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .subtitle {
   margin: 2px 0 0;
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .btn-close {
   background: transparent;
   border: none;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
   cursor: pointer;
 }
 
@@ -742,7 +742,7 @@ h3 {
 .permissions-table-wrapper {
   max-height: 380px;
   overflow-y: auto;
-  border: 1px solid var(--color-border, #334155);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
@@ -755,12 +755,12 @@ h3 {
 .perm-table th,
 .perm-table td {
   padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border, #334155);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .perm-table th {
-  background: var(--color-background, #0f172a);
-  color: var(--color-heading, #f8fafc);
+  background: var(--color-surface-soft);
+  color: var(--color-heading);
   font-weight: 700;
   text-align: left;
 }
@@ -770,12 +770,12 @@ h3 {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 4px;
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
 }
 
 .cell-subperm code {
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .toggle-perm-btn {
@@ -792,13 +792,13 @@ h3 {
 }
 
 .is-granted {
-  background: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
 }
 
 .is-revoked {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
 }
 
 .modal-footer-wrapper {
@@ -807,12 +807,12 @@ h3 {
   justify-content: space-between;
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--color-border, #334155);
+  border-top: 1px solid var(--color-border);
 }
 
 .summary-text {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .modal-footer-btns {
@@ -830,7 +830,7 @@ h3 {
 .label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--color-heading, #f8fafc);
+  color: var(--color-heading);
 }
 
 .reset-error {
@@ -840,7 +840,7 @@ h3 {
 .reset-hint {
   margin: 0;
   font-size: 0.78rem;
-  color: var(--color-text-muted, #94a3b8);
+  color: var(--color-text-muted);
 }
 
 .reset-footer {
@@ -848,5 +848,6 @@ h3 {
   gap: 10px;
   padding: 16px 24px;
   margin-top: 0;
+  background: var(--color-surface-soft);
 }
 </style>
