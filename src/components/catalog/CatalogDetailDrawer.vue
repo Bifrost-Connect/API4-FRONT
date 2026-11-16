@@ -22,12 +22,14 @@ import { isBaseDisponivel, normalizeSituacaoBadge } from '@/utils/catalogoUtils'
 const props = defineProps<{
   base: CatalogoItem | null
   isOpen: boolean
+  canExport?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'open-map', base: CatalogoItem): void
   (e: 'compare-safra', base: CatalogoItem): void
+  (e: 'export-base', base: CatalogoItem): void
 }>()
 
 const isDisponivel = computed(() => (props.base ? isBaseDisponivel(props.base) : false))
@@ -120,6 +122,16 @@ onUnmounted(() => {
             >
               <FiPieChart size="16" />
               Comparar Safra
+            </button>
+            <button
+              v-if="canExport"
+              type="button"
+              class="btn-action-secondary"
+              data-testid="drawer-btn-export"
+              @click="emit('export-base', base)"
+            >
+              <FiFileText size="16" />
+              Exportar resultados
             </button>
           </div>
 

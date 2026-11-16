@@ -12,6 +12,7 @@ import {
   FiPieChart,
   FiUser,
   FiUsers,
+  FiDownload,
 } from 'vue-icons-plus/fi'
 import type { Component } from 'vue'
 
@@ -130,6 +131,7 @@ export const ROUTE_PERMISSIONS: Record<string, string | string[]> = {
   mapa: 'MAPA:VISUALIZAR',
   'analise-territorial': 'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO',
   'comparacao-temporal': 'MAPA:COMPARAR_SAFRAS',
+  exportacoes: ['EXPORTACAO:CSV', 'EXPORTACAO:GEOJSON', 'AUDITORIA:VISUALIZAR_LOGS'],
   'process-log': [
     'QUARENTENA:VISUALIZAR',
     'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
@@ -229,6 +231,12 @@ export const MENU_ITEMS: MenuItem[] = [
     to: '/comparacao-temporal',
     icon: FiMap,
     permission: 'MAPA:COMPARAR_SAFRAS',
+  },
+  {
+    label: 'Exportação de relatórios',
+    to: '/exportacoes',
+    icon: FiDownload,
+    permission: ['EXPORTACAO:CSV', 'EXPORTACAO:GEOJSON', 'AUDITORIA:VISUALIZAR_LOGS'],
   },
   {
     label: 'Perfil do usuário',

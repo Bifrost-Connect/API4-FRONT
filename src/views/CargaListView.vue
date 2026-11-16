@@ -32,6 +32,7 @@ import { dashboardService, type ProcessLog } from '@/services/dashboard'
 import { catalogoService, type CatalogoBase } from '@/services/catalogo'
 import type { CatalogoItem, CatalogoKpis, CatalogoSortOption, ViewMode } from '@/types/catalogo'
 import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
+import { userService } from '@/services/user'
 import {
   QUARANTINE_TOOLTIP,
   isBaseDisponivel,
@@ -40,14 +41,17 @@ import {
 } from '@/utils/catalogoUtils'
 import {
   type ProcessCategory,
-  isErrorOrQuarantined,
   isProcessVigente,
   matchesCategory,
   matchesStandardFilters,
-  getStatusBadgeClass,
 } from '@/utils/processUtils'
 
 const router = useRouter()
+const canExportReports = computed(
+  () =>
+    userService.getCurrentUser().role.toUpperCase() !== 'AUDITOR' &&
+    userService.canAny(['EXPORTACAO:CSV', 'EXPORTACAO:GEOJSON']),
+)
 
 // Recuperação de preferências de UI e filtros persistidos
 const initialViewMode = uiPreferencesStorage.getCatalogViewMode('grid')
@@ -200,22 +204,6 @@ const resolveSource = (process: ProcessLog): string => {
 }
 
 /**
- * Lista consolidada de opções de conjuntos disponíveis.
- */
-const availableConjuntos = computed(() => {
-  const map = new Map<string, { id: string; label: string }>()
-  for (const opt of filterOptions.value.conjuntos || []) {
-    map.set(opt.label, { id: String(opt.id), label: opt.label })
-  }
-  for (const p of processos.value) {
-    if (p.dataset && !map.has(p.dataset)) {
-      map.set(p.dataset, { id: p.dataset, label: p.dataset })
-    }
-  }
-  return Array.from(map.values())
-})
-
-/**
  * Lista consolidada de opções de órgãos disponíveis.
  */
 const availableSources = computed(() => {
@@ -290,7 +278,7 @@ const kpisData = computed<CatalogoKpis>(() => {
 /**
  * Carrega a página de processos do catálogo via API e enriquece com /catalogo/bases.
  */
-const loadPage = async (pageNumber: number, currentFilters?: any) => {
+const loadPage = async (pageNumber: number, currentFilters?: StandardFilters) => {
   isLoading.value = true
   loadError.value = false
   toastErrorMessage.value = null
@@ -349,7 +337,8 @@ const loadPage = async (pageNumber: number, currentFilters?: any) => {
         }
       })
       .catch(() => {})
-  } catch (error: any) {
+  } catch (caught: unknown) {
+    const error = caught as { code?: string; message?: string }
     console.error('Falha ao carregar catálogo de bases:', error)
     loadError.value = true
     const isTimeout =
@@ -593,6 +582,11 @@ const openBaseDetail = async (item: CatalogoItem) => {
 const closeDrawer = () => {
   isDrawerOpen.value = false
   selectedBaseForDrawer.value = null
+}
+
+const openReportExport = (base: CatalogoItem) => {
+  closeDrawer()
+  void router.push({ name: 'exportacoes', query: { processo_id: String(base.id) } })
 }
 </script>
 
@@ -1140,9 +1134,11 @@ const closeDrawer = () => {
     <CatalogDetailDrawer
       :base="selectedBaseForDrawer"
       :is-open="isDrawerOpen"
+      :can-export="canExportReports"
       @close="closeDrawer"
       @open-map="viewOnMap"
       @compare-safra="compareSafra"
+      @export-base="openReportExport"
     />
   </main>
 </template>
