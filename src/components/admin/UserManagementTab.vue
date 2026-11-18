@@ -25,11 +25,10 @@ const props = defineProps<{
   loggedInAdminEmail?: string
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'create-user'): void
   (e: 'edit-user', user: UserItem): void
   (e: 'manage-permissions', user: UserItem): void
-  (e: 'reset-password', user: UserItem): void
   (e: 'toggle-status', user: UserItem): void
 }>()
 
@@ -163,9 +162,19 @@ const isSelf = (user: UserItem): boolean => {
         </template>
 
         <template #cell-role="{ item }">
-          <span class="role-badge" :class="item.role.toLowerCase()">
-            {{ item.role }}
-          </span>
+          <div class="role-cell-wrap">
+            <span class="role-badge" :class="item.role.toLowerCase()">
+              {{ item.role }}
+            </span>
+            <span
+              v-if="item.hasCustomPermissions"
+              class="custom-perms-badge"
+              title="Permissões individuais customizadas"
+              data-testid="badge-custom-permissions"
+            >
+              Custom
+            </span>
+          </div>
         </template>
 
         <template #cell-department="{ item }">
@@ -199,25 +208,18 @@ const isSelf = (user: UserItem): boolean => {
 
         <template #cell-actions="{ item }">
           <div class="table-actions">
-            <!-- TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
+            <!-- Gerenciar Subpermissões Granulares (PUT /api/admin/usuarios/{id}/permissoes) -->
             <button
               type="button"
               class="btn-action permissions"
-              title="Gerenciar Subpermissões"
+              :class="{ 'has-custom': item.hasCustomPermissions }"
+              :title="
+                item.hasCustomPermissions
+                  ? 'Gerenciar Subpermissões (Customizadas)'
+                  : 'Gerenciar Subpermissões'
+              "
               data-testid="btn-action-permissions"
               @click.stop="$emit('manage-permissions', item)"
-            >
-              <FiKey size="14" />
-            </button>
-            -->
-
-            <!-- Redefinir Senha do Usuário (POST /api/admin/usuarios/{id}/redefinir-senha) -->
-            <button
-              type="button"
-              class="btn-action reset-password"
-              title="Redefinir Senha do Colaborador"
-              data-testid="btn-action-reset-password"
-              @click.stop="$emit('reset-password', item)"
             >
               <FiKey size="14" />
             </button>
@@ -445,6 +447,23 @@ const isSelf = (user: UserItem): boolean => {
   color: var(--color-text-muted);
 }
 
+.role-cell-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.custom-perms-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+}
+
 .role-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -558,7 +577,7 @@ const isSelf = (user: UserItem): boolean => {
 }
 
 .btn-action.permissions:hover:not(:disabled),
-.btn-action.reset-password:hover:not(:disabled) {
+.btn-action.permissions.has-custom {
   color: var(--badge-warning-text);
 }
 

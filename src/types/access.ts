@@ -105,6 +105,7 @@ export interface UserItem {
   role: SystemRole
   roleId?: string
   permissions: string[]
+  hasCustomPermissions?: boolean
   department: string
   status: 'Ativo' | 'Inativo'
   lastLogin: string

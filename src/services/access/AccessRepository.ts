@@ -54,6 +54,7 @@ export interface UpdateUserDto {
   role: string
   department?: string
   status?: 'Ativo' | 'Inativo'
+  password?: string
   sodException?: boolean
   sodJustification?: string
 }
@@ -88,8 +89,11 @@ export interface AccessRepository {
   updateUser(id: number, dto: UpdateUserDto): Promise<UserItem | null>
   toggleUserStatus(id: number, targetAtivo?: boolean): Promise<UserItem | null>
   resetPassword(id: number, novaSenha: string): Promise<void>
-  // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
-  updateUserPermissions(id: number, permissions: string[]): Promise<UserItem | null>
+  updateUserPermissions(
+    id: number,
+    permissions: string[],
+    sod?: { sodException?: boolean; sodJustification?: string },
+  ): Promise<UserItem | null>
   resetUserPermissions(id: number): Promise<string[]>
 
   // Roles

@@ -30,6 +30,7 @@ export interface BackendUserRow {
   ativo: boolean
   excecao_sod_autorizada?: boolean
   justificativa_sod?: string | null
+  permissoes_customizadas?: string[] | null
   data_criacao?: string
   data_atualizacao?: string
 }
@@ -96,6 +97,7 @@ export const BACKEND_TO_FRONT_PERMISSION_MAP: Record<string, string[]> = {
     'INDICADORES:VISUALIZAR',
     'INDICADORES:CALCULAR',
   ],
+  COMPARAR_SAFRAS: ['MAPA:COMPARAR_SAFRAS'],
 
   // PUBLICACAO
   CARGA_APROVAR: ['BASES:HOMOLOGAR', 'INDICADORES:HOMOLOGAR'],
@@ -145,6 +147,9 @@ export const BACKEND_TO_FRONT_PERMISSION_MAP: Record<string, string[]> = {
     'AUDITORIA:VISUALIZAR_ALTERACOES',
     'ROLES:VISUALIZAR',
   ],
+
+  // INTEGRACOES
+  CHAVE_API_GERENCIAR: ['API:VISUALIZAR_CHAVES', 'API:GERAR_CHAVE', 'API:REVOGAR_CHAVE'],
 }
 
 const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -181,16 +186,11 @@ export function mapFrontRoleToBackend(roleId?: string | null): string {
   return FRONT_TO_BACKEND_ROLE[norm] || norm
 }
 
-/**
- * Converte a lista de códigos de permissão do back-end para chaves MODULO:SUBPERMISSAO do front-end.
- * Aplica também ajustes específicos do perfil (ex.: trava read-only do Auditor).
- */
-export function mapBackendPermissionsToFront(
+function expandPermissionsSet(
   permissoes: string[] | null | undefined,
-  perfil?: string | null,
-): string[] {
+  frontRole?: string,
+): Set<string> {
   const result = new Set<string>(['PERFIL:VISUALIZAR'])
-  const frontRole = perfil ? mapBackendRoleToFront(perfil) : undefined
 
   if (Array.isArray(permissoes)) {
     for (const raw of permissoes) {
@@ -218,6 +218,20 @@ export function mapBackendPermissionsToFront(
     }
   }
 
+  return result
+}
+
+/**
+ * Converte a lista de códigos de permissão do back-end para chaves MODULO:SUBPERMISSAO do front-end.
+ * Aplica também ajustes específicos do perfil (ex.: trava read-only do Auditor).
+ */
+export function mapBackendPermissionsToFront(
+  permissoes: string[] | null | undefined,
+  perfil?: string | null,
+): string[] {
+  const frontRole = perfil ? mapBackendRoleToFront(perfil) : undefined
+  const result = expandPermissionsSet(permissoes, frontRole)
+
   if (frontRole === 'INTEGRADOR_EXTERNO') {
     result.delete('MAPA:COMPARAR_SAFRAS')
   }
@@ -228,6 +242,19 @@ export function mapBackendPermissionsToFront(
     result.add('API:REVOGAR_CHAVE')
   }
 
+  return Array.from(result)
+}
+
+/**
+ * Converte permissões customizadas individuais (MODULO:SUBPERMISSAO ou enum Permissao)
+ * para chaves canônicas do front-end sem forçar adições padrão de cargo (ex.: API:*).
+ */
+export function mapCustomUserPermissionsToFront(
+  permissoesCustomizadas: string[],
+  perfil?: string | null,
+): string[] {
+  const frontRole = perfil ? mapBackendRoleToFront(perfil) : undefined
+  const result = expandPermissionsSet(permissoesCustomizadas, frontRole)
   return Array.from(result)
 }
 
@@ -317,10 +344,14 @@ function formatDateTimeBr(iso?: string | null): string {
 
 export function mapBackendUserToUserItem(row: BackendUserRow, rolePermissions?: string[]): UserItem {
   const frontRole = mapBackendRoleToFront(row.perfil)
+  const hasCustomPermissions = Array.isArray(row.permissoes_customizadas)
   const defaultPerms =
     rolePermissions ||
     (ROLE_DEFAULT_PERMISSIONS as Record<string, string[]>)[frontRole] ||
     []
+  const permissions = hasCustomPermissions
+    ? mapCustomUserPermissionsToFront(row.permissoes_customizadas!, row.perfil)
+    : [...defaultPerms]
 
   return {
     id: row.id,
@@ -328,7 +359,8 @@ export function mapBackendUserToUserItem(row: BackendUserRow, rolePermissions?: 
     email: row.email,
     role: frontRole,
     roleId: frontRole,
-    permissions: [...defaultPerms],
+    permissions,
+    hasCustomPermissions,
     department: 'Corporativo',
     status: row.ativo ? 'Ativo' : 'Inativo',
     lastLogin: formatDateTimeBr(row.data_atualizacao || row.data_criacao),

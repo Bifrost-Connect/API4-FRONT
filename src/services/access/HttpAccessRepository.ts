@@ -158,10 +158,15 @@ export class HttpAccessRepository implements AccessRepository {
         }
       }
 
+      if (dto.password && dto.password.trim()) {
+        await this.resetPassword(id, dto.password.trim())
+      }
+
       const item = mapBackendUserToUserItem(latestRow)
       this.usersCache.set(item.id, item)
       return item
     } catch (err: unknown) {
+      if (err instanceof ApiError) throw err
       throw new ApiError(err)
     }
   }
@@ -208,14 +213,47 @@ export class HttpAccessRepository implements AccessRepository {
     }
   }
 
-  // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
-  async updateUserPermissions(_id: number, _permissions: string[]): Promise<UserItem | null> {
-    throw new Error('Alteração granular de permissões por usuário ainda não disponível no servidor.')
+  private cacheMappedUser(row: BackendUserRow): UserItem {
+    const rolePerms = this.rolesCache.find(
+      (r) => r.id === mapBackendRoleToFront(row.perfil),
+    )?.permissions
+    const item = mapBackendUserToUserItem(row, rolePerms)
+    this.usersCache.set(item.id, item)
+    return item
   }
 
-  // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
-  async resetUserPermissions(_id: number): Promise<string[]> {
-    throw new Error('Restauração granular de permissões ainda não disponível no servidor.')
+  async updateUserPermissions(
+    id: number,
+    permissions: string[],
+    sod?: { sodException?: boolean; sodJustification?: string },
+  ): Promise<UserItem | null> {
+    try {
+      const payload: Record<string, unknown> = {
+        permissoesCustomizadas: permissions,
+      }
+      if (sod?.sodException !== undefined) {
+        payload.excecaoSoD = Boolean(sod.sodException)
+        payload.justificativa = sod.sodJustification?.trim() || ''
+      }
+      const res = await api.put<BackendUserRow>(`/admin/usuarios/${id}/permissoes`, payload)
+      return this.cacheMappedUser(res.data)
+    } catch (err: unknown) {
+      if (err instanceof ApiError) throw err
+      throw new ApiError(err)
+    }
+  }
+
+  async resetUserPermissions(id: number): Promise<string[]> {
+    try {
+      const res = await api.put<BackendUserRow>(`/admin/usuarios/${id}/permissoes`, {
+        resetarPermissoes: true,
+      })
+      const item = this.cacheMappedUser(res.data)
+      return item.permissions
+    } catch (err: unknown) {
+      if (err instanceof ApiError) throw err
+      throw new ApiError(err)
+    }
   }
 
   async listRoles(): Promise<RoleDef[]> {

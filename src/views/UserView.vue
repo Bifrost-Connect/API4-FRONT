@@ -16,12 +16,16 @@ import {
   FiX,
   FiCheck,
   FiKey,
+  FiSave,
+  FiLock,
 } from 'vue-icons-plus/fi'
 import UserManagementTab from '@/components/admin/UserManagementTab.vue'
 import UserFormModal from '@/components/admin/UserFormModal.vue'
 import RolePermissionMatrix from '@/components/admin/RolePermissionMatrix.vue'
 import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
 import ApiKeysTab from '@/components/admin/ApiKeysTab.vue'
+import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
+import { hasSoDConflict, isAuditorReadOnlyLocked } from '@/utils/rbac'
 import {
   userService,
   DuplicateEmailError,
@@ -70,61 +74,13 @@ const isFormModalOpen = ref(false)
 const isEditingUser = ref(false)
 const selectedUserToEdit = ref<UserItem | null>(null)
 
-// Modal de Redefinição de Senha (POST /api/admin/usuarios/{id}/redefinir-senha)
-const isResetModalOpen = ref(false)
-const resetTargetUser = ref<UserItem | null>(null)
-const resetNewPassword = ref('')
-const resetConfirmPassword = ref('')
-const resetPasswordError = ref('')
-const isResettingPassword = ref(false)
-
-const openResetPasswordModal = (user: UserItem) => {
-  resetTargetUser.value = user
-  resetNewPassword.value = ''
-  resetConfirmPassword.value = ''
-  resetPasswordError.value = ''
-  isResetModalOpen.value = true
-}
-
-const closeResetPasswordModal = () => {
-  isResetModalOpen.value = false
-  resetTargetUser.value = null
-}
-
-const handleResetPassword = async () => {
-  resetPasswordError.value = ''
-  if (!resetTargetUser.value) return
-
-  if (!resetNewPassword.value || resetNewPassword.value.length < 8) {
-    resetPasswordError.value = 'A nova senha deve ter no mínimo 8 caracteres.'
-    return
-  }
-
-  if (resetNewPassword.value !== resetConfirmPassword.value) {
-    resetPasswordError.value = 'A nova senha e a confirmação não conferem.'
-    return
-  }
-
-  isResettingPassword.value = true
-  const targetName = resetTargetUser.value.name
-  try {
-    await userService.resetPasswordAsync(resetTargetUser.value.id, resetNewPassword.value)
-    closeResetPasswordModal()
-    showToast(`Senha de ${targetName} redefinida com sucesso!`)
-    await refreshData()
-  } catch (err: unknown) {
-    resetPasswordError.value = extractApiErrorMessage(err, 'Falha ao redefinir senha do colaborador.')
-  } finally {
-    isResettingPassword.value = false
-  }
-}
-
-// TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
-// const isPermModalOpen = ref(false)
-// const permUser = ref<UserItem | null>(null)
-// const selectedPermissions = ref<Set<string>>(new Set())
-// const permModuleFilter = ref('')
-// const permSearchFilter = ref('')
+// Modal de Permissões Granulares por Usuário
+const isPermModalOpen = ref(false)
+const permUser = ref<UserItem | null>(null)
+const selectedPermissions = ref<Set<string>>(new Set())
+const permModuleFilter = ref('')
+const permSearchFilter = ref('')
+const isPermSodModalOpen = ref(false)
 
 const loggedInAdmin = computed(() => userService.getCurrentUser())
 
@@ -195,17 +151,45 @@ const handleSaveUser = async (data: {
 
   try {
     if (isEditingUser.value && selectedUserToEdit.value) {
-      const updated = await userService.updateUserAsync(selectedUserToEdit.value.id, {
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        department: data.department,
-        status: data.status,
-        sodException: data.sodException,
-        sodJustification: data.sodJustification,
-      })
-      if (updated) {
-        showToast(`Colaborador ${updated.name} atualizado com sucesso!`)
+      const target = selectedUserToEdit.value
+      const trimmedPassword = data.password?.trim() || ''
+      const isSelf = loggedInAdmin.value?.email
+        ? target.email.toLowerCase() === loggedInAdmin.value.email.toLowerCase()
+        : loggedInAdmin.value?.id !== undefined && target.id === loggedInAdmin.value.id
+
+      const roleChanged = data.role !== target.role
+      const statusChanged = data.status !== target.status
+      const sodChanged =
+        Boolean(data.sodException) !== Boolean(target.sodException) ||
+        (Boolean(data.sodException) &&
+          (data.sodJustification?.trim() || '') !== (target.sodJustification?.trim() || ''))
+      const hasAccessChanges = roleChanged || statusChanged || sodChanged
+
+      if (isSelf && !hasAccessChanges) {
+        if (trimmedPassword) {
+          await userService.resetPasswordAsync(target.id, trimmedPassword)
+          showToast(`Senha de ${target.name} redefinida com sucesso!`)
+        } else {
+          showToast(`Nenhuma alteração de acesso ou senha aplicada para ${target.name}.`)
+        }
+      } else {
+        const updated = await userService.updateUserAsync(target.id, {
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          department: data.department,
+          status: data.status,
+          sodException: data.sodException,
+          sodJustification: data.sodJustification,
+        })
+        if (trimmedPassword) {
+          await userService.resetPasswordAsync(target.id, trimmedPassword)
+        }
+        if (updated) {
+          showToast(`Colaborador ${updated.name} atualizado com sucesso!`)
+        } else if (trimmedPassword) {
+          showToast(`Senha de ${target.name} redefinida com sucesso!`)
+        }
       }
     } else {
       const created = await userService.createUserAsync({
@@ -246,23 +230,28 @@ const handleToggleUserStatus = async (user: UserItem) => {
 
 // -------------------------------------------------------------
 // Subpermissões Granulares por Usuário
-// TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
 // -------------------------------------------------------------
-/*
 const openPermissionsModal = (user: UserItem) => {
   permUser.value = user
   selectedPermissions.value = new Set(user.permissions)
   permModuleFilter.value = ''
   permSearchFilter.value = ''
+  isPermSodModalOpen.value = false
   isPermModalOpen.value = true
 }
 
 const closePermissionsModal = () => {
+  isPermSodModalOpen.value = false
   isPermModalOpen.value = false
   permUser.value = null
 }
 
 const getPermKey = (p: PermissionDefinition) => `${p.modulo}:${p.subpermissao}`
+
+const isPermissionLockedForUser = (key: string): boolean => {
+  if (permUser.value?.role !== 'AUDITOR') return false
+  return key === 'MAPA:COMPARAR_SAFRAS' || isAuditorReadOnlyLocked(key)
+}
 
 const uniqueModules = computed(() => {
   const set = new Set<string>()
@@ -282,6 +271,10 @@ const filteredPermissionDefs = computed(() => {
 })
 
 const togglePermission = (key: string) => {
+  if (isPermissionLockedForUser(key)) {
+    showToast('O perfil Auditor Ambiental possui trava imutável de Somente Leitura.', 'error')
+    return
+  }
   const updated = new Set(selectedPermissions.value)
   if (updated.has(key)) {
     updated.delete(key)
@@ -291,21 +284,61 @@ const togglePermission = (key: string) => {
   selectedPermissions.value = updated
 }
 
-const resetToRoleDefaults = () => {
+const resetToRoleDefaults = async () => {
   if (!permUser.value) return
-  const defaults = userService.resetPermissionsToRole(permUser.value.id)
-  selectedPermissions.value = new Set(defaults)
-  showToast(`Permissões restauradas para os padrões da role ${permUser.value.role}.`)
+  const targetRole = permUser.value.role
+  try {
+    const defaults = await userService.resetPermissionsToRoleAsync(permUser.value.id)
+    selectedPermissions.value = new Set(defaults)
+    showToast(`Permissões restauradas para os padrões da role ${targetRole}.`)
+    await refreshData()
+    const refreshed = users.value.find((u) => u.id === permUser.value?.id)
+    if (refreshed) permUser.value = refreshed
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Falha ao restaurar permissões do usuário.'), 'error')
+  }
 }
 
-const saveUserPermissions = () => {
+const persistUserPermissions = async (
+  perms: string[],
+  sod?: { sodException?: boolean; sodJustification?: string },
+) => {
   if (!permUser.value) return
-  userService.updateUserPermissions(permUser.value.id, Array.from(selectedPermissions.value))
-  showToast(`Permissões de ${permUser.value.name} atualizadas com sucesso!`)
-  closePermissionsModal()
-  refreshData()
+  const targetName = permUser.value.name
+  try {
+    const updated = await userService.updateUserPermissionsAsync(permUser.value.id, perms, sod)
+    showToast(`Permissões de ${updated?.name || targetName} atualizadas com sucesso!`)
+    closePermissionsModal()
+    await refreshData()
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Falha ao atualizar permissões do usuário.'), 'error')
+  }
 }
-*/
+
+const saveUserPermissions = async () => {
+  if (!permUser.value) return
+  const perms = Array.from(selectedPermissions.value)
+
+  if (hasSoDConflict(perms) && !permUser.value.sodException) {
+    isPermSodModalOpen.value = true
+    return
+  }
+
+  await persistUserPermissions(
+    perms,
+    permUser.value.sodException
+      ? { sodException: true, sodJustification: permUser.value.sodJustification }
+      : undefined,
+  )
+}
+
+const onPermSodConfirm = async (justification: string) => {
+  isPermSodModalOpen.value = false
+  await persistUserPermissions(Array.from(selectedPermissions.value), {
+    sodException: true,
+    sodJustification: justification,
+  })
+}
 
 // -------------------------------------------------------------
 // Ações de Roles (Aba 2)
@@ -424,7 +457,7 @@ const handleDeleteRole = async (roleId: string) => {
       :logged-in-admin-email="loggedInAdmin.email"
       @create-user="openCreateUserModal"
       @edit-user="openEditUserModal"
-      @reset-password="openResetPasswordModal"
+      @manage-permissions="openPermissionsModal"
       @toggle-status="handleToggleUserStatus"
     />
 
@@ -457,99 +490,149 @@ const handleDeleteRole = async (roleId: string) => {
       @save="handleSaveUser"
     />
 
-    <!-- Modal de Redefinição de Senha do Colaborador (US13) -->
-    <div
-      v-if="isResetModalOpen && resetTargetUser"
-      class="modal-backdrop"
-      data-testid="reset-password-modal"
-      @click.self="closeResetPasswordModal"
-    >
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <div class="modal-title-group">
-            <FiKey size="20" class="icon-brand" />
-            <div>
-              <h3>Redefinir Senha</h3>
-              <p class="subtitle">
-                Definir nova senha de acesso para <strong>{{ resetTargetUser.name }}</strong>
-              </p>
-            </div>
-          </div>
-          <button type="button" class="btn-close" aria-label="Fechar" @click="closeResetPasswordModal">
-            <FiX size="18" />
-          </button>
-        </div>
-
-        <form @submit.prevent="handleResetPassword">
-          <div class="modal-body">
-            <div v-if="resetPasswordError" class="alert-banner alert-danger reset-error" role="alert">
-              <FiAlertCircle size="16" />
-              <span>{{ resetPasswordError }}</span>
-            </div>
-
-            <div class="form-group">
-              <label for="reset-new-password" class="label">Nova Senha (mínimo 8 caracteres): *</label>
-              <input
-                id="reset-new-password"
-                v-model="resetNewPassword"
-                type="password"
-                name="novaSenha"
-                class="input"
-                autocomplete="new-password"
-                minlength="8"
-                required
-                data-testid="input-reset-new-password"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="reset-confirm-password" class="label">Confirmar Nova Senha: *</label>
-              <input
-                id="reset-confirm-password"
-                v-model="resetConfirmPassword"
-                type="password"
-                name="confirmarNovaSenha"
-                class="input"
-                autocomplete="new-password"
-                minlength="8"
-                required
-                data-testid="input-reset-confirm-password"
-              />
-            </div>
-
-            <p class="reset-hint">
-              Ao confirmar, todas as sessões ativas deste colaborador serão encerradas imediatamente.
-            </p>
-          </div>
-
-          <div class="modal-footer-wrapper reset-footer">
-            <button type="button" class="btn btn_outline" @click="closeResetPasswordModal">
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="btn btn_primary"
-              :disabled="isResettingPassword"
-              data-testid="btn-confirm-reset-password"
-            >
-              <FiCheck size="16" />
-              <span>{{ isResettingPassword ? 'Salvando...' : 'Redefinir Senha' }}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)
+    <!-- Modal de Gerenciamento Exclusivo de Subpermissões -->
     <div
       v-if="isPermModalOpen && permUser"
       class="modal-backdrop"
       data-testid="permissions-modal"
       @click.self="closePermissionsModal"
     >
-      ...
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <FiShield size="22" class="icon-brand" />
+            <div>
+              <h3>Gerenciar Permissões de {{ permUser.name }}</h3>
+              <p class="subtitle">
+                Cargo base: <strong>{{ permUser.role }}</strong> &bull; Personalize as capacidades deste usuário
+              </p>
+            </div>
+          </div>
+          <button type="button" class="btn-close" aria-label="Fechar" @click="closePermissionsModal">
+            <FiX size="18" />
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="perm-filters-row">
+            <input
+              v-model="permSearchFilter"
+              type="text"
+              class="input search-perm-input"
+              placeholder="Filtrar por nome da ação ou módulo..."
+              data-testid="input-perm-search"
+            />
+            <select
+              v-model="permModuleFilter"
+              class="select select-module-filter"
+              data-testid="select-perm-module"
+            >
+              <option value="">Todos os Módulos</option>
+              <option v-for="m in uniqueModules" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <button
+              type="button"
+              class="btn btn_outline btn-reset-role"
+              data-testid="btn-reset-role-permissions"
+              @click="resetToRoleDefaults"
+            >
+              Restaurar Padrão do Cargo
+            </button>
+          </div>
+
+          <div class="permissions-table-wrapper">
+            <table class="perm-table">
+              <thead>
+                <tr>
+                  <th class="th-module">Módulo</th>
+                  <th class="th-subperm">Subpermissão</th>
+                  <th class="th-status">Status de Acesso</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="p in filteredPermissionDefs"
+                  :key="getPermKey(p)"
+                  :class="{ 'row-active': selectedPermissions.has(getPermKey(p)) }"
+                  @click="togglePermission(getPermKey(p))"
+                >
+                  <td class="cell-module">
+                    <span class="module-tag">{{ p.modulo }}</span>
+                  </td>
+                  <td class="cell-subperm">
+                    <code>{{ p.subpermissao }}</code>
+                  </td>
+                  <td class="cell-toggle">
+                    <button
+                      v-if="isPermissionLockedForUser(getPermKey(p))"
+                      type="button"
+                      class="toggle-perm-btn is-locked"
+                      disabled
+                      title="O perfil Auditor Ambiental possui trava imutável de Somente Leitura (Read-Only)."
+                      :data-testid="`toggle-perm-${p.modulo}-${p.subpermissao}`"
+                    >
+                      <FiLock size="14" />
+                      <span>Bloqueado</span>
+                    </button>
+                    <button
+                      v-else
+                      type="button"
+                      class="toggle-perm-btn"
+                      :class="selectedPermissions.has(getPermKey(p)) ? 'is-granted' : 'is-revoked'"
+                      :data-testid="`toggle-perm-${p.modulo}-${p.subpermissao}`"
+                      @click.stop="togglePermission(getPermKey(p))"
+                    >
+                      <template v-if="selectedPermissions.has(getPermKey(p))">
+                        <FiCheck size="15" />
+                        <span>Permitido</span>
+                      </template>
+                      <template v-else>
+                        <FiX size="15" />
+                        <span>Sem Acesso</span>
+                      </template>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="modal-footer-wrapper">
+            <span class="summary-text">
+              Total concedido: <strong>{{ selectedPermissions.size }}</strong> de
+              {{ allPermissions.length }} subpermissões do sistema.
+            </span>
+            <div class="modal-footer-btns">
+              <button
+                type="button"
+                class="btn btn_outline"
+                data-testid="btn-permissions-cancel"
+                @click="closePermissionsModal"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                class="btn btn_primary"
+                data-testid="btn-permissions-save"
+                @click="saveUserPermissions"
+              >
+                <FiSave size="16" />
+                <span>Salvar Permissões</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <SodExceptionModal
+        :is-open="isPermSodModalOpen"
+        :user-name="permUser.name"
+        :initial-justification="permUser.sodJustification"
+        @confirm="onPermSodConfirm"
+        @cancel="isPermSodModalOpen = false"
+      />
     </div>
-    -->
   </main>
 </template>
 
@@ -801,6 +884,13 @@ h3 {
   color: var(--badge-danger-text);
 }
 
+.is-locked {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
 .modal-footer-wrapper {
   display: flex;
   align-items: center;
@@ -818,36 +908,5 @@ h3 {
 .modal-footer-btns {
   display: flex;
   gap: 10px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-heading);
-}
-
-.reset-error {
-  margin-bottom: 14px;
-}
-
-.reset-hint {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.reset-footer {
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  margin-top: 0;
-  background: var(--color-surface-soft);
 }
 </style>

@@ -245,11 +245,11 @@ const onSodConfirm = (justification: string) => {
             </p>
           </div>
 
-          <!-- Senha Inicial / Temporária (apenas cadastro; redefinição usa ação dedicada) -->
-          <!-- TODO: Aguardando endpoint no API4-BACK para edição conjunta; use Redefinir Senha na tabela -->
-          <div v-if="!isEditing" class="form-group">
+          <!-- Senha Inicial (obrigatória no cadastro) / Redefinição Opcional (edição) -->
+          <div class="form-group">
             <label for="form-password" class="label">
-              Senha Inicial Temporária: <span class="required">*</span>
+              {{ isEditing ? 'Redefinir Senha (Opcional):' : 'Senha Inicial Temporária:' }}
+              <span v-if="!isEditing" class="required">*</span>
             </label>
             <div class="input-wrap">
               <FiLock class="field-icon" size="16" />
@@ -260,14 +260,20 @@ const onSodConfirm = (justification: string) => {
                 class="input input-with-icon"
                 :class="{ 'input-error': isSubmitted && errors.password }"
                 autocomplete="new-password"
-                placeholder="Ex.: GeoRural#2026"
+                :placeholder="isEditing ? 'Deixe em branco para manter a senha atual' : 'Ex.: GeoRural#2026'"
                 data-testid="input-user-password"
               />
             </div>
             <p v-if="isSubmitted && errors.password" class="field-error" data-testid="error-user-password">
               <FiAlertCircle size="12" /> {{ errors.password }}
             </p>
-            <p v-else class="field-hint">Mínimo de 8 caracteres com maiúscula, minúscula, número e símbolo.</p>
+            <p v-else class="field-hint">
+              {{
+                isEditing
+                  ? 'Deixe em branco para manter a senha atual. Se preenchida, mínimo de 8 caracteres com maiúscula, minúscula, número e símbolo.'
+                  : 'Mínimo de 8 caracteres com maiúscula, minúscula, número e símbolo.'
+              }}
+            </p>
           </div>
 
           <!-- Grid: Cargo/Perfil e Departamento -->

@@ -3,6 +3,7 @@ import {
   mapBackendRoleToFront,
   mapFrontRoleToBackend,
   mapBackendPermissionsToFront,
+  mapCustomUserPermissionsToFront,
   mapBackendMatrixToRoles,
   mapBackendUserToUserItem,
   mapBackendAuditLogToSecurityEvent,
@@ -142,6 +143,66 @@ describe('rbacAdapter', () => {
       expect(mapped).not.toContain('ROLES:VISUALIZAR')
       expect(mapped).not.toContain('INGESTAO:UPLOAD')
     })
+
+    it('mapeia enums CHAVE_API_GERENCIAR e COMPARAR_SAFRAS corretamente', () => {
+      const mapped = mapBackendPermissionsToFront(
+        ['CHAVE_API_GERENCIAR', 'COMPARAR_SAFRAS'],
+        'ANALISTA',
+      )
+
+      expect(mapped).toContain('API:VISUALIZAR_CHAVES')
+      expect(mapped).toContain('API:GERAR_CHAVE')
+      expect(mapped).toContain('API:REVOGAR_CHAVE')
+      expect(mapped).toContain('MAPA:COMPARAR_SAFRAS')
+    })
+  })
+
+  describe('mapeamento de permissões customizadas por usuário', () => {
+    it('expande chaves MODULO:SUBPERMISSAO e enums do back-end sem forçar API:* quando revogado', () => {
+      const customGestor = mapCustomUserPermissionsToFront(
+        ['BASES:VISUALIZAR', 'CATALOGO_CONSULTAR', 'MAPA:COMPARAR_SAFRAS'],
+        'GESTOR',
+      )
+
+      expect(customGestor).toContain('PERFIL:VISUALIZAR')
+      expect(customGestor).toContain('BASES:VISUALIZAR')
+      expect(customGestor).toContain('BASES:CONSULTAR_CATALOGO')
+      expect(customGestor).toContain('MAPA:COMPARAR_SAFRAS')
+      expect(customGestor).not.toContain('API:VISUALIZAR_CHAVES')
+      expect(customGestor).not.toContain('API:GERAR_CHAVE')
+      expect(customGestor).not.toContain('API:REVOGAR_CHAVE')
+
+      const customIntegrador = mapCustomUserPermissionsToFront(
+        ['MAPA:COMPARAR_SAFRAS', 'CHAVE_API_GERENCIAR'],
+        'INTEGRADOR_EXTERNO',
+      )
+      expect(customIntegrador).toContain('MAPA:COMPARAR_SAFRAS')
+      expect(customIntegrador).toContain('API:VISUALIZAR_CHAVES')
+    })
+
+    it('mantém trava estrita read-only para AUDITOR mesmo com permissões customizadas', () => {
+      const customAuditor = mapCustomUserPermissionsToFront(
+        [
+          'BASES:CONSULTAR_CATALOGO',
+          'INGESTAO:UPLOAD',
+          'BASES:HOMOLOGAR',
+          'EXPORTACAO:CSV',
+          'MAPA:COMPARAR_SAFRAS',
+          'USUARIOS:VISUALIZAR',
+          'API:GERAR_CHAVE',
+        ],
+        'AUDITOR',
+      )
+
+      expect(customAuditor).toContain('PERFIL:VISUALIZAR')
+      expect(customAuditor).toContain('BASES:CONSULTAR_CATALOGO')
+      expect(customAuditor).not.toContain('INGESTAO:UPLOAD')
+      expect(customAuditor).not.toContain('BASES:HOMOLOGAR')
+      expect(customAuditor).not.toContain('EXPORTACAO:CSV')
+      expect(customAuditor).not.toContain('MAPA:COMPARAR_SAFRAS')
+      expect(customAuditor).not.toContain('USUARIOS:VISUALIZAR')
+      expect(customAuditor).not.toContain('API:GERAR_CHAVE')
+    })
   })
 
   describe('mapeamento de matriz, usuários e logs de segurança', () => {
@@ -213,6 +274,26 @@ describe('rbacAdapter', () => {
       expect(user.sodException).toBe(true)
       expect(user.sodJustification).toBe('Plantão emergencial de safra')
       expect(user.permissions).toContain('INGESTAO:UPLOAD')
+      expect(user.hasCustomPermissions).toBe(false)
+    })
+
+    it('usa mapCustomUserPermissionsToFront e marca hasCustomPermissions quando permissoes_customizadas é array', () => {
+      const user = mapBackendUserToUserItem({
+        id: 43,
+        nome: 'Gestor Custom',
+        email: 'gestor.custom@georural.com.br',
+        perfil_id: 3,
+        perfil: 'GESTOR',
+        ativo: true,
+        permissoes_customizadas: ['BASES:VISUALIZAR', 'INGESTAO:UPLOAD'],
+      })
+
+      expect(user.hasCustomPermissions).toBe(true)
+      expect(user.permissions).toContain('PERFIL:VISUALIZAR')
+      expect(user.permissions).toContain('BASES:VISUALIZAR')
+      expect(user.permissions).toContain('INGESTAO:UPLOAD')
+      expect(user.permissions).not.toContain('API:VISUALIZAR_CHAVES')
+      expect(user.permissions).not.toContain('BASES:HOMOLOGAR')
     })
 
     it('converte log de auditoria do back-end para SecurityEvent com severidade e actionCode', () => {

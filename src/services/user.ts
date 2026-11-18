@@ -48,7 +48,11 @@ import {
 import { geojsonCache } from './storage/geojsonCache'
 import { uiPreferencesStorage } from './storage/uiPreferencesStorage'
 import api from './api'
-import { mapBackendPermissionsToFront, mapBackendRoleToFront } from '@/utils/rbacAdapter'
+import {
+  mapBackendPermissionsToFront,
+  mapBackendRoleToFront,
+  mapCustomUserPermissionsToFront,
+} from '@/utils/rbacAdapter'
 
 export { DuplicateEmailError }
 export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent, UserSession }
@@ -173,6 +177,7 @@ export const userService = {
         email: string
         perfil: string
         permissoes: string[]
+        permissoes_customizadas?: string[] | null
       }
     }
 
@@ -183,7 +188,9 @@ export const userService = {
 
     const { token, expira_em, usuario } = res.data
     const frontRole = mapBackendRoleToFront(usuario.perfil)
-    const frontPerms = mapBackendPermissionsToFront(usuario.permissoes, usuario.perfil)
+    const frontPerms = Array.isArray(usuario.permissoes_customizadas)
+      ? mapCustomUserPermissionsToFront(usuario.permissoes_customizadas, usuario.perfil)
+      : mapBackendPermissionsToFront(usuario.permissoes, usuario.perfil)
     const parsedExp = expira_em ? Date.parse(expira_em) : Number.NaN
     const expiresAt = Number.isFinite(parsedExp) ? parsedExp : Date.now() + DEFAULT_SESSION_TTL_MS
 
@@ -468,6 +475,28 @@ export const userService = {
 
   async resetPasswordAsync(id: number, novaSenha: string): Promise<void> {
     return roleService.getRepo().resetPassword(id, novaSenha)
+  },
+
+  async updateUserPermissionsAsync(
+    id: number,
+    permissions: string[],
+    sod?: { sodException?: boolean; sodJustification?: string },
+  ): Promise<UserItem | null> {
+    const updated = await roleService.getRepo().updateUserPermissions(id, permissions, sod)
+    if (updated && currentUser.value.id === id) {
+      currentUser.value.permissions = [...updated.permissions]
+      authStorage.updateSessionPermissions(updated.permissions)
+    }
+    return updated
+  },
+
+  async resetPermissionsToRoleAsync(id: number): Promise<string[]> {
+    const defaults = await roleService.getRepo().resetUserPermissions(id)
+    if (currentUser.value.id === id) {
+      currentUser.value.permissions = [...defaults]
+      authStorage.updateSessionPermissions(defaults)
+    }
+    return defaults
   },
 
   // TODO: Aguardando endpoint no API4-BACK (permissões individuais fora do perfil)

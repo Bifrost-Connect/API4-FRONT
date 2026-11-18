@@ -1,21 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import api from '@/services/api'
+import api, { ApiError } from '@/services/api'
 import { HttpAccessRepository } from '../access/HttpAccessRepository'
 import { DuplicateEmailError } from '@/types/access'
 
-vi.mock('@/services/api', () => ({
-  default: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-    interceptors: {
-      request: { use: vi.fn() },
-      response: { use: vi.fn() },
+vi.mock('@/services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api')>()
+  return {
+    ...actual,
+    default: {
+      get: vi.fn<(...args: unknown[]) => unknown>(),
+      post: vi.fn<(...args: unknown[]) => unknown>(),
+      put: vi.fn<(...args: unknown[]) => unknown>(),
+      patch: vi.fn<(...args: unknown[]) => unknown>(),
+      delete: vi.fn<(...args: unknown[]) => unknown>(),
+      interceptors: {
+        request: { use: vi.fn<(...args: unknown[]) => unknown>() },
+        response: { use: vi.fn<(...args: unknown[]) => unknown>() },
+      },
     },
-  },
-}))
+  }
+})
 
 const mockMatrixResponse = [
   {
@@ -217,6 +221,126 @@ describe('HttpAccessRepository', () => {
     expect(api.post).toHaveBeenCalledWith('/admin/usuarios/10/redefinir-senha', {
       novaSenha: 'NovaSenha#2026',
     })
+  })
+
+  it('redefine senha junto com updateUser quando dto.password é informado', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockMatrixResponse })
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: {
+        id: 10,
+        nome: 'Ana Paula',
+        email: 'ana@georural.com.br',
+        perfil_id: 2,
+        perfil: 'ANALISTA',
+        ativo: true,
+      },
+    })
+    vi.mocked(api.post).mockResolvedValueOnce({ status: 204, data: null })
+
+    await repo.updateUser(10, {
+      name: 'Ana Paula',
+      email: 'ana@georural.com.br',
+      role: 'ANALISTA',
+      password: 'NovaSenha#2026',
+    })
+
+    expect(api.put).toHaveBeenCalledWith('/admin/usuarios/10/permissoes', {
+      perfilId: 2,
+      excecaoSoD: false,
+      justificativa: '',
+    })
+    expect(api.post).toHaveBeenCalledWith('/admin/usuarios/10/redefinir-senha', {
+      novaSenha: 'NovaSenha#2026',
+    })
+  })
+
+  it('salva permissões customizadas via PUT /admin/usuarios/{id}/permissoes sem SoD e com SoD', async () => {
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: {
+        id: 10,
+        nome: 'Ana Paula',
+        email: 'ana@georural.com.br',
+        perfil_id: 2,
+        perfil: 'ANALISTA',
+        ativo: true,
+        excecao_sod_autorizada: false,
+        permissoes_customizadas: ['MAPA:VISUALIZAR', 'BASES:VISUALIZAR'],
+      },
+    })
+
+    const updated = await repo.updateUserPermissions(10, ['MAPA:VISUALIZAR', 'BASES:VISUALIZAR'])
+
+    expect(api.put).toHaveBeenCalledWith('/admin/usuarios/10/permissoes', {
+      permissoesCustomizadas: ['MAPA:VISUALIZAR', 'BASES:VISUALIZAR'],
+    })
+    expect(updated?.hasCustomPermissions).toBe(true)
+    expect(updated?.permissions).toContain('MAPA:VISUALIZAR')
+    expect(updated?.permissions).toContain('BASES:VISUALIZAR')
+    expect(await repo.getUserById(10)).toEqual(updated)
+
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: {
+        id: 10,
+        nome: 'Ana Paula',
+        email: 'ana@georural.com.br',
+        perfil_id: 2,
+        perfil: 'ANALISTA',
+        ativo: true,
+        excecao_sod_autorizada: true,
+        justificativa_sod: 'Plantão de homologação',
+        permissoes_customizadas: ['INGESTAO:UPLOAD', 'BASES:HOMOLOGAR'],
+      },
+    })
+
+    const updatedSod = await repo.updateUserPermissions(
+      10,
+      ['INGESTAO:UPLOAD', 'BASES:HOMOLOGAR'],
+      { sodException: true, sodJustification: 'Plantão de homologação' },
+    )
+
+    expect(api.put).toHaveBeenCalledWith('/admin/usuarios/10/permissoes', {
+      permissoesCustomizadas: ['INGESTAO:UPLOAD', 'BASES:HOMOLOGAR'],
+      excecaoSoD: true,
+      justificativa: 'Plantão de homologação',
+    })
+    expect(updatedSod?.sodException).toBe(true)
+    expect(updatedSod?.sodJustification).toBe('Plantão de homologação')
+  })
+
+  it('restaura permissões padrão do cargo via PUT /admin/usuarios/{id}/permissoes com resetarPermissoes', async () => {
+    vi.mocked(api.put).mockResolvedValueOnce({
+      data: {
+        id: 10,
+        nome: 'Ana Paula',
+        email: 'ana@georural.com.br',
+        perfil_id: 2,
+        perfil: 'ANALISTA',
+        ativo: true,
+        permissoes_customizadas: null,
+      },
+    })
+
+    const defaults = await repo.resetUserPermissions(10)
+
+    expect(api.put).toHaveBeenCalledWith('/admin/usuarios/10/permissoes', {
+      resetarPermissoes: true,
+    })
+    expect(defaults).toContain('ANALISE_TERRITORIAL:EXECUTAR')
+    expect((await repo.getUserById(10))?.hasCustomPermissions).toBe(false)
+  })
+
+  it('encapsula erros HTTP de updateUserPermissions e resetUserPermissions em ApiError', async () => {
+    vi.mocked(api.put).mockRejectedValueOnce({
+      response: { status: 400, data: { erro: 'Justificativa SoD obrigatória.' } },
+    })
+    await expect(
+      repo.updateUserPermissions(10, ['INGESTAO:UPLOAD', 'BASES:HOMOLOGAR']),
+    ).rejects.toThrow(ApiError)
+
+    vi.mocked(api.put).mockRejectedValueOnce({
+      response: { status: 403, data: { erro: 'Acesso negado.' } },
+    })
+    await expect(repo.resetUserPermissions(10)).rejects.toThrow(ApiError)
   })
 
   it('lista e pagina logs de segurança via GET /admin/logs-seguranca com filtros', async () => {
