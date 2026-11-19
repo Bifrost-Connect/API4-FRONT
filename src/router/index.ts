@@ -43,6 +43,18 @@ const router = createRouter({
       meta: { permission: 'MAPA:COMPARAR_SAFRAS' },
     },
     {
+      path: '/exportacoes',
+      name: 'exportacoes',
+      component: () => import('../views/ExportacaoView.vue'),
+      meta: {
+        permission: [
+          'EXPORTACAO:CSV',
+          'EXPORTACAO:GEOJSON',
+          'AUDITORIA:VISUALIZAR_LOGS',
+        ],
+      },
+    },
+    {
       path: '/catalogo',
       name: 'catalogo',
       component: CargaListView,
