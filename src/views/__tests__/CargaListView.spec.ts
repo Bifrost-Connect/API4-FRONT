@@ -3,12 +3,14 @@
  * Valida a exibição de indicadores, alternância de modos de visão,
  * filtros, pesquisa textual, trava de blindagem por status e ficha técnica.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import CargaListView from '../CargaListView.vue'
 import CatalogDetailDrawer from '@/components/catalog/CatalogDetailDrawer.vue'
 import { dashboardService, type ProcessLog } from '@/services/dashboard'
 import { catalogoService } from '@/services/catalogo'
+import { userService } from '@/services/user'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 import {
   isBaseDisponivel,
   normalizeSituacaoBadge,
@@ -88,6 +90,7 @@ describe('Catálogo de Bases Geoespaciais', () => {
       if (typeof localStorage !== 'undefined') localStorage.clear()
       if (typeof sessionStorage !== 'undefined') sessionStorage.clear()
     } catch {}
+    setTestUserRole('OPERADOR_DADOS')
     vi.spyOn(dashboardService, 'getDashboardProcesses').mockResolvedValue({
       content: [...basesCadastradasMock],
       totalElements: basesCadastradasMock.length,
@@ -133,6 +136,10 @@ describe('Catálogo de Bases Geoespaciais', () => {
         total_feicoes: 890,
       },
     ])
+  })
+
+  afterEach(() => {
+    userService.clearCurrentUser()
   })
 
   describe('Painel de Indicadores e Alternância de Visualização', () => {
@@ -489,6 +496,108 @@ describe('Catálogo de Bases Geoespaciais', () => {
       expect(porRegistros[0]?.total_feicoes).toBe(500)
       expect(porRegistros[1]?.total_feicoes).toBe(300)
       expect(porRegistros[2]?.total_feicoes).toBe(100)
+    })
+  })
+
+  describe('Controle de Acesso RBAC por Perfil (Catálogo via /catalogo/bases)', () => {
+    it('INTEGRADOR_EXTERNO carrega bases publicadas via catalogoService.listarBases sem chamar processos, métricas ou filtros de domínio', async () => {
+      setTestUserRole('INTEGRADOR_EXTERNO')
+
+      const getProcessesSpy = vi.spyOn(dashboardService, 'getDashboardProcesses')
+      const getSummarySpy = vi.spyOn(dashboardService, 'getDashboardSummary').mockResolvedValue([])
+      const getFilterOptionsSpy = vi.spyOn(dashboardService, 'getFilterOptions')
+      const listarBasesSpy = vi.spyOn(catalogoService, 'listarBases').mockResolvedValueOnce([
+        {
+          id: 201,
+          conjunto_id: 1,
+          conjunto: 'Imóveis Rurais (CAR)',
+          orgao_sigla: 'INCRA',
+          ano_safra: '2026',
+          versao_oficial: 'v1.0 (Oficial)',
+          data_publicacao: '19/10/2026 20:05',
+          epsg_destino: 'EPSG:4674',
+          total_feicoes: 1420,
+        },
+        {
+          id: 202,
+          conjunto_id: 2,
+          conjunto: 'Reserva Legal',
+          orgao_sigla: 'SICAR',
+          ano_safra: '2025',
+          versao_oficial: 'v2.1 (Oficial)',
+          data_publicacao: '15/08/2025 14:20',
+          epsg_destino: 'EPSG:4674',
+          total_feicoes: 890,
+        },
+      ])
+
+      const wrapper = mount(CargaListView)
+      await flushPromises()
+
+      expect(listarBasesSpy).toHaveBeenCalled()
+      expect(getProcessesSpy).not.toHaveBeenCalled()
+      expect(getSummarySpy).not.toHaveBeenCalled()
+      expect(getFilterOptionsSpy).not.toHaveBeenCalled()
+
+      expect(wrapper.find('[data-testid="kpi-value-total"]').text()).toBe('2')
+      expect(wrapper.find('[data-testid="kpi-value-prontas"]').text()).toBe('2')
+      expect(wrapper.find('[data-testid="kpi-value-processamento"]').text()).toBe('0')
+
+      const cards = wrapper.findAll('[data-testid="catalog-card"]')
+      expect(cards.length).toBe(2)
+      expect(wrapper.text()).toContain('Imóveis Rurais (CAR)')
+      expect(wrapper.text()).toContain('Reserva Legal')
+      expect(wrapper.text()).toContain('INCRA')
+      expect(wrapper.text()).toContain('SICAR')
+
+      await cards[0]!.find('[data-testid="btn-inspect-base"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="catalog-detail-drawer"]').exists()).toBe(true)
+    })
+
+    it('ANALISTA sem permissão de processos carrega catálogo via catalogoService.listarBases sem chamar /processos nem métricas, mas pode carregar filtros de domínio', async () => {
+      setTestUserRole('ANALISTA')
+
+      const getProcessesSpy = vi.spyOn(dashboardService, 'getDashboardProcesses')
+      const getSummarySpy = vi.spyOn(dashboardService, 'getDashboardSummary').mockResolvedValue([])
+      const getFilterOptionsSpy = vi.spyOn(dashboardService, 'getFilterOptions')
+      const listarBasesSpy = vi.spyOn(catalogoService, 'listarBases').mockResolvedValueOnce([
+        {
+          id: 301,
+          conjunto_id: 3,
+          conjunto: 'Área de Preservação Permanente (APP)',
+          orgao_sigla: 'IBAMA',
+          ano_safra: '2026',
+          versao_oficial: 'v3.0 (Oficial)',
+          data_publicacao: '01/11/2026 10:00',
+          epsg_destino: 'EPSG:4674',
+          total_feicoes: 500,
+        },
+      ])
+
+      const wrapper = mount(CargaListView)
+      await flushPromises()
+
+      expect(listarBasesSpy).toHaveBeenCalled()
+      expect(getProcessesSpy).not.toHaveBeenCalled()
+      expect(getSummarySpy).not.toHaveBeenCalled()
+      expect(getFilterOptionsSpy).toHaveBeenCalledTimes(1)
+
+      const cards = wrapper.findAll('[data-testid="catalog-card"]')
+      expect(cards.length).toBe(1)
+      expect(wrapper.text()).toContain('Área de Preservação Permanente (APP)')
+      expect(wrapper.text()).toContain('IBAMA')
+    })
+
+    it('exibe alerta de erro quando catalogoService.listarBases falhar para perfil sem acesso a processos', async () => {
+      setTestUserRole('INTEGRADOR_EXTERNO')
+      vi.spyOn(catalogoService, 'listarBases').mockRejectedValueOnce(new Error('Falha de rede'))
+
+      const wrapper = mount(CargaListView)
+      await flushPromises()
+
+      const toast = wrapper.find('[data-testid="catalog-error-toast"]')
+      expect(toast.exists()).toBe(true)
     })
   })
 })

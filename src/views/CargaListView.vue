@@ -33,6 +33,7 @@ import { catalogoService, type CatalogoBase } from '@/services/catalogo'
 import type { CatalogoItem, CatalogoKpis, CatalogoSortOption, ViewMode } from '@/types/catalogo'
 import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
 import { userService } from '@/services/user'
+import { normalizeRoleKey } from '@/utils/rbac'
 import {
   QUARANTINE_TOOLTIP,
   isBaseDisponivel,
@@ -47,6 +48,14 @@ import {
 } from '@/utils/processUtils'
 
 const router = useRouter()
+const canViewProcesses = computed(() =>
+  userService.canAny(['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS']),
+)
+const canLoadFilterOptions = computed(
+  () =>
+    normalizeRoleKey(userService.getCurrentUser().role) !== 'INTEGRADOR_EXTERNO' &&
+    (canViewProcesses.value || userService.can('ANALISE_TERRITORIAL:CONSULTAR_RESULTADO')),
+)
 const canExportReports = computed(
   () =>
     userService.getCurrentUser().role.toUpperCase() !== 'AUDITOR' &&
@@ -276,7 +285,34 @@ const kpisData = computed<CatalogoKpis>(() => {
 })
 
 /**
+ * Indexa as bases publicadas retornadas pelo catálogo por ID numérico e string.
+ */
+const populateCatalogoBasesMap = (bases: CatalogoBase[]) => {
+  const map = new Map<string | number, CatalogoBase>()
+  bases.forEach((b) => {
+    map.set(b.id, b)
+    map.set(String(b.id), b)
+  })
+  catalogoBasesMap.value = map
+}
+
+/**
+ * Converte uma base publicada do catálogo (/catalogo/bases) para ProcessLog.
+ */
+const mapCatalogoBaseToProcessLog = (base: CatalogoBase): ProcessLog => ({
+  id: String(base.id),
+  dateTime: base.data_publicacao || '',
+  dataset: base.conjunto || `Base #${base.id}`,
+  stage: 'Publicação',
+  status: 'Concluída',
+  source: base.orgao_sigla || base.orgao || '',
+  year: base.ano_safra ? String(base.ano_safra) : '',
+  epsg: base.epsg_destino || 'EPSG:4674',
+})
+
+/**
  * Carrega a página de processos do catálogo via API e enriquece com /catalogo/bases.
+ * Perfis sem permissão de consulta de processos consultam apenas /catalogo/bases.
  */
 const loadPage = async (pageNumber: number, currentFilters?: StandardFilters) => {
   isLoading.value = true
@@ -286,6 +322,37 @@ const loadPage = async (pageNumber: number, currentFilters?: StandardFilters) =>
   try {
     const f = currentFilters || filters.value
     const isNumericConjunto = /^\d+$/.test(f.conjunto)
+
+    if (!canViewProcesses.value) {
+      const catalogoFilters = isNumericConjunto ? { conjuntoId: Number(f.conjunto) } : undefined
+      const basesPublicadas = await catalogoService.listarBases(catalogoFilters)
+      const lista = Array.isArray(basesPublicadas) ? basesPublicadas : []
+
+      populateCatalogoBasesMap(lista)
+      processos.value = lista.map(mapCatalogoBaseToProcessLog)
+      serverKpis.value = {}
+      dataSource.value = 'API'
+      currentPage.value = 0
+      totalPages.value = 1
+      clientCurrentPage.value = 0
+
+      if (filterOptions.value.conjuntos.length === 0) {
+        const conjuntosMap = new Map<string | number, string>()
+        lista.forEach((b) => {
+          if (b.conjunto) {
+            conjuntosMap.set(b.conjunto_id ?? b.conjunto, b.conjunto)
+          }
+        })
+        filterOptions.value.conjuntos = Array.from(conjuntosMap.entries()).map(([id, label]) => ({
+          id,
+          label,
+        }))
+      }
+
+      isLoading.value = false
+      return
+    }
+
     const page = await dashboardService.getDashboardProcesses({
       page: pageNumber,
       size: pageSize.value,
@@ -307,12 +374,7 @@ const loadPage = async (pageNumber: number, currentFilters?: StandardFilters) =>
       .listarBases()
       .then((basesPublicadas) => {
         if (Array.isArray(basesPublicadas)) {
-          const map = new Map<string | number, CatalogoBase>()
-          basesPublicadas.forEach((b) => {
-            map.set(b.id, b)
-            map.set(String(b.id), b)
-          })
-          catalogoBasesMap.value = map
+          populateCatalogoBasesMap(basesPublicadas)
         }
       })
       .catch(() => {})
@@ -354,15 +416,17 @@ const loadPage = async (pageNumber: number, currentFilters?: StandardFilters) =>
 }
 
 onMounted(async () => {
-  try {
-    const opts = await dashboardService.getFilterOptions()
-    if (opts) {
-      filterOptions.value.conjuntos = opts.conjuntos || []
-      filterOptions.value.etapas = opts.etapas || []
-      filterOptions.value.situacoes = opts.situacoes || []
+  if (canLoadFilterOptions.value) {
+    try {
+      const opts = await dashboardService.getFilterOptions()
+      if (opts) {
+        filterOptions.value.conjuntos = opts.conjuntos || []
+        filterOptions.value.etapas = opts.etapas || []
+        filterOptions.value.situacoes = opts.situacoes || []
+      }
+    } catch {
+      // Segue com opções derivadas
     }
-  } catch {
-    // Segue com opções derivadas
   }
   await loadPage(0)
 })

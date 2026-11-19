@@ -81,7 +81,7 @@ const clearBaseLayers = () => {
 
 const buildBaseLayersFromGeoJson = (geojson: any) => {
   clearBaseLayers()
-  if (!geojson || !Array.isArray(geojson.features) || geojson.features.length === 0) {
+  if (!map || !geojson || !Array.isArray(geojson.features) || geojson.features.length === 0) {
     return
   }
 
@@ -240,6 +240,7 @@ const findLocation = async () => {
   // US09: Atualiza as camadas territoriais filtradas por busca textual no servidor
   try {
     const fetchedTerritories = await mapService.getTerritories({ busca: searchTerm.value.trim() })
+    if (!map) return
     buildBaseLayersFromGeoJson(fetchedTerritories)
   } catch (err) {
     console.warn('Falha ao filtrar camadas no mapa:', err)
@@ -293,6 +294,7 @@ const limparFiltroProcesso = async () => {
   searchTerm.value = ''
   try {
     const fetchedTerritories = await mapService.getTerritories()
+    if (!map) return
     buildBaseLayersFromGeoJson(fetchedTerritories)
   } catch (err) {
     console.warn('Erro ao restaurar territórios:', err)
@@ -301,6 +303,8 @@ const limparFiltroProcesso = async () => {
 
 const carregarCamadasElocais = async (forceRefresh = false) => {
   const rawLocations = await mapService.getPublishedLocations()
+  if (!map) return
+
   locations.value = Array.isArray(rawLocations)
     ? rawLocations.map((loc: any) => ({
         id: String(loc.id ?? ''),
@@ -329,6 +333,7 @@ const carregarCamadasElocais = async (forceRefresh = false) => {
   isRefreshingCache.value = true
   try {
     const fetchedTerritories = await mapService.getTerritories(initialFilters, { forceRefresh })
+    if (!map) return
     isFromCache.value = Boolean((fetchedTerritories as any).fromCache)
     buildBaseLayersFromGeoJson(fetchedTerritories)
   } catch (err) {
@@ -336,6 +341,8 @@ const carregarCamadasElocais = async (forceRefresh = false) => {
   } finally {
     isRefreshingCache.value = false
   }
+
+  if (!map) return
 
   if (markers && map) {
     markers.clearLayers()
@@ -394,6 +401,12 @@ onMounted(async () => {
     })
   })
 
+  map.on('click', ({ latlng }) => {
+    selectedLocation.value = null
+    selectedCoordinates.value = { latitude: latlng.lat, longitude: latlng.lng }
+    mapError.value = ''
+  })
+
   const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     {
@@ -420,12 +433,6 @@ onMounted(async () => {
   markers = L.layerGroup().addTo(map)
 
   await carregarCamadasElocais()
-
-  map.on('click', ({ latlng }) => {
-    selectedLocation.value = null
-    selectedCoordinates.value = { latitude: latlng.lat, longitude: latlng.lng }
-    mapError.value = ''
-  })
 })
 
 watch(
