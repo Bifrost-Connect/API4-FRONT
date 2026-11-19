@@ -179,11 +179,13 @@ const updateMapLayers = async () => {
   if (!map) return
   const requestId = ++mapRequestSequence
   layerError.value = ''
-  renderedLayers.forEach((layer) => layer.removeFrom(map as L.Map))
+  const activeMap = map
+  renderedLayers.forEach((layer) => layer.removeFrom(activeMap))
   renderedLayers = []
 
   const addLayer = (layer: L.Layer) => {
-    layer.addTo(map as L.Map)
+    if (!map) return
+    layer.addTo(map)
     renderedLayers.push(layer)
   }
 
@@ -193,7 +195,7 @@ const updateMapLayers = async () => {
         selectedCar.value.id,
         map.getBounds().toBBoxString(),
       )
-      if (requestId !== mapRequestSequence) return
+      if (!map || requestId !== mapRequestSequence) return
       addLayer(
         L.geoJSON(geometry, {
           style: {
@@ -214,11 +216,12 @@ const updateMapLayers = async () => {
 
     if (showRestrictionLayers.value) {
       for (const restriction of selectedRestrictions.value) {
+        if (!map || requestId !== mapRequestSequence) return
         const geometry = await spatialAnalysisService.getDocumentGeoJSON(
           restriction.id,
           map.getBounds().toBBoxString(),
         )
-        if (requestId !== mapRequestSequence) return
+        if (!map || requestId !== mapRequestSequence) return
         const colors: Record<SpatialAnalysisDocument['category'], string> = {
           CAR: getThemeColor('--map-layer-car-stroke'),
           ALERTA: getThemeColor('--map-layer-restriction-stroke'),
@@ -274,7 +277,9 @@ const updateMapLayers = async () => {
             },
           },
         )
+        if (!map || requestId !== mapRequestSequence) return
         addLayer(intersectionLayer)
+        if (!map) return
         addIntersectionPattern()
         intersectionLayer.eachLayer((layer) => {
           if (layer instanceof L.Path) {
@@ -512,7 +517,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
+  ++mapRequestSequence
+  if (mapRefreshTimer) {
+    clearTimeout(mapRefreshTimer)
+    mapRefreshTimer = null
+  }
   map?.remove()
   map = null
   activeBaseLayer = null
