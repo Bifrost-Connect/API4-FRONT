@@ -92,7 +92,7 @@ watch(selectedCategory, (cat) => {
 const filters = ref<StandardFilters>({
   dateBeggin: savedFilters?.standardFilters?.dateBeggin || '',
   dateEnd: savedFilters?.standardFilters?.dateEnd || '',
-  conjunto: savedFilters?.standardFilters?.conjunto || '',
+  conjunto: savedFilters?.standardFilters?.conjunto ? String(savedFilters.standardFilters.conjunto) : '',
   etapa: savedFilters?.standardFilters?.etapa || '',
   situacao: savedFilters?.standardFilters?.situacao || '',
 })

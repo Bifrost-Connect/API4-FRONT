@@ -1,6 +1,7 @@
 import axios from 'axios'
-import type { FeatureCollection } from 'geojson'
 import api from './api'
+
+type FeatureCollection = GeoJSON.FeatureCollection
 
 export interface PublishedSeason {
   id: string

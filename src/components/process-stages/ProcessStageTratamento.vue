@@ -40,7 +40,7 @@ const isUnderCorrection = computed(
 /** Verifica se a etapa de Validação foi superada e o Tratamento foi liberado */
 const isStageReached = computed(() => {
   if (props.details.status === 'Concluída') return true
-  return getStepIndex(props.details) >= 3
+  return getStepIndex(props.details.stage) >= 3
 })
 
 /** Status geral resumido do tratamento */

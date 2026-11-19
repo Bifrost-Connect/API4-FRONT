@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mapStage, mapStatus, mapMetricasToSummary } from '../dashboard'
 
 describe('Dashboard Service Helpers', () => {
@@ -42,10 +42,10 @@ describe('Dashboard Service Helpers', () => {
       
       const summary = mapMetricasToSummary(payload)
       expect(summary.length).toBe(4)
-      expect(summary[0].value).toBe(10) // Total
-      expect(summary[1].value).toBe(5)  // Concluídas
-      expect(summary[2].value).toBe(2)  // Em Andamento
-      expect(summary[3].value).toBe(3)  // Erros
+      expect(summary[0]!.value).toBe(10) // Total
+      expect(summary[1]!.value).toBe(5)  // Concluídas
+      expect(summary[2]!.value).toBe(2)  // Em Andamento
+      expect(summary[3]!.value).toBe(3)  // Erros
     })
   })
 })

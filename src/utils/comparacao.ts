@@ -1,5 +1,3 @@
-import type { Feature } from 'geojson'
-
 export function percentageVariation(areaA: number, areaB: number): number | null {
   if (!Number.isFinite(areaA) || !Number.isFinite(areaB) || areaA < 0 || areaB < 0) return null
   if (areaA === 0) return areaB === 0 ? 0 : null
@@ -26,7 +24,7 @@ export function parseBbox(values: readonly (string | number)[]): string | null {
   return [west, south, east, north].join(',')
 }
 
-export function featureIdentifier(feature: Feature): string {
+export function featureIdentifier(feature: GeoJSON.Feature): string {
   const p = feature.properties ?? {}
   return String(p.codigoImovel ?? p.codigo_imovel ?? p.identificadorCar ?? feature.id ?? p.id ?? '')
 }

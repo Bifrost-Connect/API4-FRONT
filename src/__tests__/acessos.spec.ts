@@ -428,7 +428,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
           name: 'Carlos Duplicado',
           email: 'CARLOS.MENDES@GEORURAL.COM.BR',
           role: 'ANALISTA',
-          password: 'Password@123',
+          temporaryPassword: 'Password@123',
         }),
       ).rejects.toThrow(DuplicateEmailError)
     })

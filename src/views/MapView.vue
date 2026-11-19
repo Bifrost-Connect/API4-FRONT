@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { markRaw, onBeforeUnmount, onMounted, ref, watch, type Raw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -46,7 +46,7 @@ interface BaseLayerItem {
   color: string
   visible: boolean
   featureCount: number
-  layer: L.GeoJSON
+  layer: Raw<L.GeoJSON>
   bounds?: L.LatLngBounds
 }
 
@@ -104,7 +104,7 @@ const buildBaseLayersFromGeoJson = (geojson: any) => {
   const allBounds: L.LatLngBounds[] = []
 
   groups.forEach((features, key) => {
-    const color = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length]
+    const color = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length] ?? '#10b981'
     index++
 
     // Encontra dados correspondentes da base
@@ -119,7 +119,7 @@ const buildBaseLayersFromGeoJson = (geojson: any) => {
       (features[0]?.properties?.anoSafra ? `Safra ${features[0].properties.anoSafra}` : 'Camada Territorial')
 
     const layer = L.geoJSON(
-      { type: 'FeatureCollection', features },
+      { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection,
       {
         style: () => ({
           color,
@@ -168,7 +168,7 @@ const buildBaseLayersFromGeoJson = (geojson: any) => {
       color,
       visible: true,
       featureCount: features.length,
-      layer,
+      layer: markRaw(layer),
       bounds,
     })
   })
@@ -176,11 +176,16 @@ const buildBaseLayersFromGeoJson = (geojson: any) => {
   // Ajusta zoom do mapa para englobar todas as camadas ativas
   if (map && allBounds.length > 0) {
     const combined = allBounds[0]
-    for (let i = 1; i < allBounds.length; i++) {
-      combined.extend(allBounds[i])
-    }
-    if (combined.isValid()) {
-      map.fitBounds(combined.pad(0.12), { maxZoom: 14 })
+    if (combined) {
+      for (let i = 1; i < allBounds.length; i++) {
+        const nextBound = allBounds[i]
+        if (nextBound) {
+          combined.extend(nextBound)
+        }
+      }
+      if (combined.isValid()) {
+        map.fitBounds(combined.pad(0.12), { maxZoom: 14 })
+      }
     }
   }
 }

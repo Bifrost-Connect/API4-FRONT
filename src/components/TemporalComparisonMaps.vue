@@ -2,9 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Feature, FeatureCollection } from 'geojson'
 import { featureIdentifier, synchronizeCameras } from '@/utils/comparacao'
 import { getThemeColor } from '@/utils/themeTokens'
+
+type Feature = GeoJSON.Feature
+type FeatureCollection = GeoJSON.FeatureCollection
 
 const props = defineProps<{
   layersA: FeatureCollection | null
@@ -69,7 +71,7 @@ function popupContent(identifier: string): HTMLElement {
     [props.labelA, props.layersA],
     [props.labelB, props.layersB],
   ] as const) {
-    const feature = collection?.features.find((item) => featureIdentifier(item) === identifier)
+    const feature = collection?.features.find((item: Feature) => featureIdentifier(item) === identifier)
     const line = document.createElement('p')
     line.textContent = `${label}: ${feature ? 'presente no recorte' : 'sem correspondente no recorte'}.`
     root.append(line)

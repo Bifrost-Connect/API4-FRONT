@@ -147,7 +147,7 @@ export const geojsonCache = {
    * Aplica limite LRU descartando a entrada mais antiga se ultrapassar 30 camadas.
    */
   async set(
-    payload: Omit<GeoJsonCacheEntry, 'cacheKey' | 'timestamp' | 'featureCount'> & {
+    payload: Omit<GeoJsonCacheEntry, 'cacheKey' | 'timestamp' | 'featureCount' | 'ttl'> & {
       ttl?: number
     },
   ): Promise<GeoJsonCacheEntry> {

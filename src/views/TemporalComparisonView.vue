@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import type { FeatureCollection } from 'geojson'
 import TemporalComparisonMaps from '@/components/TemporalComparisonMaps.vue'
+
+type FeatureCollection = GeoJSON.FeatureCollection
 import {
   comparisonService,
   comparisonErrorMessage,
@@ -77,7 +78,7 @@ const identifiers = computed(() => [
 ])
 const selectedFeatures = computed(() =>
   [layersA.value, layersB.value].map((collection) =>
-    collection?.features.find((f) => featureIdentifier(f) === selectedId.value),
+    collection?.features.find((f: GeoJSON.Feature) => featureIdentifier(f) === selectedId.value),
   ),
 )
 const area = (value: number) =>
