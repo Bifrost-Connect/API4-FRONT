@@ -32,9 +32,7 @@ const profile = computed<UserProfile>(() => {
   const stored = storedSession.value
 
   const modeLabel = stored
-    ? stored.isSimulated
-      ? 'Modo Demonstração Offline'
-      : `Autenticado via JWT (expira ${formatTimestamp(stored.expiresAt)})`
+    ? `Autenticado via JWT (expira ${formatTimestamp(stored.expiresAt)})`
     : base.lastLogin
 
   return {

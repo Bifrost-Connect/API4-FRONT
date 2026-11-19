@@ -19,11 +19,11 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(authStorage.getAccessToken())
 
   const isAuthenticated = computed(() => {
-    return Boolean(session.value && !authStorage.isSessionExpired(session.value))
+    return Boolean(session.value && accessToken.value && !authStorage.isSessionExpired(session.value))
   })
 
   const currentUser = computed(() => session.value)
-  const currentRole = computed(() => session.value?.role || 'Operador')
+  const currentRole = computed(() => session.value?.role || '')
   const permissions = computed(() => session.value?.permissions || [])
 
   /**
@@ -44,7 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Sincroniza o userService reativo
     userService.setCurrentUser({
-      id: newSession.userId,
+      id: typeof newSession.userId === 'number' ? newSession.userId : Number(newSession.userId) || undefined,
       name: newSession.name,
       email: newSession.email,
       role: newSession.role,
@@ -54,25 +54,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Realiza login simulado baseado em perfil padrão do sistema.
+   * Autentica o usuário via credenciais reais na API e sincroniza a store.
    */
-  function loginWithRole(role: string) {
-    userService.setCurrentUserRole(role)
-    const userSession = userService.getCurrentUser()
-
-    const storedSession: StoredAuthSession = {
-      userId: userSession.id,
-      name: userSession.name,
-      email: userSession.email || `${role.toLowerCase()}@georural.com.br`,
-      role: userSession.role,
-      roleId: userSession.roleId || role.toUpperCase(),
-      permissions: [...userSession.permissions],
-      loggedAt: Date.now(),
-      expiresAt: Date.now() + 8 * 3600 * 1000,
-      isSimulated: true,
-    }
-
-    setSession(storedSession)
+  async function login(email: string, senha: string) {
+    const user = await userService.loginWithCredentials(email, senha)
+    syncFromStorage()
+    return user
   }
 
   /**
@@ -98,7 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
     const current = authStorage.getSession()
     if (current) {
       userService.setCurrentUser({
-        id: current.userId,
+        id: typeof current.userId === 'number' ? current.userId : Number(current.userId) || undefined,
         name: current.name,
         email: current.email,
         role: current.role,
@@ -117,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
     permissions,
     syncFromStorage,
     setSession,
-    loginWithRole,
+    login,
     logout,
   }
 })

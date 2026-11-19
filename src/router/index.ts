@@ -120,25 +120,25 @@ const router = createRouter({
 /**
  * Guardião global de rotas (ProtectedRoute) orientado a permissões (Tarefa 6 e 7).
  */
-router.beforeEach(async (to, from, next) => {
-  const reqPerm = to.meta.permission as string | string[] | undefined
-
-  if (!reqPerm) {
+router.beforeEach(async (to, _from, next) => {
+  if (to.name === 'login') {
     return next()
   }
 
-  // Verifica se a sessão está explicitamente expirada
   const session = authStorage.getSession()
-  if (
-    to.name !== 'login' &&
-    authStorage.isSessionExpired(session) &&
-    authStorage.getAccessToken()
-  ) {
+  const token = authStorage.getAccessToken()
+  if (!session || !token || authStorage.isSessionExpired(session)) {
     authStorage.clearSession()
+    userService.clearCurrentUser()
     return next({
       name: 'login',
       query: { redirect: to.fullPath },
     })
+  }
+
+  const reqPerm = to.meta.permission as string | string[] | undefined
+  if (!reqPerm) {
+    return next()
   }
 
   const hasAccess = Array.isArray(reqPerm) ? userService.canAny(reqPerm) : userService.can(reqPerm)
@@ -147,16 +147,7 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  // Registra a tentativa de acesso não autorizado no log de segurança (Tarefa 3 e 7)
-  try {
-    userService.recordSecurityEvent({
-      action: 'Tentativa de Acesso Barrada (403)',
-      details: `Tentou acessar a rota "${to.fullPath}" sem a permissão necessária (${Array.isArray(reqPerm) ? reqPerm.join(', ') : reqPerm}).`,
-      severity: 'WARNING',
-    })
-  } catch {}
-
-  next({ name: 'forbidden' })
+  return next({ name: 'forbidden' })
 })
 
 export default router

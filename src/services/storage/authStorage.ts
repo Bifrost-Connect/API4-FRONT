@@ -7,7 +7,6 @@ export const AUTH_STORAGE_KEYS = {
   ACCESS_TOKEN: 'api4_access_token',
   REFRESH_TOKEN: 'api4_refresh_token',
   AUTH_SESSION: 'api4_auth_session',
-  LEGACY_DEMO_ROLE: 'api4-demo-role',
 } as const
 
 export const DEFAULT_SESSION_TTL_MS = 8 * 60 * 60 * 1000 // 8 horas
@@ -21,7 +20,6 @@ export interface StoredAuthSession {
   permissions: string[]
   loggedAt: number
   expiresAt: number
-  isSimulated: boolean
 }
 
 export interface TokenPair {
@@ -129,7 +127,6 @@ export const authStorage = {
 
   /**
    * Salva a sessão ativa e os tokens associados.
-   * Mantém também a chave legada 'api4-demo-role' sincronizada para compatibilidade.
    */
   saveSession(session: StoredAuthSession, tokens?: Partial<TokenPair>): void {
     const now = Date.now()
@@ -141,23 +138,13 @@ export const authStorage = {
 
     safeStorage.setItem(AUTH_STORAGE_KEYS.AUTH_SESSION, JSON.stringify(sessionWithTtl))
 
-    // Gera token simulado caso não seja passado um par real
-    const accessToken =
-      tokens?.accessToken ||
-      this.generateMockJwt({
-        sub: sessionWithTtl.userId,
-        email: sessionWithTtl.email,
-        roleId: sessionWithTtl.roleId,
-        exp: Math.floor(sessionWithTtl.expiresAt / 1000),
-      })
+    if (tokens?.accessToken) {
+      safeStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken)
+    }
 
-    const refreshToken = tokens?.refreshToken || `refresh_${sessionWithTtl.userId}_${Date.now()}`
-
-    safeStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, accessToken)
-    safeStorage.setItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN, refreshToken)
-
-    // Sincroniza chave legada para compatibilidade com asserções de testes existentes
-    safeStorage.setItem(AUTH_STORAGE_KEYS.LEGACY_DEMO_ROLE, sessionWithTtl.role)
+    if (tokens?.refreshToken) {
+      safeStorage.setItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken)
+    }
   },
 
   /**
@@ -222,9 +209,6 @@ export const authStorage = {
     }
 
     safeStorage.setItem(AUTH_STORAGE_KEYS.AUTH_SESSION, JSON.stringify(updated))
-    if (role) {
-      safeStorage.setItem(AUTH_STORAGE_KEYS.LEGACY_DEMO_ROLE, role)
-    }
   },
 
   /**
@@ -234,7 +218,6 @@ export const authStorage = {
     safeStorage.removeItem(AUTH_STORAGE_KEYS.AUTH_SESSION)
     safeStorage.removeItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)
     safeStorage.removeItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN)
-    safeStorage.removeItem(AUTH_STORAGE_KEYS.LEGACY_DEMO_ROLE)
   },
 
   /**
@@ -248,8 +231,7 @@ export const authStorage = {
     const handler = (event: StorageEvent) => {
       if (
         event.key === AUTH_STORAGE_KEYS.AUTH_SESSION ||
-        event.key === AUTH_STORAGE_KEYS.ACCESS_TOKEN ||
-        event.key === AUTH_STORAGE_KEYS.LEGACY_DEMO_ROLE
+        event.key === AUTH_STORAGE_KEYS.ACCESS_TOKEN
       ) {
         callback(this.getSession())
       }

@@ -31,7 +31,6 @@ const canRevokeKey = computed(() => userService.can('API:REVOGAR_CHAVE'))
 
 const apiKeys = ref<ApiKeyRecord[]>([])
 const isLoading = ref(false)
-const isFallbackMode = apiKeyService.isFallbackMode
 const searchQuery = ref('')
 const statusFilter = ref<'' | ApiKeyStatus>('')
 
@@ -258,16 +257,6 @@ const closeLogsModal = () => {
         </div>
 
         <div class="header-actions">
-          <span
-            v-if="isFallbackMode"
-            class="mode-pill mode-pill-fallback"
-            data-testid="apikey-fallback-badge"
-            title="Operando via repositório simulado enquanto os endpoints Java da US12 não estiverem disponíveis."
-          >
-            <FiShield size="13" />
-            <span>Modo Simulado Local</span>
-          </span>
-
           <button
             v-if="canCreateKey"
             type="button"

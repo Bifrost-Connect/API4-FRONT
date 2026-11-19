@@ -1,12 +1,20 @@
 /**
  * @file Serviço de Gerenciamento do Perfil do Usuário Logado e Segurança.
- * Centraliza regras de atualização de perfil e regras de alteração de senha.
+ * Constrói o perfil exclusivamente a partir da sessão JWT autenticada.
  */
 import { ref } from 'vue'
-import { MOCK_USER_PROFILE, type UserProfileMock } from './mocks/profile.mock'
 import { userService } from './user'
 
-export type UserProfile = UserProfileMock
+export interface UserProfile {
+  id: number | undefined
+  name: string
+  email: string
+  role: string
+  cargo: string
+  departamento: string
+  lastLogin: string
+  status: 'Ativo' | 'Inativo'
+}
 
 export interface ChangePasswordPayload {
   currentPassword: string
@@ -19,19 +27,39 @@ export interface ServiceResult {
   message: string
 }
 
-const profileData = ref<UserProfile>({ ...MOCK_USER_PROFILE })
+const emptyProfile = (): UserProfile => ({
+  id: undefined,
+  name: '',
+  email: '',
+  role: '',
+  cargo: '',
+  departamento: '',
+  lastLogin: '',
+  status: 'Inativo',
+})
+
+const profileOverrides = ref<Partial<UserProfile>>({})
 
 export const profileService = {
   /**
    * Retorna os dados completos do perfil do usuário autenticado.
    */
   getProfile(): UserProfile {
-    // Sincroniza nome e email com a sessão ativa caso tenham sido alterados
     const session = userService.getCurrentUser()
+    const isAuthenticated = Boolean(session.email || session.name || session.role)
+    if (!isAuthenticated) {
+      return emptyProfile()
+    }
+
     return {
-      ...profileData.value,
-      name: session.name || profileData.value.name,
-      email: session.email || profileData.value.email,
+      id: session.id,
+      name: profileOverrides.value.name ?? session.name,
+      email: profileOverrides.value.email ?? session.email ?? '',
+      role: session.role,
+      cargo: profileOverrides.value.cargo ?? session.role,
+      departamento: profileOverrides.value.departamento ?? '',
+      lastLogin: profileOverrides.value.lastLogin ?? 'Sessão ativa',
+      status: profileOverrides.value.status ?? 'Ativo',
     }
   },
 
@@ -39,17 +67,16 @@ export const profileService = {
    * Atualiza as informações cadastrais do perfil e reflete na sessão de usuário.
    */
   updateProfile(data: Partial<UserProfile>): ServiceResult {
-    profileData.value = {
-      ...profileData.value,
+    profileOverrides.value = {
+      ...profileOverrides.value,
       ...data,
     }
 
-    // Sincroniza com a sessão do usuário
     const currentSession = userService.getCurrentUser()
     userService.setCurrentUser({
       ...currentSession,
-      name: profileData.value.name,
-      email: profileData.value.email,
+      name: profileOverrides.value.name ?? currentSession.name,
+      email: profileOverrides.value.email ?? currentSession.email,
     })
 
     return {
@@ -91,4 +118,3 @@ export const profileService = {
     }
   },
 }
-

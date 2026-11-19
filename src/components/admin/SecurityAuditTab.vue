@@ -15,7 +15,6 @@ import {
   FiLock,
 } from 'vue-icons-plus/fi'
 import type { SecurityEvent } from '@/types/access'
-import { authStorage } from '@/services/storage/authStorage'
 import { userService } from '@/services/user'
 
 const props = defineProps<{
@@ -31,8 +30,6 @@ const dateTo = ref('')
 const currentPage = ref(1)
 const serverEvents = ref<SecurityEvent[] | null>(null)
 const serverTotalPages = ref(1)
-
-const isRealBackendSession = () => authStorage.getSession()?.isSimulated === false
 
 const ACTION_ALIAS_MAP: Record<string, string[]> = {
   USUARIO_CRIADO: ['Criação de Conta'],
@@ -61,10 +58,6 @@ function parseEventDateYmd(timestamp: string): string | null {
 }
 
 async function fetchBackendEvents() {
-  if (!isRealBackendSession()) {
-    serverEvents.value = null
-    return
-  }
   try {
     const q = searchQuery.value.trim()
     const usuarioId = /^\d+$/.test(q) ? Number(q) : undefined
@@ -84,29 +77,23 @@ async function fetchBackendEvents() {
 }
 
 onMounted(() => {
-  if (isRealBackendSession()) {
-    fetchBackendEvents()
-  }
+  fetchBackendEvents()
 })
 
 watch([selectedTypeFilter, dateFrom, dateTo], () => {
   currentPage.value = 1
-  if (isRealBackendSession()) {
-    fetchBackendEvents()
-  }
+  fetchBackendEvents()
 })
 
 watch(searchQuery, () => {
   currentPage.value = 1
-  if (isRealBackendSession() && /^\d*$/.test(searchQuery.value.trim())) {
+  if (/^\d*$/.test(searchQuery.value.trim())) {
     fetchBackendEvents()
   }
 })
 
 watch(currentPage, () => {
-  if (isRealBackendSession()) {
-    fetchBackendEvents()
-  }
+  fetchBackendEvents()
 })
 
 const localFilteredAll = computed(() => {

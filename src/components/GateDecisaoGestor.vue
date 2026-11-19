@@ -21,8 +21,7 @@ const emit = defineEmits<{
   (e: 'decisao-registrada', resultado: any): void
 }>()
 
-// Decisões operacionais habilitadas livremente enquanto a auth real é integrada
-const isGestorOrAdmin = computed(() => true)
+const isGestorOrAdmin = computed(() => userService.can('BASES:HOMOLOGAR') || userService.isAdmin())
 
 const isSubmitting = ref(false)
 const isLoadingHistorico = ref(true)
@@ -161,8 +160,12 @@ const handleAprovar = async () => {
   erroMsg.value = null
 
   try {
+    const currentUser = userService.getCurrentUser()
+    const gestorId = currentUser.id ?? 0
+    const gestorNome = currentUser.name || 'Gestor'
+
     const res = await processService.registrarDecisaoGestor(props.processoId, {
-      gestorId: 1,
+      gestorId,
       etapa: props.etapa,
       decisao: 'APROVADO',
       parecer: `Etapa de ${etapaTitulo.value} aprovada. Liberado para ${proximaEtapaNome.value}.`,
@@ -171,7 +174,7 @@ const handleAprovar = async () => {
     decisaoTomada.value = 'APROVADO'
     decisaoHistorico.value = {
       decisao: 'APROVADO',
-      gestorNome: 'Gestor',
+      gestorNome,
       parecer: `Aprovado pelo Gestor`,
       dataDecisao: new Date().toISOString(),
     }
@@ -205,8 +208,12 @@ const handleConfirmarRejeicao = async () => {
   erroMsg.value = null
 
   try {
+    const currentUser = userService.getCurrentUser()
+    const gestorId = currentUser.id ?? 0
+    const gestorNome = currentUser.name || 'Gestor'
+
     const res = await processService.registrarDecisaoGestor(props.processoId, {
-      gestorId: 1,
+      gestorId,
       etapa: props.etapa,
       decisao: 'REPROVADO',
       parecer: parecerRejeicao.value.trim(),
@@ -215,7 +222,7 @@ const handleConfirmarRejeicao = async () => {
     decisaoTomada.value = 'REPROVADO'
     decisaoHistorico.value = {
       decisao: 'REPROVADO',
-      gestorNome: 'Gestor',
+      gestorNome,
       parecer: parecerRejeicao.value.trim(),
       dataDecisao: new Date().toISOString(),
     }

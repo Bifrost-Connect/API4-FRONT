@@ -41,12 +41,10 @@ api.interceptors.request.use((config) => {
     // Fallback silencioso
   }
 
-  // Anexa o token de acesso (Bearer token) apenas para sessões reais não-simuladas
-  // Evita que o backend real rejeite requisições com 401 por assinatura inválida de mock token
+  // Anexa o token de acesso (Bearer token) sempre que presente no authStorage
   try {
-    const session = authStorage.getSession()
     const token = authStorage.getAccessToken()
-    if (token && session && !session.isSimulated && config.headers && !config.headers.Authorization) {
+    if (token && config.headers && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`
     }
   } catch {
@@ -107,31 +105,29 @@ api.interceptors.response.use(
     }
 
     if (status === 401) {
-      const session = authStorage.getSession()
+      const requestUrl = typeof error?.config?.url === 'string' ? error.config.url : ''
+      const isLoginRequest = requestUrl.includes('/auth/login')
 
-      // Se a sessão for simulada, não desloga o usuário local por 401 da API remota
-      if (session?.isSimulated) {
-        return Promise.reject(error)
-      }
+      if (!isLoginRequest) {
+        authStorage.clearSession()
 
-      authStorage.clearSession()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('api4:unauthorized', { detail: error }))
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('api4:unauthorized', { detail: error }))
+          const rawBase = import.meta.env?.BASE_URL || '/'
+          const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase
+          const currentPath = window.location.pathname
 
-        const rawBase = import.meta.env?.BASE_URL || '/'
-        const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase
-        const currentPath = window.location.pathname
+          // Remove o baseUrl do início para salvar apenas o caminho relativo interno do Vue Router
+          const cleanPath =
+            baseUrl && currentPath.startsWith(baseUrl)
+              ? currentPath.slice(baseUrl.length) || '/'
+              : currentPath
 
-        // Remove o baseUrl do início para salvar apenas o caminho relativo interno do Vue Router
-        const cleanPath =
-          baseUrl && currentPath.startsWith(baseUrl)
-            ? currentPath.slice(baseUrl.length) || '/'
-            : currentPath
-
-        if (cleanPath !== '/login' && !cleanPath.includes('/login')) {
-          const redirect = encodeURIComponent(cleanPath + window.location.search)
-          window.location.href = `${baseUrl}/login?redirect=${redirect}`
+          if (cleanPath !== '/login' && !cleanPath.includes('/login')) {
+            const redirect = encodeURIComponent(cleanPath + window.location.search)
+            window.location.href = `${baseUrl}/login?redirect=${redirect}`
+          }
         }
       }
     }

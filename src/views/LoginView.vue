@@ -13,14 +13,21 @@ const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
 const selectedRole = ref<string>(userService.getCurrentUser().role)
-const usedDemoRole = ref<string | null>(null)
 const loginError = ref('')
 const isSubmitting = ref(false)
 
+const SEED_CREDENTIALS: Record<string, { email: string; password: string }> = {
+  Operador: { email: 'operador@georural.com.br', password: 'Troca123' },
+  Auditor: { email: 'auditor@georural.com.br', password: 'Troca123' },
+  Analista: { email: 'analista@georural.com.br', password: 'Troca123' },
+  Administrador: { email: 'admin@georural.com.br', password: 'Troca123' },
+  Gestor: { email: 'gestor@georural.com.br', password: 'Troca123' },
+  Integrador: { email: 'integrador@georural.com.br', password: 'Troca123' },
+}
+
 const fillLogin = (role: string) => {
   selectedRole.value = role
-  usedDemoRole.value = role
-  const preset = userService.getDemoCredentialPreset(role)
+  const preset = SEED_CREDENTIALS[role]
   email.value = preset?.email ?? ''
   senha.value = preset?.password ?? ''
   loginError.value = ''
@@ -83,29 +90,6 @@ const handleLogin = async () => {
     redirectAfterLogin(user)
   } catch (err: unknown) {
     const status = (err as { response?: { status?: number } })?.response?.status
-    const isRejectedCredential = status === 401 || status === 403 || status === 400 || status === 422
-    const isBackendUnavailable = !status || status === 404 || status >= 500
-
-    if (!isRejectedCredential && isBackendUnavailable) {
-      const emailLower = trimmedEmail.toLowerCase()
-      const filledPreset = usedDemoRole.value
-        ? userService.getDemoCredentialPreset(usedDemoRole.value)
-        : null
-      const matchesFilledDemo = !!filledPreset && emailLower === filledPreset.email.toLowerCase()
-      const demoRole = matchesFilledDemo
-        ? usedDemoRole.value
-        : userService.resolveDemoRoleFromEmail(emailLower)
-      const rolePreset = demoRole ? userService.getDemoCredentialPreset(demoRole) : null
-
-      if (
-        demoRole &&
-        (matchesFilledDemo || (rolePreset !== null && senha.value === rolePreset.password))
-      ) {
-        const demoUser = userService.loginDemoOffline(demoRole)
-        redirectAfterLogin(demoUser)
-        return
-      }
-    }
 
     loginError.value = extractApiErrorMessage(
       err,
@@ -184,9 +168,9 @@ const handleLogin = async () => {
     </div>
 
     <div class="notice-card">
-      <h3 class="aviso">Sistema em fase de testes</h3>
+      <h3 class="aviso">Acesso Rápido (Ambiente de Homologação)</h3>
       <p>
-        Escolha um perfil de demonstração para preencher credenciais ou entrar em modo offline quando o back-end estiver indisponível.
+        Escolha um perfil para preencher automaticamente o e-mail e senha de teste no formulário de login.
       </p>
       <div class="roles-container">
         <button
@@ -228,6 +212,14 @@ const handleLogin = async () => {
           @click="fillLogin('Administrador')"
         >
           Entrar Administrador
+        </button>
+        <button
+          type="button"
+          class="btn btn_outline"
+          :class="{ 'role-selected': selectedRole === 'Integrador' }"
+          @click="fillLogin('Integrador')"
+        >
+          Entrar Integrador
         </button>
       </div>
     </div>
