@@ -3,6 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import ApiKeysTab from '../ApiKeysTab.vue'
 import { apiKeyService } from '@/services/apiKeyService'
 import { userService } from '@/services/user'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
+import type { ApiKeyRecord, ExternalApiAccessLog } from '@/types/apiKey'
 
 const storageMock = (() => {
   let store: Record<string, string> = {}
@@ -25,21 +27,111 @@ Object.defineProperty(globalThis, 'localStorage', {
   writable: true,
 })
 
+const seedKeys: ApiKeyRecord[] = [
+  {
+    id: 1,
+    usuario_id: 1,
+    nome_parceiro: 'Cooperativa Agro',
+    prefixo_chave: 'bf_live_11112222',
+    escopos: ['CATALOGO_CONSULTAR', 'MAPA_CONSULTAR'],
+    status: 'ATIVA',
+    data_criacao: '2026-10-01T10:00:00Z',
+    data_expiracao: '2027-10-01T10:00:00Z',
+    data_revogacao: null,
+    ultimo_uso_em: '2026-11-10T08:00:00Z',
+  },
+  {
+    id: 2,
+    usuario_id: 1,
+    nome_parceiro: 'Parceiro Revogado',
+    prefixo_chave: 'bf_live_33334444',
+    escopos: ['CATALOGO_CONSULTAR'],
+    status: 'REVOGADA',
+    data_criacao: '2026-09-01T10:00:00Z',
+    data_expiracao: null,
+    data_revogacao: '2026-10-15T12:00:00Z',
+    ultimo_uso_em: null,
+  },
+  {
+    id: 3,
+    usuario_id: 1,
+    nome_parceiro: 'Parceiro Expirado',
+    prefixo_chave: 'bf_live_55556666',
+    escopos: ['MAPA_CONSULTAR'],
+    status: 'EXPIRADA',
+    data_criacao: '2025-01-01T10:00:00Z',
+    data_expiracao: '2025-12-31T23:59:59Z',
+    data_revogacao: null,
+    ultimo_uso_em: null,
+  },
+]
+
+const seedLogs: ExternalApiAccessLog[] = [
+  {
+    id: 101,
+    chave_api_id: 1,
+    rota_acessada: '/api/v1/catalogo',
+    status_http: 200,
+    ip_origem: '177.10.20.30',
+    data_acesso: '2026-11-10T08:00:00Z',
+  },
+  {
+    id: 102,
+    chave_api_id: 1,
+    rota_acessada: '/api/v1/restrito',
+    status_http: 403,
+    ip_origem: '177.10.20.31',
+    data_acesso: '2026-11-10T08:05:00Z',
+  },
+]
+
 describe('ApiKeysTab (US12)', () => {
+  let keysStore: ApiKeyRecord[]
+
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
     localStorage.clear()
-    apiKeyService.resetMockData()
-    userService.setCurrentUserRole('ADMIN')
+    keysStore = seedKeys.map((k) => ({ ...k, escopos: [...k.escopos] }))
+    setTestUserRole('ADMIN')
+
+    vi.spyOn(apiKeyService, 'listKeys').mockImplementation(async () =>
+      keysStore.map((k) => ({ ...k, escopos: [...k.escopos] })),
+    )
+    vi.spyOn(apiKeyService, 'createKey').mockImplementation(async (dto) => {
+      const created: ApiKeyRecord = {
+        id: 99,
+        usuario_id: 1,
+        nome_parceiro: dto.nome_parceiro,
+        prefixo_chave: 'bf_live_99990000',
+        escopos: [...dto.escopos],
+        status: 'ATIVA',
+        data_criacao: '2026-11-18T10:00:00Z',
+        data_expiracao: dto.data_expiracao ?? null,
+        data_revogacao: null,
+        ultimo_uso_em: null,
+      }
+      keysStore.unshift(created)
+      return { key: created, rawSecret: 'bf_live_99990000abcdef1234567890' }
+    })
+    vi.spyOn(apiKeyService, 'revokeKey').mockImplementation(async (id) => {
+      const found = keysStore.find((k) => k.id === id)
+      if (!found) return null
+      found.status = 'REVOGADA'
+      found.data_revogacao = '2026-11-18T11:00:00Z'
+      return { ...found }
+    })
+    vi.spyOn(apiKeyService, 'listExternalLogs').mockImplementation(async () =>
+      seedLogs.map((l) => ({ ...l })),
+    )
   })
 
-  it('carrega e exibe a lista de chaves e o indicador de modo simulado', async () => {
+  it('carrega e exibe a lista de chaves sem badge de modo simulado', async () => {
     const wrapper = mount(ApiKeysTab)
     await flushPromises()
 
     const rows = wrapper.findAll('[data-testid="api-key-row"]')
     expect(rows.length).toBeGreaterThanOrEqual(3)
-    expect(wrapper.find('[data-testid="apikey-fallback-badge"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="apikey-fallback-badge"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('ATIVA')
     expect(wrapper.text()).toContain('REVOGADA')
     expect(wrapper.text()).toContain('EXPIRADA')
@@ -104,7 +196,6 @@ describe('ApiKeysTab (US12)', () => {
     const wrapper = mount(ApiKeysTab)
     await flushPromises()
 
-    const revokeSpy = vi.spyOn(apiKeyService, 'revokeKey')
     const activeRevokeBtn = wrapper
       .findAll('[data-testid="btn-revoke-api-key"]')
       .find((btn) => btn.attributes('disabled') === undefined)!
@@ -115,7 +206,7 @@ describe('ApiKeysTab (US12)', () => {
     await wrapper.find('[data-testid="btn-confirm-revoke-apikey"]').trigger('click')
     await flushPromises()
 
-    expect(revokeSpy).toHaveBeenCalledTimes(1)
+    expect(apiKeyService.revokeKey).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="revoke-api-key-modal"]').exists()).toBe(false)
   })
 
@@ -136,13 +227,16 @@ describe('ApiKeysTab (US12)', () => {
   })
 
   it('oculta botões de emissão e revogação quando o usuário possui apenas API:VISUALIZAR_CHAVES', async () => {
-    userService.setCurrentUser({
-      id: 77,
-      name: 'Leitor API',
-      email: 'leitor@georural.com.br',
-      role: 'INTEGRADOR_LEITURA',
-      permissions: ['API:VISUALIZAR_CHAVES'],
-    })
+    userService.setCurrentUser(
+      {
+        id: 77,
+        name: 'Leitor API',
+        email: 'leitor@georural.com.br',
+        role: 'INTEGRADOR_LEITURA',
+        permissions: ['API:VISUALIZAR_CHAVES'],
+      },
+      { accessToken: 'test-jwt-leitor' },
+    )
 
     const wrapper = mount(ApiKeysTab)
     await flushPromises()

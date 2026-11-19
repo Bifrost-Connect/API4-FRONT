@@ -5,6 +5,7 @@ import api from '@/services/api'
 import { exportacaoService } from '@/services/exportacao'
 import { processService } from '@/services/process'
 import { userService } from '@/services/user'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 import ExportacaoView from '../ExportacaoView.vue'
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -42,7 +43,7 @@ const tick = async () => {
 describe('ExportacaoView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    userService.setCurrentUserRole('Gestor')
+    setTestUserRole('Gestor')
     vi.spyOn(api, 'get').mockImplementation(async (url) => {
       if (String(url).includes('/catalogo/bases')) {
         return { data: { items: [publishedBase] } } as unknown as AxiosResponse<unknown>
@@ -122,7 +123,7 @@ describe('ExportacaoView', () => {
   })
 
   it('não mostra ações de download para o perfil Auditor', async () => {
-    userService.setCurrentUserRole('Auditor')
+    setTestUserRole('Auditor')
     const wrapper = mount(ExportacaoView)
     await flushPromises()
 

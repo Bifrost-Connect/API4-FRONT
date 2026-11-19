@@ -12,6 +12,8 @@ import UserFormModal from '@/components/admin/UserFormModal.vue'
 import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
 import SecurityAuditTab from '@/components/admin/SecurityAuditTab.vue'
 import { userService, DuplicateEmailError, type UserItem } from '@/services/user'
+import api from '@/services/api'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 import {
   hasSoDConflict,
   isAuditorReadOnlyLocked,
@@ -82,7 +84,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
 
   describe('Renderização Dinâmica do Menu Lateral e Navbar por Perfil', () => {
     it('exibe exclusivamente gerenciamento de usuários para o perfil Administrador', () => {
-      userService.setCurrentUserRole('ADMIN')
+      setTestUserRole('ADMIN')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
@@ -96,7 +98,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('exibe Dashboard, Upload, Catálogo e Mapa para o Operador de Dados', () => {
-      userService.setCurrentUserRole('OPERADOR_DADOS')
+      setTestUserRole('OPERADOR_DADOS')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
@@ -108,7 +110,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('exibe Catálogo, Mapa e Análise Territorial para o Analista sem atalhos de ingestão', () => {
-      userService.setCurrentUserRole('ANALISTA')
+      setTestUserRole('ANALISTA')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
@@ -122,7 +124,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('exibe módulos de consulta e auditoria para o Auditor Ambiental sem opções de escrita', () => {
-      userService.setCurrentUserRole('AUDITOR')
+      setTestUserRole('AUDITOR')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
@@ -136,7 +138,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('exibe Dashboard, Catálogo, Mapa, Análise Territorial e Gestão de APIs para o Gestor de Dados', () => {
-      userService.setCurrentUserRole('GESTOR')
+      setTestUserRole('GESTOR')
       const menu = getVisibleMenuItems(userService.getCurrentUser())
       const labels = menu.map((m) => m.label)
 
@@ -150,7 +152,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('exibe Catálogo de Bases, Mapa, Perfil e Gestão de Chaves API para o Integrador Externo, ocultando Dashboard e Upload', () => {
-      userService.setCurrentUserRole('INTEGRADOR_EXTERNO')
+      setTestUserRole('INTEGRADOR_EXTERNO')
       const user = userService.getCurrentUser()
       const menu = getVisibleMenuItems(user)
       const labels = menu.map((m) => m.label)
@@ -184,7 +186,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('renderiza os links na Sidebar no DOM respeitando o filtro da sessão ativa', () => {
-      userService.setCurrentUserRole('ADMIN')
+      setTestUserRole('ADMIN')
       const sidebarWrapper = mount(AppSidebar)
 
       expect(sidebarWrapper.text()).toContain('Gerenciamento de usuários')
@@ -193,13 +195,13 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('oculta atalhos de mapa e nova carga na barra superior quando o usuário não tiver permissão', () => {
-      userService.setCurrentUserRole('ADMIN')
+      setTestUserRole('ADMIN')
       const navbarWrapper = mount(AppNavbar)
 
       expect(navbarWrapper.find('a[href="/upload"]').exists()).toBe(false)
       expect(navbarWrapper.find('a[href="/mapa"]').exists()).toBe(false)
 
-      userService.setCurrentUserRole('OPERADOR_DADOS')
+      setTestUserRole('OPERADOR_DADOS')
       const opNavbar = mount(AppNavbar)
       expect(opNavbar.find('a[href="/upload"]').exists()).toBe(true)
     })
@@ -207,7 +209,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
 
   describe('Página de Bloqueio 403 e Navegação Segura', () => {
     it('renderiza o aviso de acesso não autorizado e a role do usuário bloqueado', () => {
-      userService.setCurrentUserRole('OPERADOR_DADOS')
+      setTestUserRole('OPERADOR_DADOS')
       const wrapper = mount(ForbiddenView)
 
       expect(wrapper.find('h1').text()).toContain('Acesso Não Autorizado')
@@ -216,13 +218,13 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
     })
 
     it('redireciona para a área inicial do perfil ao acionar o botão de retorno', async () => {
-      userService.setCurrentUserRole('ADMIN')
+      setTestUserRole('ADMIN')
       const wrapper = mount(ForbiddenView)
 
       await wrapper.find('[data-testid="btn-return-home"]').trigger('click')
       expect(pushMock).toHaveBeenCalledWith('/users')
 
-      userService.setCurrentUserRole('OPERADOR_DADOS')
+      setTestUserRole('OPERADOR_DADOS')
       const opWrapper = mount(ForbiddenView)
       await opWrapper.find('[data-testid="btn-return-home"]').trigger('click')
       expect(pushMock).toHaveBeenCalledWith('/')
@@ -403,19 +405,38 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(wrapper.find('[data-testid="badge-sod-active"]').text()).toContain('Exceção SoD')
     })
 
-    it('rejeita cadastro de usuário com e-mail já existente (case-insensitive) lançando DuplicateEmailError', () => {
-      expect(() => {
-        userService.createUser({
+    it('rejeita cadastro de usuário com e-mail já existente (409) lançando DuplicateEmailError', async () => {
+      vi.spyOn(api, 'get').mockResolvedValueOnce({
+        data: [
+          {
+            perfil_id: 2,
+            perfil: 'ANALISTA',
+            descricao: 'Analista territorial',
+            recurso: 'TERRITORIAL',
+            permissao: 'ANALISE_EXECUTAR',
+            descricao_permissao: 'Executar análises',
+            liberada_por_excecao_sod: false,
+          },
+        ],
+      })
+      vi.spyOn(api, 'post').mockRejectedValueOnce({
+        response: { status: 409, data: { erro: 'E-mail já cadastrado' } },
+      })
+
+      await expect(
+        userService.createUserAsync({
           name: 'Carlos Duplicado',
           email: 'CARLOS.MENDES@GEORURAL.COM.BR',
           role: 'ANALISTA',
-        })
-      }).toThrow(DuplicateEmailError)
+          password: 'Password@123',
+        }),
+      ).rejects.toThrow(DuplicateEmailError)
     })
   })
 
   describe('Auditoria de Segurança e Trilha de Eventos Administrativos', () => {
     it('renderiza os registros de criação, trocas de cargo, inativações e tentativas 403', () => {
+      vi.spyOn(userService, 'getSecurityEventsPagedAsync').mockRejectedValue(new Error('offline'))
       const mockEvents = [
         {
           id: 1,

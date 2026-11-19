@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 import router from '@/router'
 import { userService } from '@/services/user'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 
 const storageMock = (() => {
   let store: Record<string, string> = {}
@@ -43,18 +44,30 @@ Object.defineProperty(window, 'matchMedia', {
 
 describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)', () => {
   beforeAll(async () => {
-    await router.push('/profile')
+    await router.push('/login')
   })
 
   beforeEach(async () => {
     localStorage.clear()
     userService.clearCurrentUser()
-    await router.push('/profile')
+    await router.push('/login')
+  })
+
+  describe('Usuário Não Autenticado', () => {
+    it('redireciona para /login?redirect=... em qualquer rota protegida sem sessão JWT válida', async () => {
+      await router.push('/profile')
+      expect(router.currentRoute.value.name).toBe('login')
+      expect(router.currentRoute.value.query.redirect).toBe('/profile')
+
+      await router.push('/users')
+      expect(router.currentRoute.value.name).toBe('login')
+      expect(router.currentRoute.value.query.redirect).toBe('/users')
+    })
   })
 
   describe('Perfil Administrador (ADMIN)', () => {
     it('redireciona para /acesso-negado ao tentar acessar rotas de negócio e permite /users', async () => {
-      userService.setCurrentUserRole('ADMIN')
+      setTestUserRole('ADMIN')
 
       const forbiddenRoutes = [
         '/upload',
@@ -81,7 +94,7 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
 
   describe('Perfil Operador de Dados (OPERADOR_DADOS)', () => {
     it('bloqueia /users, /analise-territorial, /comparacao-temporal e /mapa, permitindo /upload e /', async () => {
-      userService.setCurrentUserRole('OPERADOR_DADOS')
+      setTestUserRole('OPERADOR_DADOS')
 
       const forbiddenRoutes = [
         '/users',
@@ -111,7 +124,7 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
 
   describe('Perfil Analista (ANALISTA)', () => {
     it('bloqueia /users, /upload e /, permitindo /catalogo, /analise-territorial e /comparacao-temporal', async () => {
-      userService.setCurrentUserRole('ANALISTA')
+      setTestUserRole('ANALISTA')
 
       const forbiddenRoutes = ['/users', '/upload', '/']
 
@@ -141,7 +154,7 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
 
   describe('Perfil Auditor (AUDITOR)', () => {
     it('bloqueia /users e /upload, permitindo /catalogo e /', async () => {
-      userService.setCurrentUserRole('AUDITOR')
+      setTestUserRole('AUDITOR')
 
       const forbiddenRoutes = ['/users', '/upload']
 
@@ -166,7 +179,7 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
 
   describe('Perfil Gestor de Dados (GESTOR)', () => {
     it('bloqueia /upload e permite /catalogo, /comparacao-temporal e /users (Chaves de API)', async () => {
-      userService.setCurrentUserRole('GESTOR')
+      setTestUserRole('GESTOR')
 
       const forbiddenRoutes = ['/upload']
 
@@ -196,7 +209,7 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
 
   describe('Perfil Integrador Externo (INTEGRADOR_EXTERNO)', () => {
     it('bloqueia /upload, /, /analise-territorial e /comparacao-temporal, permitindo /catalogo, /mapa e /users (Chaves de API)', async () => {
-      userService.setCurrentUserRole('INTEGRADOR_EXTERNO')
+      setTestUserRole('INTEGRADOR_EXTERNO')
 
       const forbiddenRoutes = [
         '/upload',

@@ -4,9 +4,9 @@ import ProcessStageIngestao from '@/components/process-stages/ProcessStageIngest
 import ProcessStageQuarentena from '@/components/process-stages/ProcessStageQuarentena.vue'
 import ProcessStagePublicacao from '@/components/process-stages/ProcessStagePublicacao.vue'
 import Auditoria from '@/components/Auditoria.vue'
-import { userService } from '@/services/user'
-import type { ProcessLogDetails } from '@/services/process'
+import { processService, type ProcessLogDetails } from '@/services/process'
 import type { ProcessVersion } from '@/services/auditoria'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
@@ -15,9 +15,9 @@ vi.mock('vue-router', () => ({
     query: {},
   }),
   useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
+    push: vi.fn<() => void>(),
+    replace: vi.fn<() => void>(),
+    back: vi.fn<() => void>(),
   }),
   RouterLink: {
     template: '<a><slot /></a>',
@@ -73,7 +73,7 @@ const sampleVersions: ProcessVersion[] = [
 
 const samplePublicacaoDetails: ProcessLogDetails = {
   id: 'CARG-2026-PUB1',
-  dataSource: 'DEMONSTRACAO',
+  dataSource: 'API',
   dataset: 'Malha Municipal e Divisão Territorial',
   stage: 'Publicação',
   status: 'Em andamento',
@@ -102,8 +102,12 @@ const samplePublicacaoDetails: ProcessLogDetails = {
 
 describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Auditoria)', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
     vi.clearAllMocks()
-    userService.setCurrentUserRole('Operador')
+    setTestUserRole('Operador')
+    vi.spyOn(processService, 'cancelQuarantineLoad').mockResolvedValue({ simulated: false })
+    vi.spyOn(processService, 'publishAndCloseVersion').mockResolvedValue({ simulated: false })
+    vi.spyOn(processService, 'registrarDecisaoGestor').mockResolvedValue({ sucesso: true })
   })
 
   describe('Etapa de Ingestão e Rastreabilidade (ProcessStageIngestao)', () => {
@@ -233,7 +237,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
     })
 
     it('restringe ações de mutação na Quarentena para o perfil Auditor, permitindo sinalização ao Operador', () => {
-      userService.setCurrentUserRole('Auditor')
+      setTestUserRole('Auditor')
       const quarentenaWrapper = mount(ProcessStageQuarentena, {
         props: {
           details: sampleDetails,
@@ -248,12 +252,12 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
 
   describe('Etapa de Publicação e Homologação Final (ProcessStagePublicacao)', () => {
     it('integra homologação com modal de confirmação e alerta de versão permanente', async () => {
-      const createObjectURLSpy = vi.fn().mockReturnValue('blob:mock-url')
-      const revokeObjectURLSpy = vi.fn()
+      const createObjectURLSpy = vi.fn<() => string>().mockReturnValue('blob:mock-url')
+      const revokeObjectURLSpy = vi.fn<() => void>()
       window.URL.createObjectURL = createObjectURLSpy
       window.URL.revokeObjectURL = revokeObjectURLSpy
 
-      userService.setCurrentUserRole('Administrador')
+      setTestUserRole('Administrador')
       const wrapper = mount(ProcessStagePublicacao, {
         props: {
           details: { ...samplePublicacaoDetails },
@@ -289,7 +293,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
     })
 
     it('modal de reprovação exige justificativa técnica obrigatória e registra motivo na carga', async () => {
-      userService.setCurrentUserRole('Administrador')
+      setTestUserRole('Administrador')
       const details = { ...samplePublicacaoDetails }
       const wrapper = mount(ProcessStagePublicacao, {
         props: {
@@ -318,7 +322,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
     })
 
     it('oculta o painel de homologação para usuários sem privilégios de administração', () => {
-      userService.setCurrentUserRole('Auditor')
+      setTestUserRole('Auditor')
       const audStage = mount(ProcessStagePublicacao, {
         props: {
           details: { ...samplePublicacaoDetails },
@@ -327,7 +331,7 @@ describe('Etapas do Processo de Carga (Pipeline, Quarentena, Publicação e Audi
       })
       expect(audStage.find('[data-testid="gestor-decision-panel"]').exists()).toBe(false)
 
-      userService.setCurrentUserRole('Operador')
+      setTestUserRole('Operador')
       const opStage = mount(ProcessStagePublicacao, {
         props: {
           details: { ...samplePublicacaoDetails },

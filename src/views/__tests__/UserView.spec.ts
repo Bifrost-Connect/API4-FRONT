@@ -6,8 +6,10 @@ import SodExceptionModal from '@/components/admin/SodExceptionModal.vue'
 import ProfileView from '../ProfileView.vue'
 import { userService } from '@/services/user'
 import { roleService } from '@/services/roles'
+import { apiKeyService } from '@/services/apiKeyService'
 import api from '@/services/api'
-import { MOCK_ROLES, MOCK_USERS_LIST, MOCK_SECURITY_EVENTS } from '@/services/mocks/user.mock'
+import { MOCK_ROLES, MOCK_USERS_LIST, MOCK_SECURITY_EVENTS } from '@/__tests__/mocks/user.mock'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 import { authStorage } from '@/services/storage/authStorage'
 
 const storageMock = (() => {
@@ -36,12 +38,17 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
     vi.restoreAllMocks()
     vi.clearAllMocks()
     localStorage.clear()
-    userService.setCurrentUserRole('ADMIN')
+    setTestUserRole('ADMIN')
     vi.spyOn(userService, 'getUsersAsync').mockResolvedValue(
       MOCK_USERS_LIST.map((u) => ({ ...u, permissions: [...u.permissions] })),
     )
     vi.spyOn(roleService, 'getRoles').mockResolvedValue([...MOCK_ROLES])
+    vi.spyOn(roleService, 'getRoleById').mockImplementation(async (id) =>
+      MOCK_ROLES.find((r) => r.id === id),
+    )
     vi.spyOn(userService, 'getSecurityEvents').mockResolvedValue([...MOCK_SECURITY_EVENTS])
+    vi.spyOn(userService, 'getSecurityEventsPagedAsync').mockRejectedValue(new Error('offline'))
+    vi.spyOn(apiKeyService, 'listKeys').mockResolvedValue([])
   })
 
   it('exibe botão de permissões (sem botão isolado de senha), badge de customização e abre permissions-modal', async () => {
@@ -331,7 +338,6 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
         permissions: ['USUARIOS:VISUALIZAR', 'PERFIL:VISUALIZAR'],
         loggedAt: Date.now(),
         expiresAt: Date.now() + 3600000,
-        isSimulated: false,
       },
       { accessToken: 'real-jwt' },
     )
@@ -344,7 +350,7 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
   })
 
   it('exibe todas as 4 abas para ADMIN e inicia em Colaboradores e Acessos', async () => {
-    userService.setCurrentUserRole('ADMIN')
+    setTestUserRole('ADMIN')
     const wrapper = mount(UserView)
     await flushPromises()
 
@@ -361,8 +367,9 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
       const usersSpy = vi.spyOn(userService, 'getUsersAsync').mockResolvedValue([])
       const rolesSpy = vi.spyOn(roleService, 'getRoles').mockResolvedValue([])
       const eventsSpy = vi.spyOn(userService, 'getSecurityEvents').mockResolvedValue([])
+      vi.spyOn(apiKeyService, 'listKeys').mockResolvedValue([])
 
-      userService.setCurrentUserRole(role)
+      setTestUserRole(role)
       const wrapper = mount(UserView)
       await flushPromises()
 

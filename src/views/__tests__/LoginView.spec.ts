@@ -38,7 +38,7 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-describe('LoginView - Autenticação Real e Fallback Offline', () => {
+describe('LoginView - Autenticação JWT Real', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
@@ -67,14 +67,13 @@ describe('LoginView - Autenticação Real e Fallback Offline', () => {
     expect(replaceMock).toHaveBeenCalledWith('/users')
   })
 
-  it('exibe erro na UI e nunca faz fallback offline quando o back-end retorna 401', async () => {
+  it('exibe erro na UI quando o back-end retorna 401', async () => {
     vi.spyOn(userService, 'loginWithCredentials').mockRejectedValueOnce({
       response: {
         status: 401,
         data: { erro: 'E-mail ou senha inválidos, ou usuário inativo.' },
       },
     })
-    const demoSpy = vi.spyOn(userService, 'loginDemoOffline')
 
     const wrapper = mount(LoginView)
     await wrapper.find('[data-testid="login-email-input"]').setValue('operador@georural.com.br')
@@ -83,31 +82,36 @@ describe('LoginView - Autenticação Real e Fallback Offline', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(demoSpy).not.toHaveBeenCalled()
     expect(replaceMock).not.toHaveBeenCalled()
     const banner = wrapper.find('[data-testid="login-error-banner"]')
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('E-mail ou senha inválidos')
   })
 
-  it('faz fallback para sessão demo offline apenas quando perfil demo é usado e o back-end está inacessível (erro de rede)', async () => {
-    vi.spyOn(userService, 'loginWithCredentials').mockRejectedValueOnce({
+  it('preenche credenciais seed V44 (Troca123) no clique rápido e exibe erro real se o back-end estiver indisponível', async () => {
+    const loginSpy = vi.spyOn(userService, 'loginWithCredentials').mockRejectedValueOnce({
       code: 'ERR_NETWORK',
       message: 'Network Error',
     })
-    const demoSpy = vi.spyOn(userService, 'loginDemoOffline')
 
     const wrapper = mount(LoginView)
-    // Clica no botão de perfil de demonstração "Entrar Operador"
     const buttons = wrapper.findAll('button')
     const opBtn = buttons.find((b) => b.text().includes('Entrar Operador'))
     expect(opBtn).toBeDefined()
     await opBtn!.trigger('click')
 
+    const emailInput = wrapper.find('[data-testid="login-email-input"]').element as HTMLInputElement
+    const passwordInput = wrapper.find('[data-testid="login-password-input"]').element as HTMLInputElement
+    expect(emailInput.value).toBe('operador@georural.com.br')
+    expect(passwordInput.value).toBe('Troca123')
+
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(demoSpy).toHaveBeenCalledWith('Operador')
-    expect(replaceMock).toHaveBeenCalledWith('/')
+    expect(loginSpy).toHaveBeenCalledWith('operador@georural.com.br', 'Troca123')
+    expect(replaceMock).not.toHaveBeenCalled()
+    const banner = wrapper.find('[data-testid="login-error-banner"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('Network Error')
   })
 })

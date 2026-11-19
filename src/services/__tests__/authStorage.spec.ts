@@ -5,8 +5,6 @@ import {
   DEFAULT_SESSION_TTL_MS,
   type StoredAuthSession,
 } from '../storage/authStorage'
-import { rbacStorage, CURRENT_RBAC_SEED_VERSION } from '../storage/rbacStorage'
-import { MockAccessRepository } from '../mocks/MockAccessRepository'
 import api from '../api'
 
 const storageMock = (() => {
@@ -60,10 +58,12 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR'],
         loggedAt: now,
         expiresAt: now + DEFAULT_SESSION_TTL_MS,
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
+      authStorage.saveSession(session, {
+        accessToken: 'jwt-access-token',
+        refreshToken: 'jwt-refresh-token',
+      })
 
       const storedRaw = localStorage.getItem(AUTH_STORAGE_KEYS.AUTH_SESSION)
       expect(storedRaw).toBeTruthy()
@@ -72,10 +72,8 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
       expect(parsed.email).toBe('admin@georural.com.br')
       expect(parsed.expiresAt).toBe(now + 8 * 3600 * 1000)
 
-      // Verifica sincronização com token e chave legada
-      expect(localStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBeTruthy()
-      expect(localStorage.getItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN)).toBeTruthy()
-      expect(localStorage.getItem(AUTH_STORAGE_KEYS.LEGACY_DEMO_ROLE)).toBe('Administrador')
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBe('jwt-access-token')
+      expect(localStorage.getItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN)).toBe('jwt-refresh-token')
     })
 
     it('recupera a sessão íntegra quando o tempo limite não foi atingido', () => {
@@ -91,16 +89,15 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['MAPA:VISUALIZAR'],
         loggedAt: now,
         expiresAt: now + 3600 * 1000,
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
+      authStorage.saveSession(session, { accessToken: 'jwt-valid-token' })
       const retrieved = authStorage.getSession()
 
       expect(retrieved).not.toBeNull()
       expect(retrieved?.email).toBe('analista@georural.com.br')
       expect(retrieved?.roleId).toBe('ANALISTA')
-      expect(authStorage.getAccessToken()).toBeTruthy()
+      expect(authStorage.getAccessToken()).toBe('jwt-valid-token')
     })
 
     it('identifica e descarta automaticamente a sessão quando expirada', () => {
@@ -116,10 +113,9 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['INGESTAO:UPLOAD'],
         loggedAt: loginTime,
         expiresAt: loginTime + 1000, // 1 segundo
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
+      authStorage.saveSession(session, { accessToken: 'jwt-short-lived' })
 
       // Simula passagem de tempo (2 segundos depois)
       vi.spyOn(Date, 'now').mockReturnValue(loginTime + 2000)
@@ -143,10 +139,9 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['AUDITORIA:VISUALIZAR'],
         loggedAt: now,
         expiresAt: now + DEFAULT_SESSION_TTL_MS,
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
+      authStorage.saveSession(session, { accessToken: 'jwt-auditor-token' })
       const tokenBefore = authStorage.getAccessToken()
 
       authStorage.updateSessionPermissions(
@@ -162,19 +157,7 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
   })
 
   describe('Integração com Tokens JWT e Axios', () => {
-    it('gera tokens simulados no formato válido header.payload.signature', () => {
-      const token = authStorage.generateMockJwt({
-        sub: 10,
-        email: 'gestor@georural.com.br',
-        roleId: 'GESTOR',
-      })
-
-      expect(typeof token).toBe('string')
-      const parts = token.split('.')
-      expect(parts.length).toBe(3)
-    })
-
-    it('injeta automaticamente o header Authorization com Bearer token no Axios para sessão real', async () => {
+    it('injeta automaticamente o header Authorization com Bearer token no Axios sempre que presente', async () => {
       const session: StoredAuthSession = {
         userId: 1,
         name: 'Carlos Mendes',
@@ -184,12 +167,10 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['USUARIOS:VISUALIZAR'],
         loggedAt: Date.now(),
         expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
-        isSimulated: false,
       }
 
       authStorage.saveSession(session, { accessToken: 'token_teste_bearer_123' })
 
-      // Simula execução do request interceptor
       const interceptors = (api.interceptors.request as any).handlers
       const requestHandler = interceptors[interceptors.length - 1].fulfilled
 
@@ -199,7 +180,7 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
       expect(updatedConfig.headers.Authorization).toBe('Bearer token_teste_bearer_123')
     })
 
-    it('não anexa Bearer token em requisições de sessão simulada para não bloquear a API pública', async () => {
+    it('limpa a sessão e credenciais quando a resposta da API retornar 401 Unauthorized', async () => {
       const session: StoredAuthSession = {
         userId: 1,
         name: 'Carlos Mendes',
@@ -209,40 +190,16 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
         permissions: ['USUARIOS:VISUALIZAR'],
         loggedAt: Date.now(),
         expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
-
-      const interceptors = (api.interceptors.request as any).handlers
-      const requestHandler = interceptors[interceptors.length - 1].fulfilled
-
-      const config = { headers: {} as Record<string, string> }
-      const updatedConfig = await requestHandler(config)
-
-      expect(updatedConfig.headers.Authorization).toBeUndefined()
-    })
-
-    it('limpa a sessão e credenciais quando a resposta da API retornar 401 Unauthorized para sessão real', async () => {
-      const session: StoredAuthSession = {
-        userId: 1,
-        name: 'Carlos Mendes',
-        email: 'admin@georural.com.br',
-        role: 'Administrador',
-        roleId: 'ADMIN',
-        permissions: ['USUARIOS:VISUALIZAR'],
-        loggedAt: Date.now(),
-        expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
-        isSimulated: false,
-      }
-
-      authStorage.saveSession(session)
+      authStorage.saveSession(session, { accessToken: 'token_teste_bearer_123' })
       expect(authStorage.getSession()).toBeTruthy()
 
       const interceptors = (api.interceptors.response as any).handlers
       const responseErrorHandler = interceptors[interceptors.length - 1].rejected
 
       const unauthorizedError = {
+        config: { url: '/processos' },
         response: { status: 401, data: { message: 'Token expirado' } },
       }
 
@@ -251,86 +208,30 @@ describe('Camada de Armazenamento de Autenticação e Sessão (authStorage)', ()
       expect(authStorage.getAccessToken()).toBeNull()
     })
 
-    it('mantém a sessão ativa quando a sessão for simulada mesmo recebendo 401 da API remota', async () => {
+    it('não limpa sessão nem redireciona quando 401 ocorre no próprio endpoint /auth/login', async () => {
       const session: StoredAuthSession = {
-        userId: 2,
-        name: 'Mariana Duarte',
-        email: 'analista@georural.com.br',
-        role: 'Analista',
-        roleId: 'ANALISTA',
-        permissions: ['MAPA:VISUALIZAR'],
+        userId: 1,
+        name: 'Carlos Mendes',
+        email: 'admin@georural.com.br',
+        role: 'Administrador',
+        roleId: 'ADMIN',
+        permissions: ['USUARIOS:VISUALIZAR'],
         loggedAt: Date.now(),
         expiresAt: Date.now() + DEFAULT_SESSION_TTL_MS,
-        isSimulated: true,
       }
 
-      authStorage.saveSession(session)
-      expect(authStorage.getSession()).toBeTruthy()
+      authStorage.saveSession(session, { accessToken: 'token_existente' })
 
       const interceptors = (api.interceptors.response as any).handlers
       const responseErrorHandler = interceptors[interceptors.length - 1].rejected
 
-      const unauthorizedError = {
-        response: { status: 401, data: { message: 'Unauthorized' } },
+      const loginUnauthorizedError = {
+        config: { url: '/auth/login' },
+        response: { status: 401, data: { erro: 'Credenciais inválidas' } },
       }
 
-      await expect(responseErrorHandler(unauthorizedError)).rejects.toEqual(unauthorizedError)
+      await expect(responseErrorHandler(loginUnauthorizedError)).rejects.toEqual(loginUnauthorizedError)
       expect(authStorage.getSession()).toBeTruthy()
-      expect(authStorage.getSession()?.role).toBe('Analista')
-    })
-  })
-
-  describe('Persistência e Versionamento do Mock RBAC', () => {
-    it('persiste novos usuários cadastrados e mantém após recriação do repositório', async () => {
-      const repo = new MockAccessRepository()
-      repo.resetToSeed()
-
-      const initialCount = (await repo.listUsers()).length
-
-      await repo.createUser({
-        name: 'Novo Colaborador Persistido',
-        email: 'persistido@georural.com.br',
-        role: 'ANALISTA',
-      })
-
-      // Simula recarregamento da página (nova instância do repositório)
-      const freshRepo = new MockAccessRepository()
-      const reloadedUsers = await freshRepo.listUsers()
-
-      expect(reloadedUsers.length).toBe(initialCount + 1)
-      expect(reloadedUsers.some((u) => u.email === 'persistido@georural.com.br')).toBe(true)
-    })
-
-    it('persiste novos papéis customizados e registros na trilha de auditoria', async () => {
-      const repo = new MockAccessRepository()
-      repo.resetToSeed()
-
-      await repo.createRole({
-        id: 'GESTOR_JUNIOR',
-        nome: 'Gestor Júnior',
-        descricao: 'Acesso inicial de gestão',
-        permissions: ['BASES:VISUALIZAR', 'MAPA:VISUALIZAR'],
-      })
-
-      // Nova instância (simulando reload)
-      const freshRepo = new MockAccessRepository()
-      const roles = await freshRepo.listRoles()
-      const events = await freshRepo.listSecurityEvents()
-
-      expect(roles.some((r) => r.id === 'GESTOR_JUNIOR')).toBe(true)
-      expect(events.some((e) => e.action === 'Criação de Papel')).toBe(true)
-    })
-
-    it('re-inicializa a partir do seed padrão caso a versão de armazenamento seja incompatível', async () => {
-      localStorage.setItem('api4_rbac_seed_version', '0.0.1_antiga')
-      localStorage.setItem('api4_rbac_users', JSON.stringify([{ id: 999, name: 'Dado Obsoleto' }]))
-
-      expect(rbacStorage.isSeedOutdated()).toBe(true)
-
-      const repo = new MockAccessRepository()
-      const found = await repo.getUserById(999)
-      expect(found).toBeUndefined()
-      expect(localStorage.getItem('api4_rbac_seed_version')).toBe(CURRENT_RBAC_SEED_VERSION)
     })
   })
 })
