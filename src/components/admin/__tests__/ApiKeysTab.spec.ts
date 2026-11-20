@@ -131,6 +131,7 @@ describe('ApiKeysTab (US12)', () => {
 
     const rows = wrapper.findAll('[data-testid="api-key-row"]')
     expect(rows.length).toBeGreaterThanOrEqual(3)
+    expect(wrapper.find('[data-testid="api-keys-table"]').classes()).toContain('component-table')
     expect(wrapper.find('[data-testid="apikey-fallback-badge"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('ATIVA')
     expect(wrapper.text()).toContain('REVOGADA')

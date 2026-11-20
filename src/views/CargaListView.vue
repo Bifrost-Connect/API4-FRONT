@@ -28,6 +28,7 @@ import ProcessFilterBar, {
 import CatalogKpiHeader from '@/components/catalog/CatalogKpiHeader.vue'
 import CatalogSkeleton from '@/components/catalog/CatalogSkeleton.vue'
 import CatalogDetailDrawer from '@/components/catalog/CatalogDetailDrawer.vue'
+import DataTable, { type Column } from '@/components/DataTable.vue'
 import { dashboardService, type ProcessLog } from '@/services/dashboard'
 import { catalogoService, type CatalogoBase } from '@/services/catalogo'
 import type { CatalogoItem, CatalogoKpis, CatalogoSortOption, ViewMode } from '@/types/catalogo'
@@ -47,6 +48,17 @@ import {
 } from '@/utils/processUtils'
 
 const router = useRouter()
+
+const catalogTableColumns: Column[] = [
+  { key: 'id', label: 'ID' },
+  { key: 'dataset', label: 'Conjunto de Dados' },
+  { key: 'source', label: 'Órgão Emissor' },
+  { key: 'year', label: 'Safra' },
+  { key: 'version', label: 'Versão Oficial' },
+  { key: 'registros', label: 'Registros' },
+  { key: 'status', label: 'Situação Operacional' },
+  { key: 'actions', label: 'Ações Analíticas' },
+]
 const canViewProcesses = computed(() =>
   userService.canAny(['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS']),
 )
@@ -1066,99 +1078,104 @@ const openReportExport = (base: CatalogoItem) => {
 
       <!-- 2. MODO TABELA DETALHADA - Tarefa 1, 3 e 8 -->
       <div v-else class="catalog-table-container" data-testid="catalog-table-container">
-        <table class="catalog-table" data-testid="catalog-table">
-          <thead>
-            <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Conjunto de Dados</th>
-              <th scope="col">Órgão Emissor</th>
-              <th scope="col">Safra</th>
-              <th scope="col">Versão Oficial</th>
-              <th scope="col">Registros</th>
-              <th scope="col">Situação Operacional</th>
-              <th scope="col" class="th-actions">Ações Analíticas</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="process in paginatedItems"
-              :key="process.id"
-              class="table-row-item"
-              data-testid="catalog-table-row"
+        <DataTable
+          :columns="catalogTableColumns"
+          :data="paginatedItems"
+          row-key="id"
+          :disable-expand="true"
+          table-test-id="catalog-table"
+          row-test-id="catalog-table-row"
+        >
+          <template #cell-id="{ item }">
+            <span class="td-id">#{{ item.id }}</span>
+          </template>
+
+          <template #cell-dataset="{ item }">
+            <div class="td-dataset">
+              <strong>{{ item.dataset }}</strong>
+              <small class="table-stage-info">Etapa: {{ item.stage }}</small>
+            </div>
+          </template>
+
+          <template #cell-source="{ item }">
+            <span data-testid="table-source">{{ item.source }}</span>
+          </template>
+
+          <template #cell-year="{ item }">
+            <span data-testid="table-year">{{ item.year }}</span>
+          </template>
+
+          <template #cell-version="{ item }">
+            <span data-testid="table-version">{{ item.versao_oficial || 'v1.0' }}</span>
+          </template>
+
+          <template #cell-registros="{ item }">
+            <span data-testid="table-registros">
+              {{ item.total_feicoes ? item.total_feicoes.toLocaleString('pt-BR') : '—' }}
+            </span>
+          </template>
+
+          <template #cell-status="{ item }">
+            <span
+              :class="['badge-situacao', normalizeSituacaoBadge(item.status).badgeClass]"
+              data-testid="badge-situacao"
             >
-              <td class="td-id">#{{ process.id }}</td>
-              <td class="td-dataset">
-                <strong>{{ process.dataset }}</strong>
-                <small class="table-stage-info">Etapa: {{ process.stage }}</small>
-              </td>
-              <td data-testid="table-source">{{ process.source }}</td>
-              <td data-testid="table-year">{{ process.year }}</td>
-              <td data-testid="table-version">{{ process.versao_oficial || 'v1.0' }}</td>
-              <td data-testid="table-registros">
-                {{ process.total_feicoes ? process.total_feicoes.toLocaleString('pt-BR') : '—' }}
-              </td>
-              <td>
-                <span
-                  :class="['badge-situacao', normalizeSituacaoBadge(process.status).badgeClass]"
-                  data-testid="badge-situacao"
-                >
-                  {{ normalizeSituacaoBadge(process.status).label }}
-                </span>
-              </td>
-              <td class="td-actions">
-                <div class="table-actions-group">
-                  <button
-                    type="button"
-                    class="btn-table-action"
-                    :class="{ 'btn-disabled': !isBaseDisponivel(process) }"
-                    :disabled="!isBaseDisponivel(process)"
-                    :title="!isBaseDisponivel(process) ? QUARANTINE_TOOLTIP : 'Ficha Técnica'"
-                    data-testid="btn-inspect-base"
-                    @click="openBaseDetail(process)"
-                  >
-                    <FiFileText size="14" />
-                  </button>
+              {{ normalizeSituacaoBadge(item.status).label }}
+            </span>
+          </template>
 
-                  <button
-                    type="button"
-                    class="btn-table-action btn-action-map"
-                    :class="{ 'btn-disabled': !isBaseDisponivel(process) }"
-                    :disabled="!isBaseDisponivel(process)"
-                    :title="!isBaseDisponivel(process) ? QUARANTINE_TOOLTIP : 'Abrir no Mapa Interativo'"
-                    data-testid="btn-view-map"
-                    @click="viewOnMap(process)"
-                  >
-                    <FiMapPin size="14" />
-                  </button>
+          <template #cell-actions="{ item }">
+            <div class="table-actions table-actions-group">
+              <button
+                type="button"
+                class="btn-table-action"
+                :class="{ 'btn-disabled': !isBaseDisponivel(item) }"
+                :disabled="!isBaseDisponivel(item)"
+                :title="!isBaseDisponivel(item) ? QUARANTINE_TOOLTIP : 'Ficha Técnica'"
+                data-testid="btn-inspect-base"
+                @click="openBaseDetail(item)"
+              >
+                <FiFileText size="14" />
+              </button>
 
-                  <button
-                    type="button"
-                    class="btn-table-action"
-                    :class="{ 'btn-disabled': !isBaseDisponivel(process) }"
-                    :disabled="!isBaseDisponivel(process)"
-                    :title="!isBaseDisponivel(process) ? QUARANTINE_TOOLTIP : 'Comparar Safra'"
-                    data-testid="btn-compare-safra"
-                    @click="compareSafra(process)"
-                  >
-                    <FiPieChart size="14" />
-                  </button>
+              <button
+                type="button"
+                class="btn-table-action btn-action-map"
+                :class="{ 'btn-disabled': !isBaseDisponivel(item) }"
+                :disabled="!isBaseDisponivel(item)"
+                :title="!isBaseDisponivel(item) ? QUARANTINE_TOOLTIP : 'Abrir no Mapa Interativo'"
+                data-testid="btn-view-map"
+                @click="viewOnMap(item)"
+              >
+                <FiMapPin size="14" />
+              </button>
 
-                  <button
-                    type="button"
-                    class="btn-table-action"
-                    :class="{ 'btn-disabled': !isBaseDisponivel(process) }"
-                    :disabled="!isBaseDisponivel(process)"
-                    :title="!isBaseDisponivel(process) ? QUARANTINE_TOOLTIP : 'Auditar Linhagem'"
-                    data-testid="btn-audit-process"
-                    @click="navigateToProcess(process.id)"
-                  >
-                    <FiShield size="14" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              <button
+                type="button"
+                class="btn-table-action"
+                :class="{ 'btn-disabled': !isBaseDisponivel(item) }"
+                :disabled="!isBaseDisponivel(item)"
+                :title="!isBaseDisponivel(item) ? QUARANTINE_TOOLTIP : 'Comparar Safra'"
+                data-testid="btn-compare-safra"
+                @click="compareSafra(item)"
+              >
+                <FiPieChart size="14" />
+              </button>
+
+              <button
+                type="button"
+                class="btn-table-action"
+                :class="{ 'btn-disabled': !isBaseDisponivel(item) }"
+                :disabled="!isBaseDisponivel(item)"
+                :title="!isBaseDisponivel(item) ? QUARANTINE_TOOLTIP : 'Auditar Linhagem'"
+                data-testid="btn-audit-process"
+                @click="navigateToProcess(item.id)"
+              >
+                <FiShield size="14" />
+              </button>
+            </div>
+          </template>
+        </DataTable>
       </div>
 
       <!-- Paginação Dinâmica (Tarefa 5) -->
@@ -1706,37 +1723,7 @@ button:disabled {
 .catalog-table-container {
   overflow-x: auto;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
   border-radius: 8px;
-}
-
-.catalog-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.catalog-table th {
-  background: var(--color-background);
-  color: var(--color-heading);
-  padding: 12px 14px;
-  text-align: left;
-  font-weight: 700;
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 2px solid var(--color-border);
-  white-space: nowrap;
-}
-
-.catalog-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.table-row-item:hover td {
-  background: var(--color-brand-soft);
 }
 
 .td-id {
@@ -1758,15 +1745,10 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
-.th-actions,
-.td-actions {
-  text-align: right;
-  white-space: nowrap;
-}
-
 .table-actions-group {
   display: inline-flex;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .btn-table-action {

@@ -307,6 +307,7 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
     ]
 
     const wrapper = mount(SecurityAuditTab, { props: { events } })
+    expect(wrapper.find('[data-testid="security-audit-table"]').classes()).toContain('component-table')
     expect(wrapper.findAll('[data-testid="audit-event-row"]')).toHaveLength(2)
 
     await wrapper.find('[data-testid="filter-audit-type"]').setValue('SENHA_REDEFINIDA')

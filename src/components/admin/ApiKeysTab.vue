@@ -23,6 +23,17 @@ import { apiKeyService } from '@/services/apiKeyService'
 import { userService } from '@/services/user'
 import { extractApiErrorMessage } from '@/services/api'
 import type { ApiKeyRecord, ApiKeyStatus, ExternalApiAccessLog } from '@/types/apiKey'
+import DataTable, { type Column } from '../DataTable.vue'
+
+const apiKeyColumns: Column[] = [
+  { key: 'partner', label: 'Parceiro / Sistema' },
+  { key: 'prefix', label: 'Prefixo' },
+  { key: 'scopes', label: 'Escopos' },
+  { key: 'status', label: 'Status' },
+  { key: 'dates', label: 'Criação / Expiração' },
+  { key: 'lastUsed', label: 'Último Uso' },
+  { key: 'actions', label: 'Ações' },
+]
 
 const AVAILABLE_SCOPES = apiKeyService.getAvailableScopes()
 
@@ -313,105 +324,89 @@ const closeLogsModal = () => {
         aria-label="Tabela de chaves de API cadastradas"
         class="table-responsive"
       >
-        <table class="apikeys-table" data-testid="api-keys-table">
-          <thead>
-            <tr>
-              <th>Parceiro / Sistema</th>
-              <th>Prefixo</th>
-              <th>Escopos</th>
-              <th>Status</th>
-              <th>Criação / Expiração</th>
-              <th>Último Uso</th>
-              <th class="th-actions">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="isLoading">
-              <td colspan="7" class="empty-state">Carregando chaves de API...</td>
-            </tr>
-            <tr
-              v-for="item in filteredKeys"
-              v-else
-              :key="item.id"
-              data-testid="api-key-row"
-            >
-              <td>
-                <div class="partner-cell">
-                  <strong class="partner-name">{{ item.nome_parceiro }}</strong>
-                  <span class="partner-meta">ID #{{ item.id }}</span>
-                </div>
-              </td>
+        <DataTable
+          :columns="apiKeyColumns"
+          :data="filteredKeys"
+          row-key="id"
+          :disable-expand="true"
+          :loading="isLoading"
+          loading-message="Carregando chaves de API..."
+          table-test-id="api-keys-table"
+          row-test-id="api-key-row"
+        >
+          <template #cell-partner="{ item }">
+            <div class="partner-cell">
+              <strong class="partner-name">{{ item.nome_parceiro }}</strong>
+              <span class="partner-meta">ID #{{ item.id }}</span>
+            </div>
+          </template>
 
-              <td>
-                <code class="prefix-code">{{ item.prefixo_chave }}...</code>
-              </td>
+          <template #cell-prefix="{ item }">
+            <code class="prefix-code">{{ item.prefixo_chave }}...</code>
+          </template>
 
-              <td>
-                <div class="scopes-list">
-                  <span v-for="scope in item.escopos" :key="scope" class="scope-pill">
-                    {{ scope }}
-                  </span>
-                </div>
-              </td>
+          <template #cell-scopes="{ item }">
+            <div class="scopes-list">
+              <span v-for="scope in item.escopos" :key="scope" class="scope-pill">
+                {{ scope }}
+              </span>
+            </div>
+          </template>
 
-              <td>
-                <span class="status-badge" :class="getStatusBadgeClass(item.status)">
-                  {{ item.status }}
-                </span>
-              </td>
+          <template #cell-status="{ item }">
+            <span class="status-badge" :class="getStatusBadgeClass(item.status)">
+              {{ item.status }}
+            </span>
+          </template>
 
-              <td>
-                <div class="dates-cell">
-                  <span>Criada: {{ formatDateTime(item.data_criacao) }}</span>
-                  <span class="date-muted">
-                    Expira: {{ item.data_expiracao ? formatDateTime(item.data_expiracao) : 'Sem expiração' }}
-                  </span>
-                </div>
-              </td>
+          <template #cell-dates="{ item }">
+            <div class="dates-cell">
+              <span>Criada: {{ formatDateTime(item.data_criacao) }}</span>
+              <span class="date-muted">
+                Expira: {{ item.data_expiracao ? formatDateTime(item.data_expiracao) : 'Sem expiração' }}
+              </span>
+            </div>
+          </template>
 
-              <td>
-                <span class="last-used-text">
-                  <FiClock size="12" />
-                  {{ item.ultimo_uso_em ? formatDateTime(item.ultimo_uso_em) : 'Nunca utilizada' }}
-                </span>
-              </td>
+          <template #cell-lastUsed="{ item }">
+            <span class="last-used-text">
+              <FiClock size="12" />
+              {{ item.ultimo_uso_em ? formatDateTime(item.ultimo_uso_em) : 'Nunca utilizada' }}
+            </span>
+          </template>
 
-              <td class="td-actions">
-                <div class="action-buttons">
-                  <button
-                    type="button"
-                    class="btn-action btn-logs"
-                    data-testid="btn-view-key-logs"
-                    title="Consultar logs de acessos externos"
-                    @click="openLogsModal(item)"
-                  >
-                    <FiActivity size="14" />
-                    <span>Logs</span>
-                  </button>
+          <template #cell-actions="{ item }">
+            <div class="table-actions action-buttons">
+              <button
+                type="button"
+                class="btn-action btn-logs"
+                data-testid="btn-view-key-logs"
+                title="Consultar logs de acessos externos"
+                @click="openLogsModal(item)"
+              >
+                <FiActivity size="14" />
+                <span>Logs</span>
+              </button>
 
-                  <button
-                    v-if="canRevokeKey"
-                    type="button"
-                    class="btn-action btn-revoke"
-                    data-testid="btn-revoke-api-key"
-                    :disabled="item.status !== 'ATIVA'"
-                    :title="item.status === 'ATIVA' ? 'Revogar chave de API' : 'Chave já inativa'"
-                    @click="openRevokeModal(item)"
-                  >
-                    <FiSlash size="14" />
-                    <span>Revogar</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
+              <button
+                v-if="canRevokeKey"
+                type="button"
+                class="btn-action btn-revoke"
+                data-testid="btn-revoke-api-key"
+                :disabled="item.status !== 'ATIVA'"
+                :title="item.status === 'ATIVA' ? 'Revogar chave de API' : 'Chave já inativa'"
+                @click="openRevokeModal(item)"
+              >
+                <FiSlash size="14" />
+                <span>Revogar</span>
+              </button>
+            </div>
+          </template>
 
-            <tr v-if="!isLoading && filteredKeys.length === 0">
-              <td colspan="7" class="empty-state">
-                Nenhuma chave de API encontrada para os filtros aplicados.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            Nenhuma chave de API encontrada para os filtros aplicados.
+          </template>
+        </DataTable>
       </div>
     </div>
 
@@ -909,7 +904,6 @@ const closeLogsModal = () => {
   overflow-x: auto;
 }
 
-.apikeys-table,
 .logs-table {
   width: 100%;
   border-collapse: collapse;
@@ -917,7 +911,6 @@ const closeLogsModal = () => {
   font-size: 0.875rem;
 }
 
-.apikeys-table th,
 .logs-table th {
   background: var(--color-surface-soft);
   color: var(--color-text-muted);
@@ -930,7 +923,6 @@ const closeLogsModal = () => {
   white-space: nowrap;
 }
 
-.apikeys-table td,
 .logs-table td {
   padding: 0.875rem 1rem;
   border-bottom: 1px solid var(--color-border);
@@ -1029,11 +1021,6 @@ const closeLogsModal = () => {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   white-space: nowrap;
-}
-
-.th-actions,
-.td-actions {
-  text-align: right;
 }
 
 .action-buttons {

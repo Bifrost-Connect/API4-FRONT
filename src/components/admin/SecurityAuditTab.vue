@@ -16,6 +16,15 @@ import {
 } from 'vue-icons-plus/fi'
 import type { SecurityEvent } from '@/types/access'
 import { userService } from '@/services/user'
+import DataTable, { type Column } from '../DataTable.vue'
+
+const auditColumns: Column[] = [
+  { key: 'timestamp', label: 'Data e Hora' },
+  { key: 'actor', label: 'Responsável (Ator)' },
+  { key: 'action', label: 'Ação Administrativa' },
+  { key: 'details', label: 'Detalhes & Justificativa' },
+  { key: 'severity', label: 'Nível' },
+]
 
 const props = defineProps<{
   events: SecurityEvent[]
@@ -205,78 +214,72 @@ const filteredEvents = computed(() => {
     <!-- Tabela da Trilha Imutável -->
     <div class="card table-card">
       <div tabindex="0" role="region" aria-label="Logs de auditoria de segurança" class="audit-table-wrap">
-        <table class="audit-table" data-testid="security-audit-table">
-          <thead>
-            <tr>
-              <th class="th-time">Data e Hora</th>
-              <th class="th-actor">Responsável (Ator)</th>
-              <th class="th-action">Ação Administrativa</th>
-              <th class="th-details">Detalhes &amp; Justificativa</th>
-              <th class="th-severity">Nível</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="ev in filteredEvents" :key="ev.id" class="tr-event" data-testid="audit-event-row">
-              <td class="td-time">
-                <span class="time-text">
-                  <FiClock size="12" class="time-icon" />
-                  {{ ev.timestamp }}
-                </span>
-              </td>
+        <DataTable
+          :columns="auditColumns"
+          :data="filteredEvents"
+          row-key="id"
+          :disable-expand="true"
+          table-test-id="security-audit-table"
+          row-test-id="audit-event-row"
+        >
+          <template #cell-timestamp="{ item }">
+            <span class="time-text">
+              <FiClock size="12" class="time-icon" />
+              {{ item.timestamp }}
+            </span>
+          </template>
 
-              <td class="td-actor">
-                <div class="actor-cell">
-                  <div class="actor-avatar">
-                    <FiUser size="12" />
-                  </div>
-                  <div>
-                    <strong class="actor-name">{{ ev.actorName }}</strong>
-                    <span class="actor-email">{{ ev.actorEmail }}</span>
-                  </div>
-                </div>
-              </td>
+          <template #cell-actor="{ item }">
+            <div class="actor-cell">
+              <div class="actor-avatar">
+                <FiUser size="12" />
+              </div>
+              <div>
+                <strong class="actor-name">{{ item.actorName }}</strong>
+                <span class="actor-email">{{ item.actorEmail }}</span>
+              </div>
+            </div>
+          </template>
 
-              <td class="td-action">
-                <span
-                  class="action-badge"
-                  :class="{
-                    'badge-sod': ev.action.includes('SoD'),
-                    'badge-403': ev.action.includes('403'),
-                    'badge-warn': ev.action.includes('Inativação'),
-                  }"
-                >
-                  <FiLock v-if="ev.action.includes('403')" size="12" />
-                  <FiAlertTriangle v-else-if="ev.action.includes('SoD')" size="12" />
-                  {{ ev.action }}
-                </span>
-              </td>
+          <template #cell-action="{ item }">
+            <span
+              class="action-badge"
+              :class="{
+                'badge-sod': item.action.includes('SoD'),
+                'badge-403': item.action.includes('403'),
+                'badge-warn': item.action.includes('Inativação'),
+              }"
+            >
+              <FiLock v-if="item.action.includes('403')" size="12" />
+              <FiAlertTriangle v-else-if="item.action.includes('SoD')" size="12" />
+              {{ item.action }}
+            </span>
+          </template>
 
-              <td class="td-details">
-                <p class="details-text">{{ ev.details }}</p>
-              </td>
+          <template #cell-details="{ item }">
+            <p class="details-text">{{ item.details }}</p>
+          </template>
 
-              <td class="td-severity">
-                <span
-                  class="severity-pill"
-                  :class="{
-                    'sev-info': ev.severity === 'INFO',
-                    'sev-warn': ev.severity === 'WARNING',
-                    'sev-danger': ev.severity === 'DANGER',
-                  }"
-                >
-                  {{ ev.severity }}
-                </span>
-              </td>
-            </tr>
+          <template #cell-severity="{ item }">
+            <span
+              class="severity-pill"
+              :class="{
+                'sev-info': item.severity === 'INFO',
+                'sev-warn': item.severity === 'WARNING',
+                'sev-danger': item.severity === 'DANGER',
+              }"
+            >
+              {{ item.severity }}
+            </span>
+          </template>
 
-            <tr v-if="filteredEvents.length === 0">
-              <td colspan="5" class="empty-cell">
-                <FiShield size="32" class="empty-icon" />
-                <p>Nenhum evento de segurança localizado para os filtros informados.</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <template #empty>
+            <div class="empty-cell">
+              <FiShield size="32" class="empty-icon" />
+              <p>Nenhum evento de segurança localizado para os filtros informados.</p>
+            </div>
+          </template>
+        </DataTable>
       </div>
 
       <div v-if="filteredEvents.length > 0" class="audit-pagination-bar">
@@ -400,25 +403,6 @@ const filteredEvents = computed(() => {
 
 .audit-table-wrap {
   overflow-x: auto;
-}
-
-.audit-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.84rem;
-}
-
-.audit-table th,
-.audit-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.audit-table th {
-  background: var(--color-surface-soft);
-  color: var(--color-heading);
-  font-weight: 700;
-  text-align: left;
 }
 
 .time-text {

@@ -166,6 +166,7 @@ describe('Catálogo de Bases Geoespaciais', () => {
       await wrapper.find('[data-testid="toggle-view-table"]').trigger('click')
       expect(wrapper.find('[data-testid="catalog-grid"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="catalog-table"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalog-table"]').classes()).toContain('component-table')
 
       // Retorna para o modo grade
       await wrapper.find('[data-testid="toggle-view-grid"]').trigger('click')

@@ -6,13 +6,22 @@ export interface Column {
   label: string
 }
 
-const props = defineProps<{
-  columns: Column[]
-  data: any[]
-  rowKey?: string
-  rowTestIdKey?: string
-  disableExpand?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    columns: Column[]
+    data: any[]
+    rowKey?: string
+    rowTestIdKey?: string
+    tableTestId?: string
+    rowTestId?: string
+    disableExpand?: boolean
+    loading?: boolean
+    loadingMessage?: string
+  }>(),
+  {
+    loadingMessage: 'Carregando...',
+  },
+)
 
 const emit = defineEmits(['row-click'])
 
@@ -40,11 +49,11 @@ const getRowTestId = (item: any) => {
   if (props.rowTestIdKey && item[props.rowTestIdKey] !== undefined) {
     return item[props.rowTestIdKey]
   }
-  return item.rowTestId || undefined
+  return item.rowTestId || props.rowTestId || undefined
 }
 
 const handleRowClick = (item: any, event: Event) => {
-  if ((event.target as HTMLElement).closest('.table-actions')) return
+  if ((event.target as HTMLElement).closest('.table-actions, .action-buttons')) return
   emit('row-click', item)
   if (!props.disableExpand) {
     toggleRow(getKey(item, 0))
@@ -54,7 +63,7 @@ const handleRowClick = (item: any, event: Event) => {
 
 <template>
   <div class="datatable-container">
-    <table class="component-table">
+    <table class="component-table" :data-testid="tableTestId || undefined">
       <thead>
         <tr>
           <th v-for="col in columns" :key="col.key">
@@ -63,33 +72,42 @@ const handleRowClick = (item: any, event: Event) => {
         </tr>
       </thead>
       <tbody>
-        <template v-for="(item, index) in data" :key="getKey(item, index)">
-          <tr
-            @click="handleRowClick(item, $event)"
-            :class="{ 'clickable-row': !disableExpand }"
-            :data-testid="getRowTestId(item)"
-          >
-            <td v-for="col in columns" :key="col.key">
-              <slot :name="'cell-' + col.key" :item="item" :value="item[col.key]" :isExpanded="expandedRows.has(getKey(item, index))">
-                {{ item[col.key] }}
-              </slot>
-            </td>
-          </tr>
-
-          <tr v-if="expandedRows.has(getKey(item, index))" class="expanded-row">
-            <td :colspan="columns.length" class="expanded-cell">
-              <div class="expanded-content-wrapper">
-                <slot name="expanded-row" :item="item">
-                  <div class="p-4 text-center">Nenhum detalhe adicional.</div>
+        <tr v-if="loading" class="loading-row">
+          <td :colspan="columns.length" class="empty-state">
+            {{ loadingMessage || 'Carregando...' }}
+          </td>
+        </tr>
+        <template v-else>
+          <template v-for="(item, index) in data" :key="getKey(item, index)">
+            <tr
+              @click="handleRowClick(item, $event)"
+              :class="{ 'clickable-row': !disableExpand }"
+              :data-testid="getRowTestId(item)"
+            >
+              <td v-for="col in columns" :key="col.key">
+                <slot :name="'cell-' + col.key" :item="item" :value="item[col.key]" :isExpanded="expandedRows.has(getKey(item, index))">
+                  {{ item[col.key] }}
                 </slot>
-              </div>
+              </td>
+            </tr>
+
+            <tr v-if="expandedRows.has(getKey(item, index))" class="expanded-row">
+              <td :colspan="columns.length" class="expanded-cell">
+                <div class="expanded-content-wrapper">
+                  <slot name="expanded-row" :item="item">
+                    <div class="p-4 text-center">Nenhum detalhe adicional.</div>
+                  </slot>
+                </div>
+              </td>
+            </tr>
+          </template>
+
+          <tr v-if="data.length === 0">
+            <td :colspan="columns.length" class="empty-state">
+              <slot name="empty">Nenhum registro encontrado.</slot>
             </td>
           </tr>
         </template>
-
-        <tr v-if="data.length === 0">
-          <td :colspan="columns.length" class="empty-state">Nenhum registro encontrado.</td>
-        </tr>
       </tbody>
     </table>
   </div>
