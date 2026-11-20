@@ -319,7 +319,7 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
     expect(wrapper.text()).toContain('15/11/2026 15:00')
   })
 
-  it('exibe dados e permissões ativas da sessão JWT na ProfileView', () => {
+  it('exibe dados da sessão JWT na ProfileView sem expor lista de permissões', () => {
     userService.setCurrentUser({
       id: 1,
       name: 'Carlos JWT',
@@ -345,7 +345,9 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
     const wrapper = mount(ProfileView)
     expect(wrapper.text()).toContain('Carlos JWT')
     expect(wrapper.text()).toContain('carlos.jwt@georural.com.br')
-    expect(wrapper.text()).toContain('USUARIOS:VISUALIZAR')
+    expect(wrapper.text()).not.toContain('USUARIOS:VISUALIZAR')
+    expect(wrapper.text()).not.toContain('Permissões Ativas na Sessão')
+    expect(wrapper.find('.permissions-summary').exists()).toBe(false)
     expect(wrapper.text()).toContain('Autenticado via JWT')
   })
 

@@ -46,13 +46,7 @@ const profile = computed<UserProfile>(() => {
   }
 })
 
-const sessionPermissions = computed<string[]>(() => {
-  const activePerms = currentSessionUser.value.permissions
-  if (Array.isArray(activePerms) && activePerms.length > 0) {
-    return activePerms
-  }
-  return storedSession.value?.permissions || []
-})
+
 
 // Feedbacks visuais
 const profileSuccessMsg = ref('')
@@ -144,14 +138,7 @@ onMounted(() => {
             </div>
           </dl>
 
-          <div v-if="sessionPermissions.length > 0" class="permissions-summary">
-            <h4>Permissões Ativas na Sessão ({{ sessionPermissions.length }})</h4>
-            <div class="permissions-chip-list">
-              <span v-for="perm in sessionPermissions" :key="perm" class="permission-chip">
-                {{ perm }}
-              </span>
-            </div>
-          </div>
+
 
           <!-- TODO: Aguardando endpoint no API4-BACK (atualização cadastral pelo próprio usuário)
           <form @submit.prevent="handleSaveProfile" class="form-layout">
@@ -247,28 +234,7 @@ onMounted(() => {
   color: var(--color-heading);
 }
 
-.permissions-summary h4 {
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: var(--color-heading);
-  margin: 0 0 10px;
-}
 
-.permissions-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.permission-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  background: var(--badge-primary-bg);
-  border: 1px solid var(--badge-primary-border);
-  color: var(--badge-primary-text);
-}
 
 .card {
   background: var(--color-surface);
