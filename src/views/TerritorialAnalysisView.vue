@@ -38,15 +38,13 @@ let renderedLayers: L.Layer[] = []
 let mapRequestSequence = 0
 let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
-const carDocuments = computed(() =>
-  documents.value.filter(
-    (item) => item.category === 'CAR' || item.zone === 'PUBLICADA' || /^\d+$/.test(item.id),
-  ),
-)
+const carDocuments = computed(() => {
+  const cars = documents.value.filter((item) => item.category === 'CAR')
+  if (cars.length > 0) return cars
+  return documents.value.filter((item) => item.zone === 'PUBLICADA' || item.localOnly)
+})
 const restrictionDocuments = computed(() =>
-  documents.value.filter(
-    (item) => item.zone !== 'PUBLICADA' && (!/^\d+$/.test(item.id) || item.category !== 'CAR'),
-  ),
+  documents.value.filter((item) => !carDocuments.value.some((c) => c.id === item.id)),
 )
 const selectedCar = computed(() => carDocuments.value.find((item) => item.id === selectedCarId.value))
 const selectedRestrictions = computed(() =>
@@ -196,22 +194,24 @@ const updateMapLayers = async () => {
         map.getBounds().toBBoxString(),
       )
       if (!map || requestId !== mapRequestSequence) return
-      addLayer(
-        L.geoJSON(geometry, {
-          style: {
-            color: getThemeColor('--map-layer-car-stroke'),
-            weight: 2,
-            fillColor: getThemeColor('--map-layer-car-fill'),
-            fillOpacity: 0.16,
-          },
-          onEachFeature: (feature, layer) => {
-            layer.bindTooltip(selectedCar.value?.name ?? 'Imóvel CAR')
-            if (selectedCar.value) {
-              layer.bindPopup(() => createCarPopup(feature, selectedCar.value as SpatialAnalysisDocument))
-            }
-          },
-        }),
-      )
+      const carLayer = L.geoJSON(geometry, {
+        style: {
+          color: getThemeColor('--map-layer-car-stroke'),
+          weight: 2,
+          fillColor: getThemeColor('--map-layer-car-fill'),
+          fillOpacity: 0.16,
+        },
+        onEachFeature: (feature, layer) => {
+          layer.bindTooltip(selectedCar.value?.name ?? 'Imóvel CAR')
+          if (selectedCar.value) {
+            layer.bindPopup(() => createCarPopup(feature, selectedCar.value as SpatialAnalysisDocument))
+          }
+        },
+      })
+      addLayer(carLayer)
+      if (carLayer.getBounds().isValid()) {
+        map.fitBounds(carLayer.getBounds().pad(0.12), { maxZoom: 14 })
+      }
     }
 
     if (showRestrictionLayers.value) {
@@ -453,10 +453,17 @@ const addGeoJSONDocument = async (event: Event) => {
 
 const initializeMap = () => {
   if (!mapElement.value || map) return
-  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.79, -47.91], 11)
+  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
   setBaseLayer()
   map.on('moveend zoomend', scheduleVisibleMapRefresh)
+  setTimeout(() => {
+    map?.invalidateSize()
+  }, 200)
+}
+
+const handleResize = () => {
+  map?.invalidateSize()
 }
 
 const scheduleVisibleMapRefresh = () => {
@@ -488,6 +495,7 @@ watch(selectedCarId, () => {
 })
 
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
   const scrollContainer = document.querySelector('.content-scroll-container')
   if (scrollContainer) {
     scrollContainer.scrollTop = 0
@@ -507,7 +515,9 @@ onMounted(async () => {
       .map((document) => document.id)
     await updateMapLayers()
     await nextTick()
-    map?.invalidateSize()
+    setTimeout(() => {
+      map?.invalidateSize()
+    }, 200)
   } catch (error) {
     console.error('Não foi possível carregar os documentos espaciais:', error)
     loadError.value = 'Não foi possível carregar os documentos territoriais disponíveis.'
@@ -517,6 +527,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
   ++mapRequestSequence
   if (mapRefreshTimer) {
     clearTimeout(mapRefreshTimer)

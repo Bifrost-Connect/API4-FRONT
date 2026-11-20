@@ -94,15 +94,37 @@ export const spatialAnalysisService = {
       if (bases && bases.length > 0) {
         catalogDocs = bases.map((b) => {
           const nomeConjunto = (b.conjunto || '').toUpperCase()
-          const cat: SpatialLayerCategory = nomeConjunto.includes('ALERTA')
-            ? 'ALERTA'
-            : nomeConjunto.includes('APP')
-              ? 'APP'
-              : nomeConjunto.includes('RESERVA')
-                ? 'RESERVA_LEGAL'
-                : nomeConjunto.includes('INDIGENA')
-                  ? 'TERRA_INDIGENA'
-                  : 'CAR'
+          const orgaoSigla = (b.orgao_sigla || '').toUpperCase()
+          const isCar =
+            nomeConjunto.includes('CAR') ||
+            nomeConjunto.includes('IMOVEIS') ||
+            nomeConjunto.includes('IMÓVEIS') ||
+            orgaoSigla === 'SICAR'
+
+          let cat: SpatialLayerCategory = 'ALERTA'
+          if (isCar) {
+            cat = 'CAR'
+          } else if (nomeConjunto.includes('APP') || nomeConjunto.includes('PRESERVA')) {
+            cat = 'APP'
+          } else if (nomeConjunto.includes('RESERVA') || nomeConjunto.includes('FLORESTA')) {
+            cat = 'RESERVA_LEGAL'
+          } else if (
+            nomeConjunto.includes('INDIGENA') ||
+            nomeConjunto.includes('INDÍGENA') ||
+            nomeConjunto.includes('QUILOMB') ||
+            nomeConjunto.includes('ASSENTAMENTO')
+          ) {
+            cat = 'TERRA_INDIGENA'
+          } else if (
+            nomeConjunto.includes('ALERTA') ||
+            nomeConjunto.includes('DESMATAMENTO') ||
+            nomeConjunto.includes('QUEIMADA') ||
+            nomeConjunto.includes('EMBARG')
+          ) {
+            cat = 'ALERTA'
+          } else {
+            cat = 'ALERTA'
+          }
 
           return {
             id: String(b.id),
@@ -140,6 +162,10 @@ export const spatialAnalysisService = {
     if (documentId.startsWith('local-')) {
       const localGeometry = this.localDocuments.get(documentId)
       if (localGeometry) return localGeometry
+    }
+
+    if (documentId.startsWith('ref-')) {
+      return { type: 'FeatureCollection', features: [] }
     }
 
     if (!options?.forceRefresh) {

@@ -32,7 +32,16 @@ export const catalogoService = {
       if (response.status === 204 || !response.data) {
         return []
       }
-      return Array.isArray(response.data) ? response.data : []
+      if (Array.isArray(response.data)) {
+        return response.data
+      }
+      if (Array.isArray(response.data.items)) {
+        return response.data.items
+      }
+      if (Array.isArray(response.data.content)) {
+        return response.data.content
+      }
+      return []
     } catch (error: any) {
       if (!mockactive) throw error
       console.warn('Falha ao buscar catálogo de bases da API.', error)
