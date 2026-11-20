@@ -18,8 +18,8 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails, IndicatorExportFormat } from '../../services/process'
 import { processService } from '../../services/process'
-import { userService } from '../../services/user'
 import { dashboardService } from '../../services/dashboard'
+import { userService } from '../../services/user'
 import ProcessoMiniMapa from '../ProcessoMiniMapa.vue'
 
 const props = withDefaults(
@@ -44,9 +44,8 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Apenas Administrador vê e aciona Aprovar/Reprovar e Fechar Versão
-const currentUser = computed(() => userService.getCurrentUser())
-const canApprove = computed(() => userService.isAdmin())
+// Permissão de homologação habilitada
+const canApprove = computed(() => !props.readOnly && (userService.can('BASES:HOMOLOGAR') || userService.isAdmin()))
 
 // Estados de submissão e decisão
 const isSubmitting = ref(false)
@@ -130,42 +129,33 @@ const confirmPublishAndClose = async () => {
   isSubmitting.value = true
   publishError.value = null
   try {
-    if (/^\d+$/.test(String(props.details.id))) {
-      try {
-        await processService.registrarDecisaoGestor(props.details.id, {
-          gestorId: currentUser.value.id || 1,
-          etapa: 'PUBLICACAO',
-          decisao: 'APROVADO',
-          parecer: 'Publicação oficial homologada pelo gestor.',
-        })
-      } catch (errApi) {
-        console.warn('Aviso: endpoint de decisão do gestor offline ou simulado:', errApi)
-      }
-    }
-
-    try {
-      await dashboardService.aprovarEFecharVersao(
-        {
-          id: String(props.details.id),
-          dataset: props.details.dataset,
-          stage: 'Publicação',
-          status: 'Fechado',
-          dateTime: props.details.dateTime,
-          source: props.details.source,
-          year: props.details.year,
-          epsg: props.details.epsg,
-        },
-        currentUser.value.name,
-      )
-    } catch (e) {
-      console.warn('Aviso ao fechar versão via dashboardService:', e)
-    }
+    await processService.publishAndCloseVersion(
+      props.details.id,
+      {
+        gestorId: 1,
+        parecer: 'Publicação oficial homologada pelo gestor.',
+      },
+      () =>
+        dashboardService.aprovarEFecharVersao(
+          {
+            id: String(props.details.id),
+            dataset: props.details.dataset,
+            stage: 'Publicação',
+            status: 'Fechado',
+            dateTime: props.details.dateTime,
+            source: props.details.source,
+            year: props.details.year,
+            epsg: props.details.epsg,
+          },
+          'Gestor',
+        ),
+    )
 
     isApproved.value = true
     isRejected.value = false
     props.details.status = 'Concluída'
     props.details.stage = 'Publicação'
-    props.details.assignedEditor = currentUser.value.name
+    props.details.assignedEditor = 'Gestor'
   } catch (err: any) {
     console.error('Erro ao aprovar e publicar:', err)
     publishError.value = err?.response?.data?.message || err?.message || 'Falha ao homologar publicação.'
@@ -202,7 +192,7 @@ const confirmReject = async () => {
   try {
     if (/^\d+$/.test(String(props.details.id))) {
       await processService.registrarDecisaoGestor(props.details.id, {
-        gestorId: currentUser.value.id || 1,
+        gestorId: 1,
         etapa: 'PUBLICACAO',
         decisao: 'REPROVADO',
         parecer: rejectionReason.value.trim(),
@@ -226,7 +216,7 @@ const confirmReject = async () => {
 
     isRejected.value = true
     isApproved.value = false
-    props.details.assignedEditor = currentUser.value.name
+    props.details.assignedEditor = 'Gestor'
 
     if (rejectionDestination.value === 'reprocessar') {
       props.details.stage = 'Tratamento'
@@ -301,7 +291,7 @@ const goToMap = () => {
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Parâmetro / Algoritmo</th>
+                  <th>Parâmetro</th>
                   <th>Resultado</th>
                   <th>Referência (Lei)</th>
                   <th>Status</th>
@@ -593,7 +583,7 @@ const goToMap = () => {
 
           <div class="publish-meta-box">
             <div class="meta-row">
-              <span class="meta-label">Carga / Processo:</span>
+              <span class="meta-label">Processo:</span>
               <strong>{{ details.id }}</strong>
             </div>
             <div class="meta-row">
@@ -602,7 +592,7 @@ const goToMap = () => {
             </div>
             <div class="meta-row">
               <span class="meta-label">Responsável pela Publicação:</span>
-              <strong>{{ currentUser.name }}</strong>
+              <strong>Gestor</strong>
             </div>
           </div>
         </div>
@@ -633,9 +623,9 @@ const goToMap = () => {
 
 .closed-version-banner {
   padding: 12px 16px;
-  color: #713f12;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
+  color: var(--badge-warning-text);
+  background: var(--badge-warning-bg);
+  border: 1px solid var(--badge-warning-border);
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 700;
@@ -773,10 +763,10 @@ const goToMap = () => {
   align-items: center;
   gap: 2rem;
   background: var(--color-surface);
-  border: 2px solid var(--vis-brand-orange, #f26522);
+  border: 2px solid var(--color-brand);
   border-radius: 12px;
   padding: 1.75rem 2rem;
-  box-shadow: 0 4px 20px rgba(242, 101, 34, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .action-content {
@@ -790,8 +780,8 @@ const goToMap = () => {
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
-  background: rgba(242, 101, 34, 0.1);
-  color: var(--vis-brand-orange, #f26522);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -857,7 +847,7 @@ const goToMap = () => {
 
 .review-textarea:focus {
   outline: none;
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .review-actions {
@@ -1013,8 +1003,8 @@ const goToMap = () => {
 }
 
 .btn-primary {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .btn-primary:hover {
@@ -1030,7 +1020,7 @@ const goToMap = () => {
 
 .btn-outline-danger:hover {
   background: var(--badge-danger-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 .btn-ghost {
@@ -1083,7 +1073,7 @@ const goToMap = () => {
 
 .btn-warning-outline:hover {
   background: var(--badge-warning-text);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 /* ═══ ESTILOS US07: Exportação Oficial, Selo Bloqueado e Modais ═══ */
@@ -1168,7 +1158,7 @@ const goToMap = () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   display: grid;
   place-items: center;
   z-index: 9999;
@@ -1176,11 +1166,11 @@ const goToMap = () => {
 }
 
 .modal-dialog {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface);
   border-radius: 12px;
   width: 100%;
   max-width: 520px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -1284,7 +1274,7 @@ const goToMap = () => {
 
 .form-textarea:focus {
   outline: none;
-  border-color: var(--vis-brand-orange, #f26522);
+  border-color: var(--color-brand);
 }
 
 .error-text {
@@ -1362,8 +1352,8 @@ const goToMap = () => {
 }
 
 .btn-confirm-rejection {
-  background: #dc2626;
-  color: white;
+  background: var(--color-danger-hover);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.6rem 1.25rem;
   border-radius: 6px;
@@ -1378,8 +1368,8 @@ const goToMap = () => {
 }
 
 .btn-confirm-publish {
-  background: #059669;
-  color: white;
+  background: var(--color-success-hover);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.6rem 1.25rem;
   border-radius: 6px;

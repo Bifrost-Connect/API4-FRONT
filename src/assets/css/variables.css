@@ -36,6 +36,11 @@
 :root {
   --color-brand: var(--vis-brand-orange);
   --color-brand-hover: var(--vis-brand-orange-hover);
+  --color-brand-contrast: #ffffff;
+  --color-brand-soft: rgba(242, 101, 34, 0.1);
+  --color-brand-soft-strong: rgba(242, 101, 34, 0.16);
+  --color-brand-border: rgba(242, 101, 34, 0.35);
+  --color-brand-ring: rgba(242, 101, 34, 0.16);
 
   --color-background: var(--vis-c-light-mute); /* Grey background for the app #f1f3f5 */
   --color-background-soft: var(--vis-c-light-soft);
@@ -43,15 +48,30 @@
 
   --color-surface: var(--vis-c-light); /* White background for cards #ffffff */
   --color-surface-soft: var(--vis-c-light-soft); /* Slightly off-white for internal card elements #f8f9fa */
-  
+  --color-surface-hover: #e9ecef;
+  --color-overlay: rgba(15, 23, 42, 0.55);
+
   --color-border: var(--vis-c-divider-light-2);
   --color-border-hover: var(--vis-c-divider-light-1);
 
   --color-heading: var(--vis-c-text-dark-1);
   --color-text: var(--vis-c-text-dark-1);
   --color-text-muted: var(--vis-c-text-dark-2);
+  --color-code-bg: var(--vis-c-light-mute);
+  --color-code-text: #0f172a;
+  --color-accent-link: #0284c7;
 
   --section-gap: 160px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 20px 25px -5px rgba(15, 23, 42, 0.18);
+  --shadow-drawer: -8px 0 24px rgba(15, 23, 42, 0.14);
+  --shadow-brand: 0 4px 15px rgba(242, 101, 34, 0.28);
+  --shadow-brand-strong: 0 7px 20px rgba(242, 101, 34, 0.42);
+  --shadow-success: 0 4px 15px rgba(16, 185, 129, 0.28);
+  --shadow-danger: 0 4px 15px rgba(239, 68, 68, 0.28);
 }
 
 /* Custom UI Colors */
@@ -62,6 +82,13 @@
   --vis-c-danger-hover: #dc2626;
   --vis-c-warning: #f59e0b;
   --vis-c-info: #3b82f6;
+
+  --color-success: var(--vis-c-success);
+  --color-success-hover: var(--vis-c-success-hover);
+  --color-danger: var(--vis-c-danger);
+  --color-danger-hover: var(--vis-c-danger-hover);
+  --color-warning: var(--vis-c-warning);
+  --color-info: var(--vis-c-info);
 
   --btn-radius: 0;
   --btn-shadow: none;
@@ -80,6 +107,10 @@
   --badge-warning-text: #b45309;
   --badge-warning-border: rgba(245, 158, 11, 0.3);
 
+  --badge-orange-bg: rgba(249, 115, 22, 0.14);
+  --badge-orange-text: #c2410c;
+  --badge-orange-border: rgba(249, 115, 22, 0.35);
+
   --badge-info-bg: rgba(59, 130, 246, 0.12);
   --badge-info-text: #0369a1;
   --badge-info-border: rgba(59, 130, 246, 0.3);
@@ -95,6 +126,24 @@
   --badge-editor-bg: rgba(124, 58, 237, 0.12);
   --badge-editor-text: #6d28d9;
   --badge-editor-border: rgba(124, 58, 237, 0.25);
+
+  /* Camadas Geográficas e Análise Territorial */
+  --map-layer-car-stroke: #15803d;
+  --map-layer-car-fill: #22c55e;
+  --map-layer-car-swatch: #bbf7d0;
+  --map-layer-restriction-stroke: #dc2626;
+  --map-layer-restriction-fill: #fecaca;
+  --map-layer-intersection-stroke: #c2410c;
+  --map-layer-intersection-fill: #facc15;
+  --map-layer-hatch-bg: #fef08a;
+  --map-layer-hatch-stroke: #ea580c;
+  --map-layer-app: #7c3aed;
+  --map-layer-reserva: #c2410c;
+  --map-layer-indigena: #0f766e;
+  --map-layer-delta-kept: #d6a217;
+  --map-layer-compare-a: #2563eb;
+  --map-layer-compare-b: #7c3aed;
+  --map-layer-neutral: #64748b;
 }
 
 /* Override para o Dark Mode (Controlado pelo Vue via atributo no HTML) */
@@ -103,7 +152,11 @@
 
   --color-brand: var(--vis-brand-orange-light);
   --color-brand-hover: var(--vis-brand-orange);
-  --vis-brand-primary: var(--vis-brand-orange-light);
+  --color-brand-primary: var(--vis-brand-orange-light);
+  --color-brand-soft: rgba(255, 133, 71, 0.16);
+  --color-brand-soft-strong: rgba(255, 133, 71, 0.24);
+  --color-brand-border: rgba(255, 133, 71, 0.45);
+  --color-brand-ring: rgba(255, 133, 71, 0.25);
 
   --color-background: var(--vis-c-dark);
   --color-background-soft: var(--vis-c-dark-soft);
@@ -111,6 +164,8 @@
 
   --color-surface: var(--vis-c-dark-soft);
   --color-surface-soft: var(--vis-c-dark-mute);
+  --color-surface-hover: #283548;
+  --color-overlay: rgba(2, 6, 23, 0.78);
 
   --color-border: var(--vis-c-divider-dark-2);
   --color-border-hover: var(--vis-c-divider-dark-1);
@@ -118,6 +173,14 @@
   --color-heading: var(--vis-c-text-light-1);
   --color-text: var(--vis-c-text-light-1);
   --color-text-muted: var(--vis-c-text-light-2);
+  --color-code-bg: var(--vis-c-dark);
+  --color-code-text: #7dd3fc;
+  --color-accent-link: #38bdf8;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.55);
+  --shadow-drawer: -8px 0 24px rgba(0, 0, 0, 0.45);
 
   /* Semantic Status Tokens (Dark Theme - Harmonizado e Acessível) */
   --badge-success-bg: rgba(16, 185, 129, 0.2);
@@ -131,6 +194,10 @@
   --badge-warning-bg: rgba(245, 158, 11, 0.2);
   --badge-warning-text: #fbbf24;
   --badge-warning-border: rgba(245, 158, 11, 0.45);
+
+  --badge-orange-bg: rgba(249, 115, 22, 0.2);
+  --badge-orange-text: #fb923c;
+  --badge-orange-border: rgba(249, 115, 22, 0.45);
 
   --badge-info-bg: rgba(59, 130, 246, 0.2);
   --badge-info-text: #60a5fa;

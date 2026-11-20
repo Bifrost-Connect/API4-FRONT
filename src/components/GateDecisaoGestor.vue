@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/**
+ * Componente de Gate de Decisão do Gestor.
+ * Permite aprovação ou reprovação da etapa (Validação, Tratamento ou Publicação)
+ * com histórico prévio das avaliações realizadas.
+ */
 import { ref, computed, onMounted, watch } from 'vue'
 import { FiCheckCircle, FiXCircle, FiAlertTriangle, FiShield, FiInfo } from 'vue-icons-plus/fi'
 import { processService } from '../services/process'
@@ -16,10 +21,7 @@ const emit = defineEmits<{
   (e: 'decisao-registrada', resultado: any): void
 }>()
 
-const currentUser = computed(() => userService.getCurrentUser())
-const isGestorOrAdmin = computed(
-  () => userService.isAdmin() || (currentUser.value.role as string) === 'Gestor',
-)
+const isGestorOrAdmin = computed(() => userService.can('BASES:HOMOLOGAR') || userService.isAdmin())
 
 const isSubmitting = ref(false)
 const isLoadingHistorico = ref(true)
@@ -158,19 +160,22 @@ const handleAprovar = async () => {
   erroMsg.value = null
 
   try {
-    const gestorLabel = formatarNomeGestor(currentUser.value.name)
+    const currentUser = userService.getCurrentUser()
+    const gestorId = currentUser.id ?? 0
+    const gestorNome = currentUser.name || 'Gestor'
+
     const res = await processService.registrarDecisaoGestor(props.processoId, {
-      gestorId: currentUser.value.id || 1,
+      gestorId,
       etapa: props.etapa,
       decisao: 'APROVADO',
-      parecer: `Etapa de ${etapaTitulo.value} aprovada pelo ${gestorLabel}. Liberado para ${proximaEtapaNome.value}.`,
+      parecer: `Etapa de ${etapaTitulo.value} aprovada. Liberado para ${proximaEtapaNome.value}.`,
     })
 
     decisaoTomada.value = 'APROVADO'
     decisaoHistorico.value = {
       decisao: 'APROVADO',
-      gestorNome: currentUser.value.name,
-      parecer: `Aprovado pelo ${gestorLabel}`,
+      gestorNome,
+      parecer: `Aprovado pelo Gestor`,
       dataDecisao: new Date().toISOString(),
     }
     sucessoMsg.value = `Etapa ${etapaTitulo.value} aprovada com sucesso! O processo avançou para ${proximaEtapaNome.value}.`
@@ -203,8 +208,12 @@ const handleConfirmarRejeicao = async () => {
   erroMsg.value = null
 
   try {
+    const currentUser = userService.getCurrentUser()
+    const gestorId = currentUser.id ?? 0
+    const gestorNome = currentUser.name || 'Gestor'
+
     const res = await processService.registrarDecisaoGestor(props.processoId, {
-      gestorId: currentUser.value.id || 1,
+      gestorId,
       etapa: props.etapa,
       decisao: 'REPROVADO',
       parecer: parecerRejeicao.value.trim(),
@@ -213,7 +222,7 @@ const handleConfirmarRejeicao = async () => {
     decisaoTomada.value = 'REPROVADO'
     decisaoHistorico.value = {
       decisao: 'REPROVADO',
-      gestorNome: currentUser.value.name,
+      gestorNome,
       parecer: parecerRejeicao.value.trim(),
       dataDecisao: new Date().toISOString(),
     }
@@ -330,11 +339,11 @@ const handleConfirmarRejeicao = async () => {
           </div>
           <div class="modal-body">
             <p class="warning-text">
-              <FiAlertTriangle size="18" style="color: #ef4444" />
+              <FiAlertTriangle size="18" style="color: var(--color-danger)" />
               Ao rejeitar esta etapa, a carga será enviada imediatamente para a <strong>Quarentena</strong> para atuação de um auditor.
             </p>
             <div class="form-group">
-              <label for="parecer-txt"><strong>Parecer Técnico / Justificativa *</strong></label>
+              <label for="parecer-txt"><strong>Parecer Técnico *</strong></label>
               <textarea
                 id="parecer-txt"
                 v-model="parecerRejeicao"
@@ -366,20 +375,20 @@ const handleConfirmarRejeicao = async () => {
 
 <style scoped>
 .gate-card {
-  background: linear-gradient(to right, rgba(59, 130, 246, 0.04), rgba(59, 130, 246, 0.01));
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: var(--badge-info-bg);
+  border: 1px solid var(--badge-info-border);
   border-radius: 10px;
   padding: 1.25rem 1.5rem;
 }
 
 .historico-aprovado {
-  background: linear-gradient(to right, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: var(--badge-success-bg);
+  border: 1px solid var(--badge-success-border);
 }
 
 .historico-reprovado {
-  background: linear-gradient(to right, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: var(--badge-danger-bg);
+  border: 1px solid var(--badge-danger-border);
 }
 
 .gate-icon-success {
@@ -431,8 +440,8 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .btn-success {
-  background-color: var(--vis-c-success);
-  color: white;
+  background-color: var(--color-success);
+  color: var(--color-brand-contrast);
   border: none;
   display: flex;
   align-items: center;
@@ -468,8 +477,8 @@ const handleConfirmarRejeicao = async () => {
 }
 
 .btn-danger {
-  background-color: var(--vis-c-danger);
-  color: white;
+  background-color: var(--color-danger);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -502,7 +511,7 @@ const handleConfirmarRejeicao = async () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -517,7 +526,7 @@ const handleConfirmarRejeicao = async () => {
   width: 90%;
   max-width: 520px;
   overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {

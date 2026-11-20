@@ -116,28 +116,28 @@ const onStepClick = (index: number) => {
 }
 
 .step--active .step__indicator {
-  border-color: var(--vis-brand-orange);
-  background-color: var(--vis-brand-orange);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(242, 101, 34, 0.2);
+  border-color: var(--color-brand);
+  background-color: var(--color-brand);
+  color: var(--color-brand-contrast);
+  box-shadow: 0 0 0 4px var(--color-brand-ring);
 }
 
 .step--completed .step__indicator {
-  border-color: var(--vis-c-success);
-  background-color: var(--vis-c-success);
-  color: #ffffff;
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+  color: var(--color-brand-contrast);
 }
 
 .step--warning .step__indicator {
-  border-color: var(--vis-c-warning);
+  border-color: var(--color-warning);
   background-color: var(--badge-warning-bg);
   color: var(--badge-warning-text);
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 0 0 4px var(--badge-warning-border);
 }
 
 .step--active.step--warning .step__indicator {
-  background-color: var(--vis-c-warning);
-  color: #ffffff;
+  background-color: var(--color-warning);
+  color: var(--color-brand-contrast);
 }
 
 .warning-icon {

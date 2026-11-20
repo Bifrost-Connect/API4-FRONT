@@ -7,8 +7,15 @@ import ProcessLogView from '../views/ProcessLogView.vue'
 import MapView from '../views/MapView.vue'
 import CargaListView from '../views/CargaListView.vue'
 import TerritorialAnalysisView from '../views/TerritorialAnalysisView.vue'
-import { userService, type UserRole } from '../services/user'
+import ProfileView from '../views/ProfileView.vue'
+import UserView from '../views/UserView.vue'
+import ForbiddenView from '../views/ForbiddenView.vue'
+import { userService } from '@/services/user'
+import { authStorage } from '@/services/storage/authStorage'
 
+/**
+ * Definição centralizada de rotas com controle de acesso RBAC por permissão (Tarefa 6 e 7).
+ */
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -16,50 +23,68 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: {
+        permission: [
+          'INGESTAO:VISUALIZAR_PROCESSAMENTO',
+          'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+        ],
+      },
     },
     {
       path: '/analise-territorial',
       name: 'analise-territorial',
       component: TerritorialAnalysisView,
-      meta: { allowedRoles: ['Analista', 'Administrador'] },
+      meta: { permission: 'ANALISE_TERRITORIAL:CONSULTAR_RESULTADO' },
     },
     {
       path: '/comparacao-temporal',
       name: 'comparacao-temporal',
       component: () => import('../views/TemporalComparisonView.vue'),
-      meta: { allowedRoles: ['Analista', 'Administrador'] },
+      meta: { permission: 'MAPA:COMPARAR_SAFRAS' },
     },
     {
-      path: '/auditor',
-      name: 'auditor',
-      component: DashboardView,
-      meta: { allowedRoles: ['Auditor', 'Administrador'] },
+      path: '/exportacoes',
+      name: 'exportacoes',
+      component: () => import('../views/ExportacaoView.vue'),
+      meta: {
+        permission: [
+          'EXPORTACAO:CSV',
+          'EXPORTACAO:GEOJSON',
+          'AUDITORIA:VISUALIZAR_LOGS',
+        ],
+      },
     },
     {
       path: '/catalogo',
       name: 'catalogo',
       component: CargaListView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { permission: 'BASES:CONSULTAR_CATALOGO' },
     },
     {
       path: '/processo/:id',
       alias: ['/processos/:id'],
       name: 'process-log',
       component: ProcessLogView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: {
+        permission: [
+          'QUARENTENA:VISUALIZAR',
+          'AUDITORIA:VISUALIZAR_PROCESSAMENTOS',
+          'BASES:HOMOLOGAR',
+          'INGESTAO:VISUALIZAR_PROCESSAMENTO',
+        ],
+      },
     },
     {
       path: '/upload',
       name: 'upload',
       component: UploadView,
-      meta: { allowedRoles: ['Operador', 'Administrador'] },
+      meta: { permission: 'INGESTAO:UPLOAD' },
     },
     {
       path: '/mapa',
       name: 'mapa',
       component: MapView,
-      meta: { allowedRoles: ['Operador', 'Auditor', 'Analista', 'Administrador'] },
+      meta: { permission: 'MAPA:VISUALIZAR' },
     },
     {
       path: '/styleguide',
@@ -72,50 +97,57 @@ const router = createRouter({
       component: LoginView,
       meta: { hideMenu: true },
     },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: UserView,
+      meta: { permission: ['USUARIOS:VISUALIZAR', 'ROLES:VISUALIZAR', 'API:VISUALIZAR_CHAVES'] },
+    },
+    {
+      path: '/acesso-negado',
+      name: 'forbidden',
+      component: ForbiddenView,
+      meta: { hideMenu: false },
+    },
   ],
 })
 
-export default router
+/**
+ * Guardião global de rotas (ProtectedRoute) orientado a permissões (Tarefa 6 e 7).
+ */
+router.beforeEach(async (to, _from, next) => {
+  if (to.name === 'login') {
+    return next()
+  }
 
-router.beforeEach((to) => {
-  // 1. Se a rota de destino já for o login, permite o acesso direto
-  if (to.name === 'login') return true
-
-  // 2. Busca o usuário atual simulado
-  const currentUser = userService.getCurrentUser()
-
-  // 3. Verifica se nenhum usuário foi selecionado
-  // (valida tanto se currentUser for nulo/indefinido quanto se não houver role/id definido)
-  if (!currentUser || !currentUser.role) {
-    return {
+  const session = authStorage.getSession()
+  const token = authStorage.getAccessToken()
+  if (!session || !token || authStorage.isSessionExpired(session)) {
+    authStorage.clearSession()
+    userService.clearCurrentUser()
+    return next({
       name: 'login',
-      query: { redirect: to.fullPath }, // Opcional: salva a rota para voltar após selecionar o login
-    }
+      query: { redirect: to.fullPath },
+    })
   }
 
-  const currentRole = currentUser.role
-
-  // 4. Administrador tem acesso a todas as telas do sistema
-  if (userService.isAdmin()) {
-    return true
+  const reqPerm = to.meta.permission as string | string[] | undefined
+  if (!reqPerm) {
+    return next()
   }
 
-  const allowedRoles = to.meta.allowedRoles as UserRole[] | undefined
-  const homeByRole: Record<string, string> = {
-    Auditor: 'auditor',
-    Analista: 'analise-territorial',
-    Operador: 'dashboard',
-    Administrador: 'dashboard',
-  }
-  const home = homeByRole[currentRole] ?? 'dashboard'
+  const hasAccess = Array.isArray(reqPerm) ? userService.canAny(reqPerm) : userService.can(reqPerm)
 
-  if (allowedRoles && !userService.canAccess(allowedRoles)) {
-    return { name: home }
+  if (hasAccess) {
+    return next()
   }
 
-  if (to.name === 'dashboard' && currentRole !== 'Operador') {
-    return { name: home }
-  }
-
-  return true
+  return next({ name: 'forbidden' })
 })
+
+export default router

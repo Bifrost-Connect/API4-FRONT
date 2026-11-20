@@ -8,8 +8,8 @@ vi.mock('../api', async (importOriginal) => {
   return {
     ...actual,
     default: {
-      get: vi.fn(),
-      post: vi.fn(),
+      get: vi.fn<() => Promise<unknown>>(),
+      post: vi.fn<() => Promise<unknown>>(),
     },
     mockactive: false,
   }
@@ -17,8 +17,8 @@ vi.mock('../api', async (importOriginal) => {
 
 vi.mock('../catalogo', () => ({
   catalogoService: {
-    listarBases: vi.fn(),
-    buscarDetalhesBase: vi.fn(),
+    listarBases: vi.fn<() => Promise<unknown>>(),
+    buscarDetalhesBase: vi.fn<() => Promise<unknown>>(),
   },
 }))
 
@@ -52,10 +52,10 @@ describe('Spatial Analysis Service', () => {
 
     const docs = await spatialAnalysisService.listDocuments()
     expect(docs.length).toBe(5)
-    expect(docs[0].id).toBe('1')
-    expect(docs[0].category).toBe('CAR')
-    expect(docs[1].id).toBe('2')
-    expect(docs[1].category).toBe('APP')
+    expect(docs[0]!.id).toBe('1')
+    expect(docs[0]!.category).toBe('CAR')
+    expect(docs[1]!.id).toBe('2')
+    expect(docs[1]!.category).toBe('APP')
     expect(docs.some((d) => d.id === 'ref-app')).toBe(true)
     expect(docs.some((d) => d.id === 'ref-reserva-legal')).toBe(true)
     expect(docs.some((d) => d.id === 'ref-alerta')).toBe(true)
@@ -70,7 +70,7 @@ describe('Spatial Analysis Service', () => {
   })
 
   it('deve registrar e recuperar documento local pré-carregado na sessão', async () => {
-    const geojson: GeoJSON.FeatureCollection = {
+    const geojson: GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>> = {
       type: 'FeatureCollection',
       features: [
         {
@@ -149,8 +149,8 @@ describe('Spatial Analysis Service', () => {
     })
     expect(result.status).toBe('CONCLUIDO')
     expect(result.results.length).toBe(1)
-    expect(result.results[0].codigoCar).toBe('CAR-MS-001')
-    expect(result.results[0].percentualSobreposicao).toBe(25) // (50/200)*100
+    expect(result.results[0]!.codigoCar).toBe('CAR-MS-001')
+    expect(result.results[0]!.percentualSobreposicao).toBe(25) // (50/200)*100
   })
 
   it('deve bloquear cálculo de sobreposição com arquivos locais não persistidos', async () => {

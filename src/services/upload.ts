@@ -3,12 +3,48 @@
  * Todas as operações utilizam a API REST do backend (/carga/*, /dominios/*).
  */
 import api from './api'
-import { userService } from './user'
+
+export interface FormatoConfig {
+  extensions: string[]
+  label: string
+  tag: string
+}
+
+export const UPLOAD_FORMATO_OPTIONS = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
+export const UPLOAD_CLASSIFICACAO_OPTIONS = ['Público', 'Restrito', 'Confidencial']
+
+export const UPLOAD_FORMATO_CONFIG_MAP: Record<string, FormatoConfig> = {
+  GeoJSON: {
+    extensions: ['.geojson', '.json'],
+    label: 'GeoJSON (.geojson, .json)',
+    tag: '.geojson, .json',
+  },
+  'Shapefile (ZIP)': {
+    extensions: ['.zip'],
+    label: 'Shapefile compactado (.zip)',
+    tag: '.zip (Shapefile)',
+  },
+  CSV: {
+    extensions: ['.csv'],
+    label: 'Tabela delimitada (.csv)',
+    tag: '.csv',
+  },
+  GeoPackage: {
+    extensions: ['.gpkg'],
+    label: 'GeoPackage (.gpkg)',
+    tag: '.gpkg',
+  },
+  KML: {
+    extensions: ['.kml', '.kmz'],
+    label: 'Keyhole Markup Language (.kml, .kmz)',
+    tag: '.kml, .kmz',
+  },
+}
 
 export const uploadService = {
   async cadastrarMetadados(payload: Record<string, any>): Promise<any> {
     const backendPayload = {
-      operadorId: userService.getCurrentUser().id || 1,
+      operadorId: payload.operadorId || 1,
       orgaoId: parseInt(payload.orgaoEmissor) || 1,
       conjuntoId: parseInt(payload.conjuntoDados) || 1,
       anoSafra: String(payload.anoReferencia || '2026').trim(),
@@ -27,7 +63,7 @@ export const uploadService = {
   async uploadArquivo(
     processoId: number,
     file: File,
-    usuarioId: number = userService.getCurrentUser().id,
+    usuarioId?: number,
   ): Promise<any> {
     const formData = new FormData()
     formData.append('processoId', processoId.toString())
@@ -73,7 +109,7 @@ export const uploadService = {
   async reprocessarCarga(
     processoId: number,
     file: File,
-    usuarioId: number = userService.getCurrentUser().id,
+    usuarioId?: number,
   ): Promise<any> {
     try {
       const formData = new FormData()
@@ -95,23 +131,25 @@ export const uploadService = {
   async cancelarCarga(
     processoId: number,
     motivo: string,
-    usuarioId: number = userService.getCurrentUser().id,
+    usuarioId?: number,
   ): Promise<void> {
+    const params: Record<string, any> = {}
+    if (usuarioId) params.usuarioId = usuarioId
     await api.patch(
       `/carga/${processoId}/cancelar`,
       { motivo },
-      {
-        params: { usuarioId },
-      },
+      { params },
     )
   },
 
   async notificarOperadorQuarentena(
     processoId: number,
-    usuarioId: number = userService.getCurrentUser().id,
+    usuarioId?: number,
   ): Promise<void> {
+    const params: Record<string, any> = {}
+    if (usuarioId) params.usuarioId = usuarioId
     await api.post(`/carga/${processoId}/quarentena/notificar-operador`, null, {
-      params: { usuarioId },
+      params,
     })
   },
 

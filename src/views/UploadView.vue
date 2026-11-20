@@ -2,8 +2,16 @@
 import { ref, shallowRef, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle } from 'vue-icons-plus/fi'
-import { uploadService } from '@/services/upload'
+import {
+  uploadService,
+  UPLOAD_FORMATO_OPTIONS,
+  UPLOAD_CLASSIFICACAO_OPTIONS,
+  UPLOAD_FORMATO_CONFIG_MAP,
+  type FormatoConfig,
+} from '@/services/upload'
 import { processService } from '@/services/process'
+import { userService } from '@/services/user'
+import { userUploadsStorage } from '@/services/storage/userUploadsStorage'
 import Stepper from '@/components/Stepper.vue'
 
 // Passos
@@ -38,42 +46,9 @@ const coberturaEspacial = ref('')
 const coberturaTemporalInicio = ref('')
 const coberturaTemporalFim = ref('')
 
-const formatoOptions = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
-const classificacaoOptions = ['Público', 'Restrito', 'Confidencial']
-
-interface FormatoConfig {
-  extensions: string[]
-  label: string
-  tag: string
-}
-
-const formatoConfigMap: Record<string, FormatoConfig> = {
-  GeoJSON: {
-    extensions: ['.geojson', '.json'],
-    label: 'GeoJSON (.geojson, .json)',
-    tag: '.geojson / .json',
-  },
-  'Shapefile (ZIP)': {
-    extensions: ['.zip'],
-    label: 'Shapefile compactado (.zip)',
-    tag: '.zip (Shapefile)',
-  },
-  CSV: {
-    extensions: ['.csv'],
-    label: 'Tabela delimitada (.csv)',
-    tag: '.csv',
-  },
-  GeoPackage: {
-    extensions: ['.gpkg'],
-    label: 'GeoPackage (.gpkg)',
-    tag: '.gpkg',
-  },
-  KML: {
-    extensions: ['.kml', '.kmz'],
-    label: 'Keyhole Markup Language (.kml, .kmz)',
-    tag: '.kml / .kmz',
-  },
-}
+const formatoOptions = UPLOAD_FORMATO_OPTIONS
+const classificacaoOptions = UPLOAD_CLASSIFICACAO_OPTIONS
+const formatoConfigMap = UPLOAD_FORMATO_CONFIG_MAP
 
 const formatoConfigAtual = computed<FormatoConfig | null>(() => {
   if (!formato.value) return null
@@ -260,7 +235,9 @@ const handleUpload = async () => {
     }
 
     // 2. Upload de nova carga
+    const currentUser = userService.getCurrentUser()
     const metadataPayload = {
+      operadorId: currentUser.id || 1,
       nomeCamada: nomeCamada.value,
       orgaoEmissor: orgaoEmissor.value,
       anoReferencia: anoReferencia.value,
@@ -283,8 +260,9 @@ const handleUpload = async () => {
     }
 
     if (arquivoSelecionado.value && processoId) {
-      const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value)
+      const response = await uploadService.uploadArquivo(processoId, arquivoSelecionado.value, currentUser.id)
       uploadResult.value = response
+      userUploadsStorage.recordUpload(processoId, { id: currentUser.id, email: currentUser.email })
       currentStep.value = 3
     }
   } catch (err: any) {
@@ -333,8 +311,8 @@ const resetForm = () => {
         v-if="reprocessId"
         class="alert-info mb-4"
         style="
-          background-color: rgba(59, 130, 246, 0.1);
-          border-left: 3px solid #3b82f6;
+          background-color: var(--badge-info-bg);
+          border-left: 3px solid var(--color-info);
           padding: 1rem;
           border-radius: 4px;
           display: flex;
@@ -342,7 +320,7 @@ const resetForm = () => {
           gap: 0.5rem;
         "
       >
-        <FiInfo size="18" style="color: #3b82f6" />
+        <FiInfo size="18" style="color: var(--color-info)" />
         <span style="color: var(--color-text)"
           >Reprocessando Carga #{{ reprocessId }} - O arquivo enviado substituirá os registros
           rejeitados na quarentena.</span
@@ -359,7 +337,7 @@ const resetForm = () => {
 
       <div class="form-grid">
         <div class="form-group form-group--full">
-          <label class="label" for="upload-nome">Nome da Fonte de Dados / Camada *</label>
+          <label class="label" for="upload-nome">Nome da Camada *</label>
           <input
             id="upload-nome"
             v-model="nomeCamada"
@@ -526,11 +504,11 @@ const resetForm = () => {
                 {{ formatoConfigAtual.tag }}
               </span>
               <template v-else>
-                <span class="format-tag">.geojson / .json</span>
-                <span class="format-tag">.zip (Shapefile / CSV)</span>
+                <span class="format-tag">.geojson, .json</span>
+                <span class="format-tag">.zip (Shapefile)</span>
                 <span class="format-tag">.csv</span>
                 <span class="format-tag">.gpkg (GeoPackage)</span>
-                <span class="format-tag">.kml / .kmz</span>
+                <span class="format-tag">.kml, .kmz</span>
               </template>
             </div>
           </template>
@@ -544,7 +522,7 @@ const resetForm = () => {
             <div class="dropzone__formats">
               <span
                 class="format-tag"
-                style="background: rgba(16, 185, 129, 0.1); color: var(--vis-c-success)"
+                style="background: var(--badge-success-bg); color: var(--color-success)"
                 >Selecionado</span
               >
             </div>
@@ -562,8 +540,8 @@ const resetForm = () => {
               style="
                 width: 16px;
                 height: 16px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                border-top-color: white;
+                border: 2px solid var(--color-border);
+                border-top-color: var(--color-brand-contrast);
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
               "
@@ -624,15 +602,15 @@ const resetForm = () => {
                 class="epsg-val"
                 :style="{
                   color: processamentoStatus?.quarentena
-                    ? 'var(--color-danger, #ef4444)'
+                    ? 'var(--color-danger)'
                     : processamentoStatus?.situacaoAtualId === 3
-                    ? '#f59e0b'
-                    : 'var(--vis-c-success, #10b981)'
+                    ? 'var(--color-warning)'
+                    : 'var(--color-success)'
                 }"
               >
                 {{
                   processamentoStatus?.quarentena
-                    ? 'Em Quarentena / Análise'
+                    ? 'Em Quarentena'
                     : processamentoStatus?.situacaoAtualId === 3
                     ? 'Com Ressalva de EPSG'
                     : processamentoStatus
@@ -647,8 +625,8 @@ const resetForm = () => {
             v-if="processamentoErro"
             class="alert-warning mt-3"
             style="
-              background: rgba(239, 68, 68, 0.08);
-              border-left: 3px solid #ef4444;
+              background: var(--badge-danger-bg);
+              border-left: 3px solid var(--color-danger);
               padding: 0.75rem 1rem;
               border-radius: 4px;
               color: var(--color-heading);
@@ -710,9 +688,7 @@ const resetForm = () => {
   padding: 2rem;
   width: 100%;
   box-sizing: border-box;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.05),
-    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-header {
@@ -816,7 +792,7 @@ const resetForm = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(242, 101, 34, 0.1), rgba(242, 101, 34, 0.05));
+  background: var(--color-brand-soft);
   margin-bottom: 0.5rem;
 }
 
@@ -853,14 +829,14 @@ const resetForm = () => {
   font-size: 0.7rem;
   font-weight: 600;
   font-family: monospace;
-  background-color: rgba(242, 101, 34, 0.08);
-  color: var(--vis-brand-orange);
+  background-color: var(--color-brand-soft);
+  color: var(--color-brand);
   letter-spacing: 0.03em;
 }
 
 .format-tag-active {
-  background-color: rgba(242, 101, 34, 0.16);
-  border: 1px solid var(--vis-brand-orange);
+  background-color: var(--color-brand-soft-strong);
+  border: 1px solid var(--color-brand);
   font-weight: 700;
   font-size: 0.78rem;
   padding: 0.3rem 0.7rem;
@@ -888,7 +864,7 @@ const resetForm = () => {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  background: var(--badge-success-bg);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -8,7 +9,9 @@ import {
   type SpatialAnalysisRequest,
   type SpatialAnalysisResult,
 } from '../services/spatialAnalysis'
+import { getThemeColor } from '@/utils/themeTokens'
 
+const route = useRoute()
 const documents = ref<SpatialAnalysisDocument[]>([])
 const selectedCarId = ref('')
 const selectedRestrictionIds = ref<string[]>([])
@@ -163,10 +166,10 @@ const addIntersectionPattern = () => {
   const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
   background.setAttribute('width', '8')
   background.setAttribute('height', '8')
-  background.setAttribute('fill', '#fef08a')
+  background.setAttribute('fill', getThemeColor('--map-layer-hatch-bg'))
   const hatch = document.createElementNS('http://www.w3.org/2000/svg', 'path')
   hatch.setAttribute('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4')
-  hatch.setAttribute('stroke', '#ea580c')
+  hatch.setAttribute('stroke', getThemeColor('--map-layer-hatch-stroke'))
   hatch.setAttribute('stroke-width', '1.5')
   pattern.append(background, hatch)
   defs.append(pattern)
@@ -176,11 +179,13 @@ const updateMapLayers = async () => {
   if (!map) return
   const requestId = ++mapRequestSequence
   layerError.value = ''
-  renderedLayers.forEach((layer) => layer.removeFrom(map as L.Map))
+  const activeMap = map
+  renderedLayers.forEach((layer) => layer.removeFrom(activeMap))
   renderedLayers = []
 
   const addLayer = (layer: L.Layer) => {
-    layer.addTo(map as L.Map)
+    if (!map) return
+    layer.addTo(map)
     renderedLayers.push(layer)
   }
 
@@ -190,10 +195,15 @@ const updateMapLayers = async () => {
         selectedCar.value.id,
         map.getBounds().toBBoxString(),
       )
-      if (requestId !== mapRequestSequence) return
+      if (!map || requestId !== mapRequestSequence) return
       addLayer(
         L.geoJSON(geometry, {
-          style: { color: '#15803d', weight: 2, fillColor: '#22c55e', fillOpacity: 0.16 },
+          style: {
+            color: getThemeColor('--map-layer-car-stroke'),
+            weight: 2,
+            fillColor: getThemeColor('--map-layer-car-fill'),
+            fillOpacity: 0.16,
+          },
           onEachFeature: (feature, layer) => {
             layer.bindTooltip(selectedCar.value?.name ?? 'Imóvel CAR')
             if (selectedCar.value) {
@@ -206,17 +216,18 @@ const updateMapLayers = async () => {
 
     if (showRestrictionLayers.value) {
       for (const restriction of selectedRestrictions.value) {
+        if (!map || requestId !== mapRequestSequence) return
         const geometry = await spatialAnalysisService.getDocumentGeoJSON(
           restriction.id,
           map.getBounds().toBBoxString(),
         )
-        if (requestId !== mapRequestSequence) return
+        if (!map || requestId !== mapRequestSequence) return
         const colors: Record<SpatialAnalysisDocument['category'], string> = {
-          CAR: '#15803d',
-          ALERTA: '#dc2626',
-          APP: '#7c3aed',
-          RESERVA_LEGAL: '#c2410c',
-          TERRA_INDIGENA: '#0f766e',
+          CAR: getThemeColor('--map-layer-car-stroke'),
+          ALERTA: getThemeColor('--map-layer-restriction-stroke'),
+          APP: getThemeColor('--map-layer-app'),
+          RESERVA_LEGAL: getThemeColor('--map-layer-reserva'),
+          TERRA_INDIGENA: getThemeColor('--map-layer-indigena'),
         }
         const color = colors[restriction.category]
         addLayer(
@@ -250,9 +261,9 @@ const updateMapLayers = async () => {
           intersectionCollection,
           {
             style: {
-              color: '#c2410c',
+              color: getThemeColor('--map-layer-intersection-stroke'),
               weight: 2,
-              fillColor: '#facc15',
+              fillColor: getThemeColor('--map-layer-intersection-fill'),
               fillOpacity: 0.62,
               dashArray: '3 3',
             },
@@ -266,7 +277,9 @@ const updateMapLayers = async () => {
             },
           },
         )
+        if (!map || requestId !== mapRequestSequence) return
         addLayer(intersectionLayer)
+        if (!map) return
         addIntersectionPattern()
         intersectionLayer.eachLayer((layer) => {
           if (layer instanceof L.Path) {
@@ -482,7 +495,12 @@ onMounted(async () => {
   initializeMap()
   try {
     documents.value = await spatialAnalysisService.listDocuments()
-    selectedCarId.value = carDocuments.value[0]?.id ?? ''
+    const targetBaseId = route.query.baseId ? String(route.query.baseId) : ''
+    const targetSafra = route.query.safra ? String(route.query.safra) : ''
+    const matchingDoc = targetBaseId
+      ? carDocuments.value.find((d) => String(d.id) === targetBaseId)
+      : (targetSafra ? carDocuments.value.find((d) => String(d.year) === targetSafra) : null)
+    selectedCarId.value = matchingDoc?.id ?? carDocuments.value[0]?.id ?? ''
     selectedRestrictionIds.value = restrictionDocuments.value
       .filter((document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year)
       .slice(0, 3)
@@ -499,7 +517,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
+  ++mapRequestSequence
+  if (mapRefreshTimer) {
+    clearTimeout(mapRefreshTimer)
+    mapRefreshTimer = null
+  }
   map?.remove()
   map = null
   activeBaseLayer = null
@@ -696,7 +718,7 @@ h2 { font-size: 1.05rem; }
 .category-tag { flex-shrink: 0; padding: 3px 6px; color: var(--color-brand); background: var(--color-surface-soft); border-radius: 4px; font-size: .64rem; font-weight: 700; }
 .selection-footer { align-items: flex-end; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-border); }
 .field-hint { margin: 0; color: var(--color-text-muted); font-size: .74rem; line-height: 1.45; }
-.calculate-button { flex-shrink: 0; min-height: 42px; padding: 0 18px; color: white; background: var(--color-brand); border: 0; border-radius: 6px; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
+.calculate-button { flex-shrink: 0; min-height: 42px; padding: 0 18px; color: var(--color-brand-contrast); background: var(--color-brand); border: 0; border-radius: 6px; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
 .calculate-button:disabled { opacity: .5; cursor: not-allowed; }
 .analysis-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 610px; gap: 16px; }
 .map-panel { display: flex; min-width: 0; flex-direction: column; overflow: hidden; }
@@ -710,13 +732,13 @@ h2 { font-size: 1.05rem; }
 .map-layer-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 11px 14px; border-top: 1px solid var(--color-border); }
 .map-layer-controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); font-size: .73rem; cursor: pointer; }
 .legend-swatch { width: 12px; height: 12px; border: 2px solid; border-radius: 3px; }
-.swatch-car { border-color: #15803d; background: #bbf7d0; }
-.swatch-restriction { border-color: #dc2626; background: #fecaca; }
-.swatch-intersection { border-color: #c2410c; background: #facc15; }
-.map-error { margin: 0; padding: 8px 14px; color: var(--vis-c-danger); font-size: .78rem; }
+.swatch-car { border-color: var(--map-layer-car-stroke); background: var(--map-layer-car-swatch); }
+.swatch-restriction { border-color: var(--map-layer-restriction-stroke); background: var(--map-layer-restriction-fill); }
+.swatch-intersection { border-color: var(--map-layer-intersection-stroke); background: var(--map-layer-intersection-fill); }
+.map-error { margin: 0; padding: 8px 14px; color: var(--color-danger); font-size: .78rem; }
 .results-panel { display: flex; min-width: 0; flex-direction: column; padding: 17px 15px; }
 .results-heading { padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
-.result-count { display: grid; width: 28px; height: 28px; place-items: center; color: white; background: var(--vis-brand-orange); border-radius: 50%; font-size: .77rem; font-weight: 800; }
+.result-count { display: grid; width: 28px; height: 28px; place-items: center; color: var(--color-brand-contrast); background: var(--color-brand); border-radius: 50%; font-size: .77rem; font-weight: 800; }
 .result-summary { margin: 12px 0 8px; color: var(--color-text-muted); font-size: .72rem; line-height: 1.4; }
 .result-list { display: grid; max-height: 310px; gap: 7px; overflow-y: auto; }
 .result-item { display: grid; gap: 5px; padding: 10px; color: var(--color-text); text-align: left; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; }

@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import type { FeatureCollection } from 'geojson'
 import TemporalComparisonMaps from '@/components/TemporalComparisonMaps.vue'
+
+type FeatureCollection = GeoJSON.FeatureCollection
 import {
   comparisonService,
   comparisonErrorMessage,
@@ -77,7 +78,7 @@ const identifiers = computed(() => [
 ])
 const selectedFeatures = computed(() =>
   [layersA.value, layersB.value].map((collection) =>
-    collection?.features.find((f) => featureIdentifier(f) === selectedId.value),
+    collection?.features.find((f: GeoJSON.Feature) => featureIdentifier(f) === selectedId.value),
   ),
 )
 const area = (value: number) =>
@@ -585,7 +586,7 @@ legend {
   font-size: 0.83rem;
 }
 .btn-primary {
-  color: white;
+  color: var(--color-brand-contrast);
   background: var(--color-brand);
   border-color: var(--color-brand);
   font-weight: 700;
@@ -640,13 +641,13 @@ select:disabled {
   height: 12px;
 }
 .legend-new {
-  background: #dc2626;
+  background: var(--map-layer-restriction-stroke);
 }
 .legend-reduction {
-  background: #15803d;
+  background: var(--map-layer-car-stroke);
 }
 .legend-kept {
-  background: #d6a217;
+  background: var(--map-layer-delta-kept);
 }
 .metrics-panel {
   padding: 0;

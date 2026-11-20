@@ -4,9 +4,9 @@ import api from '../api'
 
 vi.mock('../api', () => ({
   default: {
-    get: vi.fn(),
-    post: vi.fn(),
-    patch: vi.fn(),
+    get: vi.fn<() => Promise<unknown>>(),
+    post: vi.fn<() => Promise<unknown>>(),
+    patch: vi.fn<() => Promise<unknown>>(),
     defaults: { baseURL: 'http://localhost:8080' },
   },
   mockactive: false,
@@ -84,12 +84,12 @@ describe('Auditoria Service (US05 - Rastreabilidade e Reprocessamento)', () => {
     expect(resultado.carga.id).toBe('46')
     expect(resultado.versions.length).toBe(2)
     // Mais recente no topo:
-    expect(resultado.versions[0].versionNumber).toBe(2)
-    expect(resultado.versions[0].integrityHash).toBe('hash_reprocessado_v2')
-    expect(resultado.versions[0].isLatest).toBe(true)
+    expect(resultado.versions[0]!.versionNumber).toBe(2)
+    expect(resultado.versions[0]!.integrityHash).toBe('hash_reprocessado_v2')
+    expect(resultado.versions[0]!.isLatest).toBe(true)
     // Arquivo original preservado:
-    expect(resultado.versions[1].versionNumber).toBe(1)
-    expect(resultado.versions[1].integrityHash).toBe('hash_original_v1')
+    expect(resultado.versions[1]!.versionNumber).toBe(1)
+    expect(resultado.versions[1]!.integrityHash).toBe('hash_original_v1')
   })
 
   it('deve retornar lista vazia de versões quando o banco não tiver histórico e não houver currentDetails', async () => {
@@ -114,7 +114,7 @@ describe('Auditoria Service (US05 - Rastreabilidade e Reprocessamento)', () => {
 
     const resultado = await auditoriaService.getVersionsForProcess('46', mockDetails)
     expect(resultado.versions.length).toBe(1)
-    expect(resultado.versions[0].id).toBe('46')
-    expect(resultado.versions[0].integrityHash).toBe('fallback_hash_123')
+    expect(resultado.versions[0]!.id).toBe('46')
+    expect(resultado.versions[0]!.integrityHash).toBe('fallback_hash_123')
   })
 })

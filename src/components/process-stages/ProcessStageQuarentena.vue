@@ -11,9 +11,6 @@ import {
 } from 'vue-icons-plus/fi'
 import type { ProcessLogDetails } from '../../services/process'
 import { processService } from '../../services/process'
-import { dashboardService } from '../../services/dashboard'
-import { userService } from '../../services/user'
-import { uploadService } from '../../services/upload'
 
 const props = withDefaults(
   defineProps<{
@@ -25,12 +22,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: 'reload'): void }>()
 
-const currentUser = computed(() => userService.getCurrentUser())
-const isAuditor = computed(() => currentUser.value.role === 'Auditor')
-const isAdmin = computed(() => userService.isAdmin())
-
-// Trava read-only de mutação para Auditor ou versão fechada (Tarefa 9)
-const isMutationReadOnly = computed(() => props.readOnly || isAuditor.value)
+// Apenas respeita read-only de versão fechada
+const isMutationReadOnly = computed(() => props.readOnly)
 
 // Toast de erro / sucesso (Tarefa 10)
 const toastError = ref<string | null>(null)
@@ -69,7 +62,7 @@ const confirmAlocarAuditor = async () => {
   isAlocandoAuditor.value = true
   try {
     const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-    await processService.alocarAuditor(numericId || props.details.id, selectedAuditorId.value, currentUser.value.id || 1)
+    await processService.alocarAuditor(numericId || props.details.id, selectedAuditorId.value, 1)
     const auditorObj = auditores.value.find((a) => a.id === selectedAuditorId.value)
     showSuccessToast(`Auditor ${auditorObj ? auditorObj.nome : ''} alocado com sucesso para a carga ${props.details.id}!`)
     showAlocarAuditorModal.value = false
@@ -86,22 +79,15 @@ const signalStatus = ref<'idle' | 'loading' | 'signaled'>('idle')
 const signalOperatorReprocess = async () => {
   signalStatus.value = 'loading'
   toastError.value = null
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  try {
-    if (numericId) {
-      await uploadService.notificarOperadorQuarentena(numericId)
-    } else {
-      await dashboardService.requestAuditor(props.details.id)
-    }
-    signalStatus.value = 'signaled'
-    showSuccessToast(
-      `Sinalização operacional enviada ao Operador para reprocessamento da carga ${props.details.id}.`,
-    )
-  } catch {
-    // Fallback local da flag operacional caso o backend esteja offline
-    signalStatus.value = 'signaled'
+  const result = await processService.signalQuarantineReprocess(props.details.id)
+  signalStatus.value = 'signaled'
+  if (result.simulated) {
     showSuccessToast(
       `Flag de aviso operacional ativada para reprocessamento da carga ${props.details.id}.`,
+    )
+  } else {
+    showSuccessToast(
+      `Sinalização operacional enviada ao Operador para reprocessamento da carga ${props.details.id}.`,
     )
   }
 }
@@ -116,51 +102,24 @@ const exportQuarantine = async (format: 'csv' | 'json') => {
     return
   }
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (format === 'csv' && numericId) {
-    try {
-      const blob = await uploadService.exportarRejeicoesCsv(numericId)
-      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `rejeicoes_carga_${numericId}.csv`
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        URL.revokeObjectURL(url)
-        showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
-        return
-      }
-    } catch {
-      // Fallback para os registros locais em memória
-    }
-  }
-
-  let content = ''
-  let mimeType = ''
-  if (format === 'csv') {
-    content =
-      'ID,Motivo,Etapa,Data\n' +
-      records
-        .map((r) => `${r.recordId},"${r.motivo}",${r.etapaOrigem},${r.dataRejeicao}`)
-        .join('\n')
-    mimeType = 'text/csv;charset=utf-8'
-  } else {
-    content = JSON.stringify(records, null, 2)
-    mimeType = 'application/json;charset=utf-8'
-  }
+  const { blob, filename, isOfficial } = await processService.exportQuarantineReport(
+    props.details.id,
+    format,
+    records,
+  )
 
   if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-    const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `rejeicoes_${props.details.id}.${format}`
+    link.download = filename
     document.body.appendChild(link)
     link.click()
     link.remove()
     URL.revokeObjectURL(url)
+    if (isOfficial) {
+      showSuccessToast('Relatório oficial de rejeições exportado com sucesso.')
+    }
   }
 }
 
@@ -203,30 +162,15 @@ const confirmReprocess = async () => {
   selectedFile.value = null
   reprocessNote.value = ''
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (numericId) {
-    try {
-      localStorage.removeItem(`api4_decisoes_${numericId}`)
-    } catch {
-      // ignore storage error
-    }
-    try {
-      await uploadService.reprocessarCarga(numericId, fileToUpload)
-      emit('reload')
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location) {
-          window.location.reload()
-        }
-      }, 700)
-    } catch (e: any) {
-      console.warn('Erro ao chamar endpoint de reprocessamento, simulando localmente:', e)
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location) {
-          window.location.reload()
-        }
-      }, 700)
-    }
+  const { simulated } = await processService.reprocessQuarantineLoad(props.details.id, fileToUpload)
+  if (!simulated) {
+    emit('reload')
   }
+  setTimeout(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.reload()
+    }
+  }, 700)
 }
 
 // Tarefa 8: Modal de Cancelar / Invalidar Carga com justificativa obrigatória e aviso de preservação de Hash
@@ -247,14 +191,7 @@ const confirmCancelLoad = async () => {
   )
   cancelJustification.value = ''
 
-  const numericId = Number(String(props.details.id).replace(/\D/g, ''))
-  if (numericId) {
-    try {
-      await uploadService.cancelarCarga(numericId, justification)
-    } catch (e: any) {
-      console.warn('Erro ao chamar endpoint de cancelamento, simulando localmente:', e)
-    }
-  }
+  await processService.cancelQuarantineLoad(props.details.id, justification)
 }
 </script>
 
@@ -335,8 +272,8 @@ const confirmCancelLoad = async () => {
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID Polígono / Registro</th>
-              <th>Motivo da Rejeição / Erro Topológico</th>
+              <th>ID do Registro</th>
+              <th>Motivo da Rejeição</th>
               <th>Etapa de Origem</th>
               <th>ID Execução</th>
             </tr>
@@ -353,11 +290,10 @@ const confirmCancelLoad = async () => {
       </div>
       <p v-else>Nenhum registro detalhado na quarentena.</p>
 
-      <!-- Barra de Ações por Perfil (Tarefas 5, 7, 8 e 9) -->
+      <!-- Barra de Ações Operacionais -->
       <div class="mt-4 border-top pt-4 action-footer">
-        <!-- Alocar Auditor pelo Gestor / Administrador -->
+        <!-- Alocar Auditor -->
         <button
-          v-if="isAdmin || (currentUser.role as string) === 'Gestor'"
           type="button"
           class="btn btn_outline"
           style="color: var(--color-brand); border-color: var(--color-brand); display: flex; align-items: center; gap: 0.4rem"
@@ -368,9 +304,8 @@ const confirmCancelLoad = async () => {
           Alocar Auditor
         </button>
 
-        <!-- Tarefa 5: Botão do Auditor / Admin para Sinalizar Reprocessamento ao Operador -->
+        <!-- Botão para Sinalizar Reprocessamento ao Operador -->
         <button
-          v-if="isAuditor || isAdmin"
           type="button"
           class="btn btn_outline btn-signal"
           data-testid="btn-signal-operator"
@@ -381,11 +316,11 @@ const confirmCancelLoad = async () => {
           {{
             signalStatus === 'signaled'
               ? 'Operador Sinalizado para Reprocessamento'
-              : 'Sinalizar / Solicitar Reprocessamento ao Operador'
+              : 'Solicitar Reprocessamento ao Operador'
           }}
         </button>
 
-        <!-- Tarefa 7 e 8: Botões de Mutação do Operador/Admin (Ocultos para o Auditor - Tarefa 9) -->
+        <!-- Botões de Mutação (Ocultos se a versão estiver fechada) -->
         <template v-if="!isMutationReadOnly">
           <button
             type="button"
@@ -404,7 +339,7 @@ const confirmCancelLoad = async () => {
             @click="showCancelModal = true"
           >
             <FiXCircle size="14" />
-            Cancelar / Invalidar Envio
+            Cancelar Envio
           </button>
         </template>
       </div>
@@ -525,7 +460,7 @@ const confirmCancelLoad = async () => {
     >
       <div class="modal-dialog">
         <div class="modal-header">
-          <h4>Cancelar / Invalidar Envio #{{ details.id }}</h4>
+          <h4>Cancelar Envio #{{ details.id }}</h4>
           <button type="button" class="modal-close" @click="showCancelModal = false">
             &times;
           </button>
@@ -674,8 +609,8 @@ const confirmCancelLoad = async () => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background-color: var(--vis-brand-orange, #f26522);
-  color: white;
+  background-color: var(--color-brand);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.55rem 1.1rem;
   border-radius: 6px;
@@ -697,8 +632,8 @@ const confirmCancelLoad = async () => {
 }
 
 .btn-danger {
-  background: var(--badge-danger-text);
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
   border: none;
   padding: 0.55rem 1.1rem;
   border-radius: 6px;
@@ -784,7 +719,7 @@ const confirmCancelLoad = async () => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;

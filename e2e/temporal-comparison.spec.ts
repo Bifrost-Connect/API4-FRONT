@@ -169,7 +169,7 @@ test('atalho do catálogo preenche a versão inicial publicada', async ({ page }
     }),
   )
   await page.goto('/catalogo')
-  await page.getByRole('button', { name: 'Comparar safras' }).click()
+  await page.getByRole('button', { name: /Comparar safra/i }).click()
   await expect(page).toHaveURL('/comparacao-temporal?baseA=1')
   await expect(page.getByLabel('Conjunto temático', { exact: true })).toHaveValue('2')
   await expect(page.getByLabel('Safra inicial / Base A')).toHaveValue('1')
@@ -179,6 +179,6 @@ test('operador não acessa a comparação por URL', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('api4-demo-role', 'Operador'))
   await page.route('**/api/**', (route) => route.fulfill({ json: [] }))
   await page.goto('/comparacao-temporal')
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL('/acesso-negado')
   await expect(page.getByRole('link', { name: 'Comparação temporal' })).toHaveCount(0)
 })

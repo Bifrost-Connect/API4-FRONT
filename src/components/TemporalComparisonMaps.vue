@@ -2,8 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Feature, FeatureCollection } from 'geojson'
 import { featureIdentifier, synchronizeCameras } from '@/utils/comparacao'
+import { getThemeColor } from '@/utils/themeTokens'
+
+type Feature = GeoJSON.Feature
+type FeatureCollection = GeoJSON.FeatureCollection
 
 const props = defineProps<{
   layersA: FeatureCollection | null
@@ -39,12 +42,20 @@ let resizeObserver: ResizeObserver | undefined
 let disposed = false
 let renderSequence = 0
 
-const colors = { NOVO_ALERTA: '#dc2626', REDUCAO_ALERTA: '#15803d', MANTIDO: '#d6a217' }
+const colors = {
+  NOVO_ALERTA: getThemeColor('--map-layer-restriction-stroke'),
+  REDUCAO_ALERTA: getThemeColor('--map-layer-car-stroke'),
+  MANTIDO: getThemeColor('--map-layer-delta-kept'),
+}
 function style(feature: Feature | undefined, side: number): L.PathOptions {
   const selected =
     !!feature && !!props.selectedId && featureIdentifier(feature) === props.selectedId
   return {
-    color: selected ? '#f26522' : side === 0 ? '#2563eb' : '#7c3aed',
+    color: selected
+      ? getThemeColor('--vis-brand-orange')
+      : side === 0
+        ? getThemeColor('--map-layer-compare-a')
+        : getThemeColor('--map-layer-compare-b'),
     weight: selected ? 5 : 2,
     fillOpacity: selected ? 0.42 : 0.18,
   }
@@ -60,7 +71,7 @@ function popupContent(identifier: string): HTMLElement {
     [props.labelA, props.layersA],
     [props.labelB, props.layersB],
   ] as const) {
-    const feature = collection?.features.find((item) => featureIdentifier(item) === identifier)
+    const feature = collection?.features.find((item: Feature) => featureIdentifier(item) === identifier)
     const line = document.createElement('p')
     line.textContent = `${label}: ${feature ? 'presente no recorte' : 'sem correspondente no recorte'}.`
     root.append(line)
@@ -102,7 +113,9 @@ function updateDelta() {
         deltaLayers[side] = L.geoJSON(undefined, {
           interactive: false,
           style: (feature) => ({
-            color: colors[feature?.properties?.classe as keyof typeof colors] ?? '#64748b',
+            color:
+              colors[feature?.properties?.classe as keyof typeof colors] ??
+              getThemeColor('--map-layer-neutral'),
             weight: 2,
             fillOpacity: 0.5,
           }),

@@ -52,3 +52,8 @@ playwright-report/
 # Enforce pnpm
 package-lock.json
 yarn.lock
+
+# Executavel gerado pelo build:exe / GitHub Actions
+executavel/frontend
+executavel/.env
+scripts/dist_embedded.cpp

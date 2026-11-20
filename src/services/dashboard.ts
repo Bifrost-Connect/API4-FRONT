@@ -1,5 +1,4 @@
 import api from './api'
-import { userService } from './user'
 import { processService } from './process'
 
 export interface Page<T> {
@@ -214,14 +213,10 @@ export const dashboardService = {
    */
   async aprovarEFecharVersao(
     item: any,
-    responsavelNome = userService.getCurrentUser().name,
+    responsavelNome = 'Gestor',
   ): Promise<{ success: boolean }> {
-    const usuarioId = userService.getCurrentUser().id
-
     if (/^\d+$/.test(String(item.id))) {
-      await api.patch(`/indicadores/${item.id}/fechar`, null, {
-        headers: { 'X-Gestor-ID': String(usuarioId) },
-      })
+      await api.patch(`/indicadores/${item.id}/fechar`, null)
     }
 
     item.decided = true
@@ -251,7 +246,7 @@ export const dashboardService = {
 
     if (/^\d+$/.test(String(item.id))) {
       await api.put(`/processos/${item.id}/editor`, {
-        editorId: userService.getCurrentUser().id,
+        editorId: 1,
       })
     }
 

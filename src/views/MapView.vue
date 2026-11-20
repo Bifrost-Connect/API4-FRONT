@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, markRaw, onBeforeUnmount, onMounted, ref, watch, type Raw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { mapService } from '../services/map'
+import { mapService, DEFAULT_MAP_PALETTE, type PublishedLocation } from '../services/map'
+import { geojsonCache } from '@/services/storage/geojsonCache'
+import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
 
 interface MapLocation {
   id: string
@@ -12,6 +14,17 @@ interface MapLocation {
   latitude: number
   longitude: number
   status: 'Processado' | 'Em validação' | 'Aguardando' | 'Concluída'
+  total_feicoes: number
+}
+
+type RawLocationInput = PublishedLocation & {
+  nome?: string
+  tipo?: string
+  lat?: number
+  lng?: number
+  totalFeicoes?: number
+  feicoes?: number
+  featureCount?: number
 }
 
 interface TerritoryProperties {
@@ -19,6 +32,7 @@ interface TerritoryProperties {
   processoId?: number | string
   codigoImovel?: string
   anoSafra?: string
+  areaHectares?: number | string
   name?: string
   category?: string
   status?: string
@@ -32,6 +46,8 @@ const searchTerm = ref('')
 const selectedLocation = ref<MapLocation | null>(null)
 const selectedCoordinates = ref({ latitude: -15.78, longitude: -47.93 })
 const mapError = ref('')
+const isFromCache = ref(false)
+const isRefreshingCache = ref(false)
 
 const locations = ref<MapLocation[]>([])
 
@@ -43,24 +59,55 @@ interface BaseLayerItem {
   color: string
   visible: boolean
   featureCount: number
-  layer: L.GeoJSON
+  layer: Raw<L.GeoJSON>
   bounds?: L.LatLngBounds
 }
 
-const baseLayers = ref<BaseLayerItem[]>([])
+interface CatalogBaseItem {
+  id: string
+  name: string
+  type: string
+  latitude: number
+  longitude: number
+  status: MapLocation['status']
+  total_feicoes: number
+  color: string
+  visible: boolean
+  loading: boolean
+  loaded: boolean
+}
 
-const DEFAULT_PALETTE = [
-  '#10b981', // Verde Esmeralda
-  '#3b82f6', // Azul Royal
-  '#8b5cf6', // Roxo Violeta
-  '#f59e0b', // Âmbar / Laranja
-  '#ec4899', // Rosa
-  '#06b6d4', // Ciano
-  '#ef4444', // Vermelho
-  '#14b8a6', // Verde Água
-  '#84cc16', // Lima
-  '#6366f1', // Índigo
-]
+const baseLayers = ref<BaseLayerItem[]>([])
+const loadingBaseIds = ref<Record<string, boolean>>({})
+const customColors = ref<Record<string, string>>({})
+
+const DEFAULT_PALETTE = DEFAULT_MAP_PALETTE
+
+const catalogBases = computed<CatalogBaseItem[]>(() => {
+  return locations.value.map((location, index) => {
+    const id = String(location.id)
+    const layerMatch = baseLayers.value.find((b) => String(b.id) === id)
+    const color =
+      customColors.value[id] ??
+      layerMatch?.color ??
+      DEFAULT_PALETTE[index % DEFAULT_PALETTE.length] ??
+      '#10b981'
+
+    return {
+      id,
+      name: location.name,
+      type: location.type,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      status: location.status,
+      total_feicoes: location.total_feicoes,
+      color,
+      visible: layerMatch ? layerMatch.visible : false,
+      loading: Boolean(loadingBaseIds.value[id]),
+      loaded: Boolean(layerMatch),
+    }
+  })
+})
 
 let map: L.Map | null = null
 let markers: L.LayerGroup | null = null
@@ -80,117 +127,56 @@ const selectLocation = (location: MapLocation) => {
 
 const clearBaseLayers = () => {
   baseLayers.value.forEach((b) => {
-    if (b.layer && map) {
+    if (b.layer && map && map.hasLayer(b.layer)) {
       map.removeLayer(b.layer)
     }
   })
   baseLayers.value = []
 }
 
-const buildBaseLayersFromGeoJson = (geojson: any) => {
-  clearBaseLayers()
-  if (!geojson || !Array.isArray(geojson.features) || geojson.features.length === 0) {
-    return
-  }
+const createGeoJsonLayer = (
+  features: GeoJSON.Feature[],
+  color: string,
+  baseName: string,
+): L.GeoJSON => {
+  return L.geoJSON(
+    { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection,
+    {
+      style: () => ({
+        color,
+        weight: 2,
+        opacity: 1,
+        fillColor: color,
+        fillOpacity: 0.3,
+      }),
+      onEachFeature: (feature, fLayer) => {
+        const props = (feature.properties || {}) as TerritoryProperties
+        const title = props.codigoImovel || props.name || `Feição #${props.id || ''}`
+        const details = [
+          props.areaHectares ? `Área: ${props.areaHectares} ha` : null,
+          props.category ? `Categoria: ${props.category}` : null,
+          props.anoSafra ? `Safra: ${props.anoSafra}` : null,
+          props.processoId ? `Processo: #${props.processoId}` : null,
+          baseName ? `Base: ${baseName}` : null,
+        ].filter(Boolean)
 
-  // Agrupa feições por processoId ou categoria
-  const groups = new Map<string, any[]>()
-  geojson.features.forEach((feature: any) => {
-    const key = String(
-      feature.properties?.processoId ||
-      feature.properties?.category ||
-      feature.properties?.source ||
-      'base_padrao'
-    )
-    if (!groups.has(key)) {
-      groups.set(key, [])
-    }
-    groups.get(key)!.push(feature)
-  })
-
-  let index = 0
-  const allBounds: L.LatLngBounds[] = []
-
-  groups.forEach((features, key) => {
-    const color = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length]
-    index++
-
-    // Encontra dados correspondentes da base
-    const locMatch = locations.value.find((l) => String(l.id) === key)
-    const baseName =
-      locMatch?.name ||
-      features[0]?.properties?.name ||
-      features[0]?.properties?.category ||
-      `Base #${key}`
-    const baseType =
-      locMatch?.type ||
-      (features[0]?.properties?.anoSafra ? `Safra ${features[0].properties.anoSafra}` : 'Camada Territorial')
-
-    const layer = L.geoJSON(
-      { type: 'FeatureCollection', features },
-      {
-        style: () => ({
-          color,
-          weight: 2,
-          opacity: 1,
-          fillColor: color,
-          fillOpacity: 0.3,
-        }),
-        onEachFeature: (feature, fLayer) => {
-          const props = feature.properties || {}
-          const title = props.codigoImovel || props.name || `Feição #${props.id || ''}`
-          const details = [
-            props.areaHectares ? `Área: ${props.areaHectares} ha` : null,
-            props.category ? `Categoria: ${props.category}` : null,
-            props.anoSafra ? `Safra: ${props.anoSafra}` : null,
-            props.processoId ? `Processo: #${props.processoId}` : null,
-            baseName ? `Base: ${baseName}` : null,
-          ].filter(Boolean)
-
-          fLayer.bindTooltip(title)
-          fLayer.bindPopup(
-            `<div style="font-size: 0.85rem; line-height: 1.4;">
-              <strong style="color: ${color}; font-size: 0.95rem;">${title}</strong><br />
-              ${details.join('<br />')}
-              ${props.processoId ? `<div style="margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px;">
-                <a href="/processo/${props.processoId}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
-              </div>` : ''}
+        fLayer.bindTooltip(title)
+        fLayer.bindPopup(
+          `<div style="font-size: 0.85rem; line-height: 1.4;">
+            <strong style="color: ${color}; font-size: 0.95rem;">${title}</strong><br />
+            ${details.join('<br />')}
+            ${
+              props.processoId
+                ? `<div style="margin-top: 8px; border-top: 1px solid var(--color-border); padding-top: 4px;">
+              <a href="/processo/${props.processoId}" style="color: var(--color-accent-link); text-decoration: underline; font-weight: 600;">Ver Detalhes do Processo</a>
             </div>`
-          )
-        },
-      }
-    )
-
-    if (map) {
-      layer.addTo(map)
-    }
-
-    const bounds = layer.getBounds().isValid() ? layer.getBounds() : undefined
-    if (bounds) allBounds.push(bounds)
-
-    baseLayers.value.push({
-      id: key,
-      name: baseName,
-      type: baseType,
-      processoId: features[0]?.properties?.processoId,
-      color,
-      visible: true,
-      featureCount: features.length,
-      layer,
-      bounds,
-    })
-  })
-
-  // Ajusta zoom do mapa para englobar todas as camadas ativas
-  if (map && allBounds.length > 0) {
-    const combined = allBounds[0]
-    for (let i = 1; i < allBounds.length; i++) {
-      combined.extend(allBounds[i])
-    }
-    if (combined.isValid()) {
-      map.fitBounds(combined.pad(0.12), { maxZoom: 14 })
-    }
-  }
+                : ''
+            }
+          </div>`,
+        )
+      },
+    },
+  )
 }
 
 const toggleBaseVisibility = (base: BaseLayerItem) => {
@@ -219,8 +205,108 @@ const zoomToBase = (base: BaseLayerItem) => {
   if (base.bounds && base.bounds.isValid()) {
     map.fitBounds(base.bounds.pad(0.12), { maxZoom: 14 })
   } else {
-    const loc = locations.value.find((l) => l.id === base.id)
+    const loc = locations.value.find((l) => String(l.id) === String(base.id))
     if (loc) selectLocation(loc)
+  }
+}
+
+const upsertBaseLayerFromFeatures = (
+  baseId: string,
+  features: GeoJSON.Feature[],
+  options?: { fitBounds?: boolean },
+): BaseLayerItem | null => {
+  if (!map || features.length === 0) return null
+
+  const normalizedId = String(baseId)
+  const existingIndex = baseLayers.value.findIndex((b) => String(b.id) === normalizedId)
+  const existing = existingIndex >= 0 ? baseLayers.value[existingIndex] : undefined
+
+  const locIndex = locations.value.findIndex((l) => String(l.id) === normalizedId)
+  const locMatch = locIndex >= 0 ? locations.value[locIndex] : undefined
+  const paletteIndex = locIndex >= 0 ? locIndex : baseLayers.value.length
+
+  const color =
+    customColors.value[normalizedId] ??
+    existing?.color ??
+    DEFAULT_PALETTE[paletteIndex % DEFAULT_PALETTE.length] ??
+    '#10b981'
+
+  const firstProps = (features[0]?.properties || {}) as TerritoryProperties
+  const baseName =
+    locMatch?.name || firstProps.name || firstProps.category || `Base #${normalizedId}`
+  const baseType =
+    locMatch?.type ||
+    (firstProps.anoSafra ? `Safra ${firstProps.anoSafra}` : 'Camada Territorial')
+
+  if (existing?.layer && map.hasLayer(existing.layer)) {
+    map.removeLayer(existing.layer)
+  }
+
+  const layer = createGeoJsonLayer(features, color, baseName)
+  layer.addTo(map)
+
+  const rawBounds = layer.getBounds()
+  const bounds = rawBounds && rawBounds.isValid() ? rawBounds : undefined
+
+  const item: BaseLayerItem = {
+    id: normalizedId,
+    name: baseName,
+    type: baseType,
+    processoId: firstProps.processoId ?? locMatch?.id,
+    color,
+    visible: true,
+    featureCount: features.length,
+    layer: markRaw(layer),
+    bounds,
+  }
+
+  if (existingIndex >= 0) {
+    baseLayers.value.splice(existingIndex, 1, item)
+  } else {
+    baseLayers.value.push(item)
+  }
+
+  if (options?.fitBounds) {
+    zoomToBase(item)
+  }
+
+  return item
+}
+
+const mergeGeoJsonIntoBaseLayers = (geojson: { features?: GeoJSON.Feature[] }) => {
+  if (!map || !Array.isArray(geojson.features) || geojson.features.length === 0) return
+
+  const groups = new Map<string, GeoJSON.Feature[]>()
+  geojson.features.forEach((feature) => {
+    const props = (feature.properties || {}) as TerritoryProperties
+    const key = String(props.processoId || props.category || props.source || 'base_padrao')
+    if (!groups.has(key)) {
+      groups.set(key, [])
+    }
+    groups.get(key)!.push(feature)
+  })
+
+  const mergedBounds: L.LatLngBounds[] = []
+  groups.forEach((groupFeatures, key) => {
+    const item = upsertBaseLayerFromFeatures(key, groupFeatures, { fitBounds: false })
+    if (item?.bounds) {
+      mergedBounds.push(item.bounds)
+    }
+  })
+
+  if (mergedBounds.length > 0) {
+    const combined = mergedBounds[0]
+    if (combined) {
+      for (let i = 1; i < mergedBounds.length; i++) {
+        const nextBound = mergedBounds[i]
+        if (nextBound) {
+          combined.extend(nextBound)
+        }
+      }
+      if (combined.isValid()) {
+        map.fitBounds(combined.pad(0.12), { maxZoom: 14 })
+      }
+    }
   }
 }
 
@@ -231,44 +317,165 @@ const toggleAllBases = (visible: boolean) => {
   })
 }
 
+const loadBaseLayerOnDemand = async (
+  baseId: string,
+  options?: { forceRefresh?: boolean; fitBounds?: boolean },
+) => {
+  const normalizedBaseId = String(baseId).trim()
+  if (!normalizedBaseId) return
+  if (loadingBaseIds.value[normalizedBaseId]) return
+
+  const existing = baseLayers.value.find((b) => String(b.id) === normalizedBaseId)
+  if (existing && !options?.forceRefresh) {
+    existing.visible = true
+    toggleBaseVisibility(existing)
+    if (options?.fitBounds) {
+      zoomToBase(existing)
+    }
+    return
+  }
+
+  loadingBaseIds.value = { ...loadingBaseIds.value, [normalizedBaseId]: true }
+  try {
+    const numericOrStringId = /^\d+$/.test(normalizedBaseId)
+      ? Number(normalizedBaseId)
+      : normalizedBaseId
+
+    const fetchedTerritories = await mapService.getTerritories(
+      { processoId: numericOrStringId, baseId: numericOrStringId },
+      { forceRefresh: options?.forceRefresh },
+    )
+    if (!map) return
+
+    isFromCache.value = Boolean(fetchedTerritories.fromCache)
+    mapError.value = ''
+
+    const features = Array.isArray(fetchedTerritories.features)
+      ? (fetchedTerritories.features as GeoJSON.Feature[])
+      : []
+
+    if (features.length > 0) {
+      upsertBaseLayerFromFeatures(normalizedBaseId, features, {
+        fitBounds: options?.fitBounds,
+      })
+    } else {
+      if (existing) {
+        if (existing.layer && map.hasLayer(existing.layer)) {
+          map.removeLayer(existing.layer)
+        }
+        baseLayers.value = baseLayers.value.filter((b) => String(b.id) !== normalizedBaseId)
+      }
+      if (options?.fitBounds) {
+        const loc = locations.value.find((l) => String(l.id) === normalizedBaseId)
+        if (loc) selectLocation(loc)
+      }
+    }
+  } catch (err) {
+    console.warn('Falha ao carregar camada da base:', err)
+    mapError.value = 'Não foi possível carregar os polígonos desta base.'
+  } finally {
+    loadingBaseIds.value = { ...loadingBaseIds.value, [normalizedBaseId]: false }
+  }
+}
+
+const onToggleBase = async (base: CatalogBaseItem, event?: Event) => {
+  const existing = baseLayers.value.find((b) => String(b.id) === base.id)
+  if (!existing) {
+    await loadBaseLayerOnDemand(base.id, { fitBounds: true })
+    const loaded = baseLayers.value.find((b) => String(b.id) === base.id)
+    if (!loaded && event?.target instanceof HTMLInputElement) {
+      event.target.checked = false
+    }
+    return
+  }
+
+  existing.visible = !existing.visible
+  toggleBaseVisibility(existing)
+}
+
+const onFocusBase = async (base: CatalogBaseItem) => {
+  if (loadingBaseIds.value[base.id]) return
+
+  const loc = locations.value.find((l) => String(l.id) === base.id)
+  if (loc) {
+    selectLocation(loc)
+  } else {
+    selectedLocation.value = null
+    selectedCoordinates.value = { latitude: base.latitude, longitude: base.longitude }
+  }
+
+  const existing = baseLayers.value.find((b) => String(b.id) === base.id)
+  if (!existing) {
+    await loadBaseLayerOnDemand(base.id, { fitBounds: true })
+    return
+  }
+
+  existing.visible = true
+  toggleBaseVisibility(existing)
+  zoomToBase(existing)
+}
+
+const onColorInput = (base: CatalogBaseItem, event: Event) => {
+  const target = event.target as HTMLInputElement | null
+  const nextColor = target?.value
+  if (!nextColor) return
+
+  customColors.value = {
+    ...customColors.value,
+    [base.id]: nextColor,
+  }
+
+  const existing = baseLayers.value.find((b) => String(b.id) === base.id)
+  if (existing) {
+    existing.color = nextColor
+    updateBaseColor(existing)
+  }
+}
+
 const findLocation = async () => {
-  const normalizedTerm = searchTerm.value.trim().toLowerCase()
+  const rawTerm = searchTerm.value.trim()
+  const normalizedTerm = rawTerm.toLowerCase()
   if (!normalizedTerm) return
 
-  const location = locations.value.find((item) => item.name.toLowerCase().includes(normalizedTerm))
-  if (location) {
-    selectLocation(location)
-  }
-
-  // US09: Atualiza as camadas territoriais filtradas por busca textual no servidor
-  try {
-    const fetchedTerritories = await mapService.getTerritories({ busca: searchTerm.value.trim() })
-    buildBaseLayersFromGeoJson(fetchedTerritories)
-  } catch (err) {
-    console.warn('Falha ao filtrar camadas no mapa:', err)
-  }
-
-  const coordinates = normalizedTerm.split(',').map(Number)
-  if (coordinates.length === 2 && coordinates.every((coordinate) => !Number.isNaN(coordinate))) {
-    const latitude = coordinates[0]
-    const longitude = coordinates[1]
-    if (
-      latitude !== undefined &&
-      longitude !== undefined &&
-      latitude >= -90 &&
-      latitude <= 90 &&
-      longitude >= -180 &&
-      longitude <= 180
-    ) {
+  const parts = normalizedTerm.split(',').map((part) => part.trim())
+  if (parts.length === 2 && parts.every((part) => part !== '' && !Number.isNaN(Number(part)))) {
+    const latitude = Number(parts[0])
+    const longitude = Number(parts[1])
+    if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
       selectedLocation.value = null
       selectedCoordinates.value = { latitude, longitude }
+      mapError.value = ''
       map?.flyTo([latitude, longitude], 8, { duration: 0.8 })
       return
     }
   }
 
+  const location = locations.value.find(
+    (item) =>
+      item.name.toLowerCase().includes(normalizedTerm) ||
+      item.type.toLowerCase().includes(normalizedTerm),
+  )
   if (location) {
     mapError.value = ''
+    selectLocation(location)
+    await loadBaseLayerOnDemand(location.id, { fitBounds: true })
+    return
+  }
+
+  // Fallback para busca textual de feições no servidor preservando o catálogo de bases
+  try {
+    const fetchedTerritories = await mapService.getTerritories({ busca: rawTerm })
+    if (!map) return
+    if (Array.isArray(fetchedTerritories.features) && fetchedTerritories.features.length > 0) {
+      mapError.value = ''
+      isFromCache.value = Boolean(fetchedTerritories.fromCache)
+      mergeGeoJsonIntoBaseLayers({ features: fetchedTerritories.features as GeoJSON.Feature[] })
+    } else {
+      mapError.value = 'Nenhuma base ou feição encontrada para a busca informada.'
+    }
+  } catch (err) {
+    console.warn('Falha ao filtrar camadas no mapa:', err)
+    mapError.value = 'Não foi possível realizar a busca no mapa.'
   }
 }
 
@@ -292,71 +499,101 @@ const locateUser = () => {
 }
 
 const limparFiltroProcesso = async () => {
-  router.push({ path: '/mapa' })
   searchTerm.value = ''
+  mapError.value = ''
+  selectedLocation.value = null
+  clearBaseLayers()
+  await router.push({ path: '/mapa' })
+}
+
+const carregarCamadasElocais = async (forceRefresh = false) => {
+  isRefreshingCache.value = true
   try {
-    const fetchedTerritories = await mapService.getTerritories()
-    buildBaseLayersFromGeoJson(fetchedTerritories)
-  } catch (err) {
-    console.warn('Erro ao restaurar territórios:', err)
+    const rawLocations = await mapService.getPublishedLocations()
+    if (!map) return
+
+    locations.value = Array.isArray(rawLocations)
+      ? (rawLocations as RawLocationInput[]).map((loc) => ({
+          id: String(loc.id ?? ''),
+          name: String(loc.name ?? loc.nome ?? `Base #${loc.id ?? ''}`),
+          type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
+          latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
+          longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
+          status: (loc.status ?? 'Concluída') as MapLocation['status'],
+          total_feicoes: Number(
+            loc.total_feicoes ?? loc.totalFeicoes ?? loc.feicoes ?? loc.featureCount ?? 0,
+          ),
+        }))
+      : []
+
+    if (markers && map) {
+      markers.clearLayers()
+      locations.value.forEach((location) => {
+        if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
+          const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
+            .bindTooltip(location.name)
+            .on('click', () => selectLocation(location))
+          marker.addTo(markers as L.LayerGroup)
+        }
+      })
+    }
+
+    const rawProcessoId = route.query?.processoId || route.query?.id
+    const targetProcessoId = rawProcessoId ? String(rawProcessoId).trim() : ''
+    const requestedBase = String(route.query?.base || '').trim()
+    const requestedYear = String(route.query?.year || '').trim()
+
+    if (targetProcessoId) {
+      const matchedLocation = locations.value.find((l) => String(l.id) === targetProcessoId)
+      if (matchedLocation) {
+        selectedLocation.value = matchedLocation
+        selectedCoordinates.value = {
+          latitude: matchedLocation.latitude,
+          longitude: matchedLocation.longitude,
+        }
+      }
+      await loadBaseLayerOnDemand(targetProcessoId, { forceRefresh, fitBounds: true })
+    } else if (requestedBase || requestedYear) {
+      if (requestedBase) searchTerm.value = requestedBase
+      const normalizedBase = requestedBase.toLowerCase()
+      const normalizedYear = requestedYear.toLowerCase()
+
+      const exactMatch = locations.value.find((item) => {
+        const name = item.name.toLowerCase()
+        const type = item.type.toLowerCase()
+        const matchesBase =
+          !normalizedBase || name.includes(normalizedBase) || type.includes(normalizedBase)
+        const matchesYear =
+          !normalizedYear || type.includes(normalizedYear) || name.includes(normalizedYear)
+        return matchesBase && matchesYear
+      })
+
+      const match =
+        exactMatch ||
+        (normalizedBase
+          ? locations.value.find(
+              (item) =>
+                item.name.toLowerCase().includes(normalizedBase) ||
+                item.type.toLowerCase().includes(normalizedBase),
+            )
+          : undefined)
+
+      if (match) {
+        selectLocation(match)
+        await loadBaseLayerOnDemand(match.id, { forceRefresh, fitBounds: true })
+      } else if (locations.value[0]) {
+        selectLocation(locations.value[0])
+      }
+    }
+  } finally {
+    isRefreshingCache.value = false
   }
 }
 
-const carregarCamadasElocais = async () => {
-  const rawLocations = await mapService.getPublishedLocations()
-  locations.value = Array.isArray(rawLocations)
-    ? rawLocations.map((loc: any) => ({
-        id: String(loc.id ?? ''),
-        name: String(loc.name ?? loc.nome ?? `Base #${loc.id}`),
-        type: String(loc.type ?? loc.tipo ?? 'Base Territorial'),
-        latitude: Number(loc.latitude ?? loc.lat ?? -15.78),
-        longitude: Number(loc.longitude ?? loc.lng ?? -47.93),
-        status: (loc.status ?? 'Concluída') as any,
-      }))
-    : []
-
-  const targetProcessoId = (route.query?.processoId || route.query?.id)
-    ? Number(route.query.processoId || route.query.id)
-    : undefined
-  const requestedBase = String(route.query?.base || '').trim()
-  const requestedYear = String(route.query?.year || '').trim()
-
-  const initialFilters: any = {}
-  if (targetProcessoId) {
-    initialFilters.processoId = targetProcessoId
-  } else {
-    if (requestedBase) initialFilters.busca = requestedBase
-    if (requestedYear) initialFilters.anoSafra = requestedYear
-  }
-
-  const fetchedTerritories = await mapService.getTerritories(initialFilters)
-  buildBaseLayersFromGeoJson(fetchedTerritories)
-
-  if (markers && map) {
-    markers.clearLayers()
-    locations.value.forEach((location) => {
-      if (!Number.isNaN(location.latitude) && !Number.isNaN(location.longitude)) {
-        const marker = L.marker([location.latitude, location.longitude], { icon: markerIcon })
-          .bindTooltip(location.name)
-          .on('click', () => selectLocation(location))
-        marker.addTo(markers as L.LayerGroup)
-      }
-    })
-  }
-
-  if (requestedBase || requestedYear) {
-    if (requestedBase) searchTerm.value = requestedBase
-    const match = locations.value.find(
-      (item) =>
-        item.name.toLowerCase().includes(requestedBase.toLowerCase()) ||
-        item.type.toLowerCase().includes(requestedBase.toLowerCase()),
-    )
-    if (match) {
-      selectLocation(match)
-    } else if (locations.value[0]) {
-      selectLocation(locations.value[0])
-    }
-  }
+const forcarAtualizacaoCache = async () => {
+  clearBaseLayers()
+  await geojsonCache.clearAll()
+  await carregarCamadasElocais(true)
 }
 
 onMounted(async () => {
@@ -367,8 +604,29 @@ onMounted(async () => {
 
   if (!mapElement.value) return
 
-  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
+  const savedCamera = uiPreferencesStorage.getMapCamera()
+  const initialLat = savedCamera?.lat ?? -15.78
+  const initialLng = savedCamera?.lng ?? -47.93
+  const initialZoom = savedCamera?.zoom ?? 4
+
+  map = L.map(mapElement.value, { zoomControl: false }).setView([initialLat, initialLng], initialZoom)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+  map.on('moveend', () => {
+    if (!map) return
+    const center = map.getCenter()
+    uiPreferencesStorage.setMapCamera({
+      lat: Number(center.lat.toFixed(4)),
+      lng: Number(center.lng.toFixed(4)),
+      zoom: map.getZoom(),
+    })
+  })
+
+  map.on('click', ({ latlng }) => {
+    selectedLocation.value = null
+    selectedCoordinates.value = { latitude: latlng.lat, longitude: latlng.lng }
+    mapError.value = ''
+  })
 
   const satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -396,12 +654,6 @@ onMounted(async () => {
   markers = L.layerGroup().addTo(map)
 
   await carregarCamadasElocais()
-
-  map.on('click', ({ latlng }) => {
-    selectedLocation.value = null
-    selectedCoordinates.value = { latitude: latlng.lat, longitude: latlng.lng }
-    mapError.value = ''
-  })
 })
 
 watch(
@@ -442,6 +694,25 @@ onBeforeUnmount(() => {
       <button type="button" class="btn-clear-filter" @click="limparFiltroProcesso">Ver todas as cargas</button>
     </div>
 
+    <!-- Indicador de Cache e Ação de Atualização -->
+    <div class="cache-status-bar">
+      <span v-if="isFromCache" class="cache-badge cache-hit" title="Camadas carregadas instantaneamente do IndexedDB local">
+        ⚡ Carregado do cache local
+      </span>
+      <span v-else class="cache-badge cache-miss" title="Camadas sincronizadas diretamente da API REST">
+        🌐 Sincronizado da API
+      </span>
+      <button
+        type="button"
+        class="btn-refresh-cache"
+        :disabled="isRefreshingCache"
+        @click="forcarAtualizacaoCache"
+        title="Limpar cache e buscar feições atualizadas da API"
+      >
+        {{ isRefreshingCache ? 'Atualizando...' : '🔄 Atualizar camadas (limpar cache)' }}
+      </button>
+    </div>
+
     <section class="map-toolbar" aria-label="Ferramentas do mapa">
       <form class="search-form" @submit.prevent="findLocation">
         <label for="map-search">Buscar base ou coordenadas</label>
@@ -471,7 +742,7 @@ onBeforeUnmount(() => {
             <p class="eyebrow">Camadas e Delimitações</p>
             <h2>Bases cadastradas</h2>
           </div>
-          <span class="location-count">{{ baseLayers.length || locations.length }}</span>
+          <span class="location-count">{{ locations.length }}</span>
         </div>
 
         <!-- Atalhos de visualização rápida -->
@@ -487,85 +758,66 @@ onBeforeUnmount(() => {
 
         <div class="location-list">
           <div
-            v-if="baseLayers.length === 0 && locations.length === 0"
+            v-if="locations.length === 0"
             class="empty-locations-state"
-            style="padding: 1.5rem 0.5rem; text-align: center; color: var(--vis-c-text-dark-2); font-size: 0.82rem;"
+            style="padding: 1.5rem 0.5rem; text-align: center; color: var(--color-text-muted); font-size: 0.82rem;"
           >
             Nenhuma base oficial cadastrada ainda.
           </div>
 
-          <!-- Camadas carregadas com polígonos e controle de cores -->
-          <template v-if="baseLayers.length > 0">
-            <div
-              v-for="base in baseLayers"
-              :key="base.id"
-              class="base-layer-card"
-              :class="{ 'base-layer-inactive': !base.visible }"
-            >
-              <div class="base-layer-header">
-                <!-- Checkbox de ativação/desativação da base -->
-                <label class="base-checkbox-label" title="Ativar ou desativar esta base no mapa">
-                  <input
-                    type="checkbox"
-                    v-model="base.visible"
-                    class="base-checkbox"
-                    @change="toggleBaseVisibility(base)"
-                  />
-                </label>
+          <div
+            v-for="base in catalogBases"
+            :key="base.id"
+            class="base-layer-card"
+            :class="{ 'base-layer-inactive': !base.visible && !base.loading }"
+          >
+            <div class="base-layer-header">
+              <!-- Checkbox de ativação/desativação da base -->
+              <label class="base-checkbox-label" title="Ativar ou desativar esta base no mapa">
+                <input
+                  type="checkbox"
+                  :checked="base.visible"
+                  :disabled="base.loading"
+                  class="base-checkbox"
+                  @change="onToggleBase(base, $event)"
+                />
+              </label>
 
-                <!-- Seletor de cor com amostra interativa -->
-                <div class="color-picker-control" title="Clique para escolher a cor dos polígonos desta base">
-                  <input
-                    type="color"
-                    v-model="base.color"
-                    class="native-color-picker"
-                    @input="updateBaseColor(base)"
-                  />
-                  <span
-                    class="color-indicator-swatch"
-                    :style="{ backgroundColor: base.color }"
-                  ></span>
-                </div>
-
-                <!-- Informações e zoom na base -->
-                <div class="base-layer-info" @click="zoomToBase(base)">
-                  <strong>{{ base.name }}</strong>
-                  <small>{{ base.type }} &bull; {{ base.featureCount }} polígonos</small>
-                </div>
-
-                <button
-                  type="button"
-                  class="btn-zoom-target"
-                  title="Focar nesta base no mapa"
-                  @click="zoomToBase(base)"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-                </button>
+              <!-- Seletor de cor com amostra interativa -->
+              <div class="color-picker-control" title="Clique para escolher a cor dos polígonos desta base">
+                <input
+                  type="color"
+                  :value="base.color"
+                  class="native-color-picker"
+                  @input="onColorInput(base, $event)"
+                />
+                <span
+                  class="color-indicator-swatch"
+                  :style="{ backgroundColor: base.color }"
+                ></span>
               </div>
-            </div>
-          </template>
 
-          <!-- Fallback para lista de pontos se não houver polígonos carregados -->
-          <template v-else>
-            <button
-              v-for="location in locations"
-              :key="location.id"
-              type="button"
-              class="location-item"
-              :class="{ 'location-item-active': selectedLocation?.id === location.id }"
-              @click="selectLocation(location)"
-            >
-              <span class="location-dot" :class="`status-${location.status.toLowerCase().replace(' ', '-')}`"></span>
-              <span class="location-content">
-                <strong>{{ location.name }}</strong>
-                <small>{{ location.type }}</small>
-                <small>{{ location.latitude.toFixed(4) }}, {{ location.longitude.toFixed(4) }}</small>
-              </span>
-            </button>
-          </template>
+              <!-- Informações e zoom na base -->
+              <div class="base-layer-info" @click="onFocusBase(base)">
+                <strong>{{ base.name }}</strong>
+                <small>{{ base.type }} &bull; {{ base.total_feicoes }} polígonos</small>
+                <small v-if="base.loading" class="base-loading-indicator">Carregando polígonos...</small>
+              </div>
+
+              <button
+                type="button"
+                class="btn-zoom-target"
+                title="Focar nesta base no mapa"
+                :disabled="base.loading"
+                @click="onFocusBase(base)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="coordinates-card">
@@ -629,8 +881,8 @@ h2 {
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 1rem;
-  background: rgba(242, 101, 34, 0.12);
-  border: 1px solid rgba(242, 101, 34, 0.35);
+  background: var(--badge-primary-bg);
+  border: 1px solid var(--badge-primary-border);
   border-radius: 6px;
   font-size: 0.88rem;
   color: var(--color-heading);
@@ -638,8 +890,8 @@ h2 {
 
 .btn-clear-filter {
   background: transparent;
-  border: 1px solid var(--vis-brand-orange, #f26522);
-  color: var(--vis-brand-orange, #f26522);
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
   font-size: 0.78rem;
   font-weight: 600;
   padding: 0.25rem 0.6rem;
@@ -649,8 +901,8 @@ h2 {
 }
 
 .btn-clear-filter:hover {
-  background: var(--vis-brand-orange, #f26522);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
 }
 
 .locate-button {
@@ -723,7 +975,7 @@ h2 {
   min-height: 28px;
   display: grid;
   place-items: center;
-  color: white;
+  color: var(--color-brand-contrast);
   background: var(--color-brand);
   border-radius: 50%;
   font-size: 0.8rem;
@@ -734,6 +986,10 @@ h2 {
   display: grid;
   gap: 4px;
   margin-top: 18px;
+  max-height: 380px;
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 4px;
 }
 
 /* Controles de Camadas e Cores */
@@ -748,7 +1004,7 @@ h2 {
 .btn-quick-toggle {
   background: transparent;
   border: none;
-  color: var(--vis-brand-orange, #f26522);
+  color: var(--color-brand);
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
@@ -767,7 +1023,7 @@ h2 {
 .base-layer-card {
   padding: 8px 10px;
   border-radius: 6px;
-  background: var(--color-surface-soft, rgba(0, 0, 0, 0.03));
+  background: var(--color-surface-soft);
   border: 1px solid var(--color-border);
   transition: all 0.2s ease;
   margin-bottom: 6px;
@@ -798,7 +1054,7 @@ h2 {
 .base-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: var(--vis-brand-orange, #f26522);
+  accent-color: var(--color-brand);
   cursor: pointer;
 }
 
@@ -825,8 +1081,8 @@ h2 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
   pointer-events: none;
   transition: transform 0.15s ease;
 }
@@ -860,6 +1116,18 @@ h2 {
   text-overflow: ellipsis;
 }
 
+.base-layer-info small.base-loading-indicator {
+  color: var(--color-brand);
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.base-checkbox:disabled,
+.btn-zoom-target:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 .btn-zoom-target {
   background: transparent;
   border: none;
@@ -874,7 +1142,7 @@ h2 {
 }
 
 .btn-zoom-target:hover {
-  color: var(--vis-brand-orange, #f26522);
+  color: var(--color-brand);
 }
 
 .location-item {
@@ -982,5 +1250,55 @@ h2 {
   .location-list {
     grid-template-columns: 1fr;
   }
+}
+
+.cache-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cache-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.cache-badge.cache-hit {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border: 1px solid var(--badge-success-border);
+}
+
+.cache-badge.cache-miss {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border: 1px solid var(--badge-info-border);
+}
+
+.btn-refresh-cache {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-refresh-cache:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.btn-refresh-cache:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

@@ -1,3 +1,6 @@
+/**
+ * Serviço de integração com o Catálogo de Bases Geoespaciais (US09 - Tarefas 7 e 8).
+ */
 import api, { mockactive } from './api'
 
 export interface CatalogoFilters {
@@ -50,5 +53,33 @@ export const catalogoService = {
       return null
     }
   },
-}
 
+  /**
+   * Busca dados de linhagem e integridade (Hash de origem) se disponível
+   */
+  async buscarLinhagemBase(idBase: number | string): Promise<any | null> {
+    try {
+      const response = await api.get(`/indicadores/${idBase}/linhagem`)
+      return response.data
+    } catch {
+      // Endpoint opcional ou base sem linhagem calculada
+      return null
+    }
+  },
+
+  /**
+   * Tenta buscar prévia da tabela de atributos se o endpoint existir futuramente
+   */
+  async buscarPreviaAtributos(idBase: number | string): Promise<Record<string, any>[]> {
+    try {
+      const response = await api.get(`/catalogo/bases/${idBase}/previa`)
+      if (response.status === 200 && Array.isArray(response.data)) {
+        return response.data
+      }
+      return []
+    } catch {
+      // Fallback gracioso: backend ainda não expõe rota dedicada de prévia
+      return []
+    }
+  },
+}

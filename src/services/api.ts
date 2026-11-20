@@ -1,8 +1,10 @@
 /**
  * Configuração de cliente HTTP (Axios) para comunicação com a API REST.
+ * Integração automática com authStorage para injeção do header Authorization: Bearer
+ * e tratamento global de expiração de token (401 Unauthorized).
  */
 import axios from 'axios'
-import { userService } from './user'
+import { authStorage } from './storage/authStorage'
 
 // Flag legada mantida como false para compatibilidade com asserções de testes existentes.
 export const mockactive = false
@@ -29,28 +31,109 @@ const api = axios.create({
   },
 })
 
-// Adiciona credenciais Basic Auth de acordo com o perfil autenticado no sistema
+// Request Interceptor: Atualiza baseURL dinâmica e injeta token de autenticação
 api.interceptors.request.use((config) => {
   try {
     const currentBase = getApiBaseUrl().replace(/\/+$/, '')
     config.baseURL = currentBase + '/api'
     api.defaults.baseURL = currentBase + '/api'
+  } catch {
+    // Fallback silencioso
+  }
 
-    const user = userService.getCurrentUser()
-    const roleCredentials: Record<string, string> = {
-      Operador: 'operador:Troca123',
-      Auditor: 'auditor:Troca123',
-      Analista: 'analista:Troca123',
-      Administrador: 'admin:Troca123',
-    }
-    const cred = roleCredentials[user?.role] || 'admin:Troca123'
-    if (typeof btoa === 'function') {
-      config.headers.Authorization = `Basic ${btoa(cred)}`
+  // Anexa o token de acesso (Bearer token) sempre que presente no authStorage
+  try {
+    const token = authStorage.getAccessToken()
+    if (token && config.headers && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`
     }
   } catch {
-    // Fallback silencioso caso userService não esteja disponível
+    // Fallback silencioso
   }
+
   return config
 })
+
+/**
+ * Extrai mensagem amigável de erro HTTP preservando o formato { erro, message } do API4-BACK.
+ */
+export function extractApiErrorMessage(error: unknown, fallback = 'Erro ao comunicar com o servidor.'): string {
+  if (!error || typeof error !== 'object') return fallback
+  const errObj = error as {
+    response?: { data?: { erro?: string; message?: string; error?: string } | string }
+    message?: string
+  }
+  const data = errObj.response?.data
+  if (typeof data === 'string' && data.trim()) return data.trim()
+  if (data && typeof data === 'object') {
+    if (typeof data.erro === 'string' && data.erro.trim()) return data.erro.trim()
+    if (typeof data.message === 'string' && data.message.trim()) return data.message.trim()
+    if (typeof data.error === 'string' && data.error.trim()) return data.error.trim()
+  }
+  if (typeof errObj.message === 'string' && errObj.message.trim()) {
+    return errObj.message.trim()
+  }
+  return fallback
+}
+
+export class ApiError extends Error {
+  status?: number
+  erro?: string
+  data?: unknown
+  cause?: unknown
+
+  constructor(error: unknown, fallback?: string) {
+    const message = extractApiErrorMessage(error, fallback)
+    super(message)
+    this.name = 'ApiError'
+    this.cause = error
+    const errObj = error as { response?: { status?: number; data?: { erro?: string } } }
+    this.status = errObj?.response?.status
+    this.erro = errObj?.response?.data?.erro
+    this.data = errObj?.response?.data
+  }
+}
+
+// Response Interceptor: Trata erro 401 Unauthorized e 403 Forbidden
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+
+    if (status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api4:forbidden', { detail: error }))
+    }
+
+    if (status === 401) {
+      const requestUrl = typeof error?.config?.url === 'string' ? error.config.url : ''
+      const isLoginRequest = requestUrl.includes('/auth/login')
+
+      if (!isLoginRequest) {
+        authStorage.clearSession()
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('api4:unauthorized', { detail: error }))
+
+          const rawBase = import.meta.env?.BASE_URL || '/'
+          const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase
+          const currentPath = window.location.pathname
+
+          // Remove o baseUrl do início para salvar apenas o caminho relativo interno do Vue Router
+          const cleanPath =
+            baseUrl && currentPath.startsWith(baseUrl)
+              ? currentPath.slice(baseUrl.length) || '/'
+              : currentPath
+
+          if (cleanPath !== '/login' && !cleanPath.includes('/login')) {
+            const redirect = encodeURIComponent(cleanPath + window.location.search)
+            window.location.href = `${baseUrl}/login?redirect=${redirect}`
+          }
+        }
+      }
+    }
+
+    return Promise.reject(error)
+  },
+)
 
 export default api

@@ -2,8 +2,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import api from '../services/api'
+import { mapService } from '../services/map'
 import { useRouter } from 'vue-router'
+import { getThemeColor } from '@/utils/themeTokens'
 
 const props = withDefaults(
   defineProps<{
@@ -30,6 +31,9 @@ const router = useRouter()
 const mapContainer = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
 let geoJsonLayer: L.GeoJSON | null = null
+let disposed = false
+let renderSequence = 0
+let fitBoundsTimer: ReturnType<typeof setTimeout> | null = null
 
 const isLoading = ref(true)
 const totalFeicoes = ref(0)
@@ -37,61 +41,38 @@ const areaTotalHa = ref<number | null>(null)
 const errorMsg = ref('')
 
 const carregarGeometrias = async () => {
-  if (!props.processoId) return
+  if (!props.processoId || disposed) return
+  const seq = ++renderSequence
   isLoading.value = true
   errorMsg.value = ''
 
   try {
-    // 1. Tenta carregar da revisão de publicação
-    try {
-      const res = await api.get(`/publicacao/${props.processoId}/revisao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Tenta rota alternativa
-    }
+    const geojson = await mapService.getProcessPreviewGeometry(props.processoId)
+    if (disposed || seq !== renderSequence) return
 
-    // 2. Tenta carregar via /carga/{id}/revisao-publicacao
-    try {
-      const res = await api.get(`/carga/${props.processoId}/revisao-publicacao`)
-      const geojson = res.data?.feicoesGeoJson
-      if (geojson && geojson.features && geojson.features.length > 0) {
-        isLoading.value = false
-        renderizarMapa(geojson)
-        totalFeicoes.value = geojson.features.length
-        return
-      }
-    } catch (e) {
-      // Segue para fallback
-    }
-
-    // 3. Fallback para /mapa/camadas?processoId=
-    const fallbackRes = await api.get('/mapa/camadas', {
-      params: { processoId: props.processoId },
-    })
-    if (fallbackRes.data && fallbackRes.data.features && fallbackRes.data.features.length > 0) {
-      isLoading.value = false
-      renderizarMapa(fallbackRes.data)
-      totalFeicoes.value = fallbackRes.data.features.length
+    if (geojson && geojson.features && geojson.features.length > 0) {
+      await renderizarMapa(geojson, seq)
+      if (disposed || seq !== renderSequence) return
+      totalFeicoes.value = geojson.features.length
       return
     }
 
-    errorMsg.value = 'Nenhuma geometria encontrada para esta carga.'
-  } catch (err: any) {
-    errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
+    errorMsg.value = 'Nenhuma geomet ria encontrada para esta carga.'
+  } catch {
+    if (!disposed && seq === renderSequence) {
+      errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
+    }
   } finally {
-    isLoading.value = false
+    if (!disposed && seq === renderSequence) {
+      isLoading.value = false
+    }
   }
 }
 
-const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
+const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject, seq = renderSequence) => {
+  if (disposed || seq !== renderSequence) return
   await nextTick()
-  if (!mapContainer.value) return
+  if (disposed || seq !== renderSequence || !mapContainer.value) return
 
   if (!map) {
     map = L.map(mapContainer.value, {
@@ -99,9 +80,11 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
       attributionControl: false,
     }).setView([-15.78, -47.93], 5)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-    }).addTo(map)
+    })
+    if (disposed || !map) return
+    tiles.addTo(map)
   }
 
   map.invalidateSize()
@@ -113,38 +96,52 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
 
   let totalArea = 0
 
-  geoJsonLayer = L.geoJSON(geojson, {
+  const brandColor = getThemeColor('--color-brand')
+  const layer = L.geoJSON(geojson, {
     style: {
-      color: '#f26522',
+      color: brandColor,
       weight: 2,
-      fillColor: '#f26522',
+      fillColor: brandColor,
       fillOpacity: 0.35,
     },
-    onEachFeature: (feature, layer) => {
-      const props = feature.properties || {}
-      const cod = props.codigoImovel || props.identificador || `Feição #${props.id || ''}`
-      const area = props.areaHectares ? Number(props.areaHectares) : 0
+    onEachFeature: (feature, featureLayer) => {
+      const featureProps = feature.properties || {}
+      const cod =
+        featureProps.codigoImovel ||
+        featureProps.identificador ||
+        `Feição #${featureProps.id || ''}`
+      const area = featureProps.areaHectares ? Number(featureProps.areaHectares) : 0
       if (area > 0) totalArea += area
 
-      layer.bindTooltip(cod)
-      layer.bindPopup(`
+      featureLayer.bindTooltip(cod)
+      featureLayer.bindPopup(`
         <div style="font-size: 0.85rem; color: var(--color-text);">
           <strong style="color: var(--color-brand);">${cod}</strong><br/>
           ${area > 0 ? `Área: ${area.toFixed(4)} ha<br/>` : ''}
-          Feição ID: #${props.id || ''}
+          Feição ID: #${featureProps.id || ''}
         </div>
       `)
     },
-  }).addTo(map)
+  })
+
+  if (disposed || !map) return
+  geoJsonLayer = layer.addTo(map)
 
   if (totalArea > 0) {
     areaTotalHa.value = Number(totalArea.toFixed(4))
   }
 
-  setTimeout(() => {
-    map?.invalidateSize()
+  if (fitBoundsTimer !== null) {
+    clearTimeout(fitBoundsTimer)
+    fitBoundsTimer = null
+  }
+
+  fitBoundsTimer = setTimeout(() => {
+    fitBoundsTimer = null
+    if (disposed || seq !== renderSequence || !map) return
+    map.invalidateSize()
     if (geoJsonLayer && geoJsonLayer.getLayers().length > 0 && geoJsonLayer.getBounds().isValid()) {
-      map?.fitBounds(geoJsonLayer.getBounds().pad(0.12), { maxZoom: 15 })
+      map.fitBounds(geoJsonLayer.getBounds().pad(0.12), { maxZoom: 15 })
     }
   }, 150)
 }
@@ -153,20 +150,29 @@ const abrirNoMapaCompleto = () => {
   router.push(`/mapa?processoId=${props.processoId}`)
 }
 
-watch(() => props.processoId, () => {
-  carregarGeometrias()
-})
+watch(
+  () => props.processoId,
+  () => {
+    carregarGeometrias()
+  },
+)
 
 onMounted(() => {
   carregarGeometrias()
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  ++renderSequence
+  if (fitBoundsTimer !== null) {
+    clearTimeout(fitBoundsTimer)
+    fitBoundsTimer = null
+  }
   if (map) {
     map.remove()
     map = null
-    geoJsonLayer = null
   }
+  geoJsonLayer = null
 })
 </script>
 
@@ -187,13 +193,24 @@ onBeforeUnmount(() => {
         title="Visualizar no mapa com ferramentas completas"
       >
         <span>Abrir no Mapa Completo</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
           <polyline points="15 3 21 3 21 9"></polyline>
           <line x1="10" y1="14" x2="21" y2="3"></line>
         </svg>
       </button>
-      <span v-else class="badge-preview-tag" title="Disponível no mapa completo após a publicação oficial">
+      <span
+        v-else
+        class="badge-preview-tag"
+        title="Disponível no mapa completo após a publicação oficial"
+      >
         Pré-visualização
       </span>
     </div>
@@ -204,7 +221,14 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else-if="errorMsg" class="mini-mapa-empty" :style="{ height }">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      >
         <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
         <line x1="8" y1="2" x2="8" y2="18"></line>
         <line x1="16" y1="6" x2="16" y2="22"></line>
@@ -289,7 +313,7 @@ onBeforeUnmount(() => {
 
 .btn-ver-mapa:hover {
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-brand-contrast);
 }
 
 .mini-mapa-canvas {
@@ -316,8 +340,8 @@ onBeforeUnmount(() => {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(242, 101, 34, 0.2);
-  border-top-color: var(--vis-brand-orange, #f26522);
+  border: 3px solid var(--color-brand-soft-strong);
+  border-top-color: var(--color-brand);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

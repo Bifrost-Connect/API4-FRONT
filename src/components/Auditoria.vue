@@ -34,7 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   layerName: '',
   canClose: true,
   linhagemCompleta: null,
-  userRole: 'Auditor',
+  userRole: '',
 })
 
 const emit = defineEmits<{
@@ -336,7 +336,7 @@ const formatDateTime = (dt?: string) => {
           @click="emit('cancelar', String(cargaId))"
         >
           <FiXCircle />
-          <span>Cancelar / Invalidar Carga</span>
+          <span>Cancelar Carga</span>
         </button>
       </div>
 
@@ -531,7 +531,7 @@ const formatDateTime = (dt?: string) => {
 .tab-btn.active {
   background: var(--color-surface);
   color: var(--color-heading);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
 .tab-content {
@@ -900,8 +900,8 @@ const formatDateTime = (dt?: string) => {
 }
 
 .badge-severidade {
-  background: var(--vis-c-danger);
-  color: #ffffff;
+  background: var(--color-danger);
+  color: var(--color-brand-contrast);
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 4px;

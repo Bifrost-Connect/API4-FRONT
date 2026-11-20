@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import DashboardView from '../DashboardView.vue'
-import { userService } from '@/services/user'
 import { dashboardService, type ProcessLog } from '@/services/dashboard'
+import { setTestUserRole } from '@/__tests__/mocks/testAuthHelper'
 
-const pushMock = vi.fn()
+const pushMock = vi.fn<() => void>()
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
@@ -14,8 +14,8 @@ vi.mock('vue-router', () => ({
   }),
   useRouter: () => ({
     push: pushMock,
-    replace: vi.fn(),
-    back: vi.fn(),
+    replace: vi.fn<() => void>(),
+    back: vi.fn<() => void>(),
   }),
   RouterLink: {
     template: '<a><slot /></a>',
@@ -63,7 +63,7 @@ const mockProcesses: ProcessLog[] = [
 describe('DashboardView - Painel Operacional Unificado', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    userService.setCurrentUserRole('Operador')
+    setTestUserRole('Operador')
 
     vi.spyOn(dashboardService, 'getFilterOptions').mockResolvedValue({
       conjuntos: [
@@ -142,7 +142,7 @@ describe('DashboardView - Painel Operacional Unificado', () => {
   })
 
   it('expande linha para exibir detalhes e permite navegar para a tela de auditoria da carga', async () => {
-    userService.setCurrentUserRole('Auditor')
+    setTestUserRole('Auditor')
     const wrapper = mount(DashboardView)
     await flushPromises()
 
@@ -155,7 +155,7 @@ describe('DashboardView - Painel Operacional Unificado', () => {
     // Detalhes expandidos: exibe metadados e botão de auditoria
     const auditBtn = wrapper.find('.btn_action_audit')
     expect(auditBtn.exists()).toBe(true)
-    expect(auditBtn.text()).toContain('AUDITAR CARGA / VER LINHAGEM')
+    expect(auditBtn.text()).toContain('AUDITAR CARGA')
 
     await auditBtn.trigger('click')
     expect(pushMock).toHaveBeenCalledWith({
@@ -164,8 +164,51 @@ describe('DashboardView - Painel Operacional Unificado', () => {
     })
   })
 
+  it('oculta botão de auditoria direta para o Operador, exibindo detalhes do processo na linha expandida', async () => {
+    setTestUserRole('Operador')
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    const row = wrapper.find('.clickable-row')
+    expect(row.exists()).toBe(true)
+    await row.trigger('click')
+    await flushPromises()
+
+    // Operador não tem botão de auditar carga
+    expect(wrapper.find('.btn_action_audit').exists()).toBe(false)
+    expect(wrapper.find('.btn_action_approve').exists()).toBe(false)
+
+    // Mas visualiza os detalhes do processo (stepper e metadados)
+    expect(wrapper.find('.expanded-details-title').text()).toContain('Detalhes do Processo de Carga')
+    expect(wrapper.find('.expanded-stepper').exists()).toBe(true)
+    expect(wrapper.text()).toContain('EPSG:4674')
+  })
+
+  it('permite que o Gestor visualize o dashboard operacional, audite cargas e tenha botão de homologação', async () => {
+    setTestUserRole('Gestor')
+    const wrapper = mount(DashboardView)
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toContain('Dashboard Operacional')
+
+    const row = wrapper.find('.clickable-row')
+    expect(row.exists()).toBe(true)
+    await row.trigger('click')
+    await flushPromises()
+
+    // Gestor possui tudo do auditor (auditar carga)
+    const auditBtn = wrapper.find('.btn_action_audit')
+    expect(auditBtn.exists()).toBe(true)
+    expect(auditBtn.text()).toContain('AUDITAR CARGA')
+
+    // E possui a prerrogativa exclusiva de homologar o processo
+    const approveBtn = wrapper.find('.btn_action_approve')
+    expect(approveBtn.exists()).toBe(true)
+    expect(approveBtn.text()).toContain('HOMOLOGAR PROCESSO')
+  })
+
   it('permite acesso de visualização das cargas operacionais para usuário com perfil Administrador', async () => {
-    userService.setCurrentUserRole('Administrador')
+    setTestUserRole('Administrador')
     const wrapper = mount(DashboardView)
     await flushPromises()
 
@@ -176,13 +219,13 @@ describe('DashboardView - Painel Operacional Unificado', () => {
 
   it('exibe botão de upload para Operador e oculta botões de mutação para Auditor', async () => {
     // 1. Operador: visualiza botão de upload
-    userService.setCurrentUserRole('Operador')
+    setTestUserRole('Operador')
     const opWrapper = mount(DashboardView)
     await flushPromises()
     expect(opWrapper.find('.btn-upload').exists()).toBe(true)
 
     // 2. Auditor: oculta botão de upload e de alocação de especialista
-    userService.setCurrentUserRole('Auditor')
+    setTestUserRole('Auditor')
     const audWrapper = mount(DashboardView)
     await flushPromises()
     expect(audWrapper.find('.btn-upload').exists()).toBe(false)
