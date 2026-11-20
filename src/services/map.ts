@@ -6,6 +6,16 @@
 import api from './api'
 import { geojsonCache } from './storage/geojsonCache'
 
+export interface PublishedLocation {
+  id: string
+  name: string
+  type: string
+  latitude: number
+  longitude: number
+  status: 'Processado' | 'Em validação' | 'Aguardando' | 'Concluída'
+  total_feicoes: number
+}
+
 export interface MapFilters {
   conjuntoId?: number | string
   anoSafra?: string
@@ -14,11 +24,12 @@ export interface MapFilters {
   size?: number
   busca?: string
   processoId?: number | string
+  baseId?: number | string
 }
 
 export interface PaginatedGeoJson {
   type: 'FeatureCollection'
-  features: any[]
+  features: GeoJSON.Feature[]
   page?: number
   size?: number
   totalElements?: number
@@ -42,14 +53,14 @@ export const mapService = {
   /**
    * Obtém as localizações das bases publicadas via API.
    */
-  async getPublishedLocations() {
+  async getPublishedLocations(): Promise<PublishedLocation[]> {
     try {
       const response = await api.get('/mapa/camadas-legado')
       if (Array.isArray(response.data)) {
         return response.data
       }
       return []
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.warn('Falha ao buscar locais do mapa via API:', error)
       return []
     }
@@ -62,8 +73,10 @@ export const mapService = {
     filters?: MapFilters,
     options?: { forceRefresh?: boolean; versao?: string; safra?: string },
   ): Promise<PaginatedGeoJson & { fromCache?: boolean }> {
-    const baseId = filters?.processoId
-      ? String(filters.processoId)
+    const targetBaseId = filters?.baseId ?? filters?.processoId
+    const hasTargetBaseId = targetBaseId !== undefined && String(targetBaseId).trim() !== ''
+    const baseId = hasTargetBaseId
+      ? String(targetBaseId)
       : filters?.conjuntoId
         ? `conjunto_${filters.conjuntoId}`
         : filters?.busca
@@ -88,8 +101,13 @@ export const mapService = {
       } catch {}
     }
 
+    const requestParams =
+      filters && targetBaseId !== undefined
+        ? { ...filters, processoId: targetBaseId, baseId: targetBaseId }
+        : filters
+
     try {
-      const response = await api.get('/mapa/camadas', { params: filters })
+      const response = await api.get('/mapa/camadas', { params: requestParams })
       let resultData: PaginatedGeoJson | null = null
 
       if (response.data && response.data.type === 'FeatureCollection') {
@@ -98,10 +116,10 @@ export const mapService = {
         }
       }
 
-      // Se filtrou por processoId específico e ainda não constou em /mapa/camadas, tenta a revisão da carga
-      if (!resultData && filters?.processoId) {
+      // Se filtrou por baseId/processoId específico e ainda não constou em /mapa/camadas, tenta a revisão da carga
+      if (!resultData && hasTargetBaseId) {
         try {
-          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          const rev = await api.get(`/publicacao/${targetBaseId}/revisao`)
           if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
             resultData = rev.data.feicoesGeoJson
           }
@@ -134,10 +152,10 @@ export const mapService = {
       }
 
       return { ...finalResult, fromCache: false }
-    } catch (error: any) {
-      if (filters?.processoId) {
+    } catch (error: unknown) {
+      if (hasTargetBaseId) {
         try {
-          const rev = await api.get(`/publicacao/${filters.processoId}/revisao`)
+          const rev = await api.get(`/publicacao/${targetBaseId}/revisao`)
           if (rev.data?.feicoesGeoJson?.features && rev.data.feicoesGeoJson.features.length > 0) {
             return { ...rev.data.feicoesGeoJson, fromCache: false }
           }
@@ -184,7 +202,7 @@ export const mapService = {
   async getProcessPreviewGeometry(
     processoId: string | number,
     options?: { forceRefresh?: boolean; versao?: string },
-  ): Promise<any | null> {
+  ): Promise<GeoJSON.FeatureCollection | null> {
     if (!processoId) return null
 
     const baseId = `preview_${processoId}`
