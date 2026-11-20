@@ -31,6 +31,9 @@ const router = useRouter()
 const mapContainer = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
 let geoJsonLayer: L.GeoJSON | null = null
+let disposed = false
+let renderSequence = 0
+let fitBoundsTimer: ReturnType<typeof setTimeout> | null = null
 
 const isLoading = ref(true)
 const totalFeicoes = ref(0)
@@ -38,29 +41,38 @@ const areaTotalHa = ref<number | null>(null)
 const errorMsg = ref('')
 
 const carregarGeometrias = async () => {
-  if (!props.processoId) return
+  if (!props.processoId || disposed) return
+  const seq = ++renderSequence
   isLoading.value = true
   errorMsg.value = ''
 
   try {
     const geojson = await mapService.getProcessPreviewGeometry(props.processoId)
+    if (disposed || seq !== renderSequence) return
+
     if (geojson && geojson.features && geojson.features.length > 0) {
-      renderizarMapa(geojson)
+      await renderizarMapa(geojson, seq)
+      if (disposed || seq !== renderSequence) return
       totalFeicoes.value = geojson.features.length
       return
     }
 
     errorMsg.value = 'Nenhuma geomet ria encontrada para esta carga.'
   } catch {
-    errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
+    if (!disposed && seq === renderSequence) {
+      errorMsg.value = 'Geometrias ainda não processadas ou indisponíveis.'
+    }
   } finally {
-    isLoading.value = false
+    if (!disposed && seq === renderSequence) {
+      isLoading.value = false
+    }
   }
 }
 
-const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
+const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject, seq = renderSequence) => {
+  if (disposed || seq !== renderSequence) return
   await nextTick()
-  if (!mapContainer.value) return
+  if (disposed || seq !== renderSequence || !mapContainer.value) return
 
   if (!map) {
     map = L.map(mapContainer.value, {
@@ -68,9 +80,11 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
       attributionControl: false,
     }).setView([-15.78, -47.93], 5)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-    }).addTo(map)
+    })
+    if (disposed || !map) return
+    tiles.addTo(map)
   }
 
   map.invalidateSize()
@@ -83,38 +97,51 @@ const renderizarMapa = async (geojson: GeoJSON.GeoJsonObject) => {
   let totalArea = 0
 
   const brandColor = getThemeColor('--color-brand')
-  geoJsonLayer = L.geoJSON(geojson, {
+  const layer = L.geoJSON(geojson, {
     style: {
       color: brandColor,
       weight: 2,
       fillColor: brandColor,
       fillOpacity: 0.35,
     },
-    onEachFeature: (feature, layer) => {
-      const props = feature.properties || {}
-      const cod = props.codigoImovel || props.identificador || `Feição #${props.id || ''}`
-      const area = props.areaHectares ? Number(props.areaHectares) : 0
+    onEachFeature: (feature, featureLayer) => {
+      const featureProps = feature.properties || {}
+      const cod =
+        featureProps.codigoImovel ||
+        featureProps.identificador ||
+        `Feição #${featureProps.id || ''}`
+      const area = featureProps.areaHectares ? Number(featureProps.areaHectares) : 0
       if (area > 0) totalArea += area
 
-      layer.bindTooltip(cod)
-      layer.bindPopup(`
+      featureLayer.bindTooltip(cod)
+      featureLayer.bindPopup(`
         <div style="font-size: 0.85rem; color: var(--color-text);">
           <strong style="color: var(--color-brand);">${cod}</strong><br/>
           ${area > 0 ? `Área: ${area.toFixed(4)} ha<br/>` : ''}
-          Feição ID: #${props.id || ''}
+          Feição ID: #${featureProps.id || ''}
         </div>
       `)
     },
-  }).addTo(map)
+  })
+
+  if (disposed || !map) return
+  geoJsonLayer = layer.addTo(map)
 
   if (totalArea > 0) {
     areaTotalHa.value = Number(totalArea.toFixed(4))
   }
 
-  setTimeout(() => {
-    map?.invalidateSize()
+  if (fitBoundsTimer !== null) {
+    clearTimeout(fitBoundsTimer)
+    fitBoundsTimer = null
+  }
+
+  fitBoundsTimer = setTimeout(() => {
+    fitBoundsTimer = null
+    if (disposed || seq !== renderSequence || !map) return
+    map.invalidateSize()
     if (geoJsonLayer && geoJsonLayer.getLayers().length > 0 && geoJsonLayer.getBounds().isValid()) {
-      map?.fitBounds(geoJsonLayer.getBounds().pad(0.12), { maxZoom: 15 })
+      map.fitBounds(geoJsonLayer.getBounds().pad(0.12), { maxZoom: 15 })
     }
   }, 150)
 }
@@ -135,11 +162,17 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  ++renderSequence
+  if (fitBoundsTimer !== null) {
+    clearTimeout(fitBoundsTimer)
+    fitBoundsTimer = null
+  }
   if (map) {
     map.remove()
     map = null
-    geoJsonLayer = null
   }
+  geoJsonLayer = null
 })
 </script>
 
