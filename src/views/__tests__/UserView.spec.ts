@@ -361,29 +361,27 @@ describe('UserView - Permissões Granulares, Edição de Senha e Fluxos Administ
     expect(wrapper.find('[data-testid="tab-colaboradores"]').classes()).toContain('active')
   })
 
-  it('para GESTOR e INTEGRADOR_EXTERNO exibe apenas a aba Chaves de API, abre nela e não dispara buscas administrativas restritas', async () => {
-    for (const role of ['GESTOR', 'INTEGRADOR_EXTERNO'] as const) {
-      vi.clearAllMocks()
-      const usersSpy = vi.spyOn(userService, 'getUsersAsync').mockResolvedValue([])
-      const rolesSpy = vi.spyOn(roleService, 'getRoles').mockResolvedValue([])
-      const eventsSpy = vi.spyOn(userService, 'getSecurityEvents').mockResolvedValue([])
-      vi.spyOn(apiKeyService, 'listKeys').mockResolvedValue([])
+  it('para GESTOR exibe apenas a aba Chaves de API, abre nela e não dispara buscas administrativas restritas', async () => {
+    vi.clearAllMocks()
+    const usersSpy = vi.spyOn(userService, 'getUsersAsync').mockResolvedValue([])
+    const rolesSpy = vi.spyOn(roleService, 'getRoles').mockResolvedValue([])
+    const eventsSpy = vi.spyOn(userService, 'getSecurityEvents').mockResolvedValue([])
+    vi.spyOn(apiKeyService, 'listKeys').mockResolvedValue([])
 
-      setTestUserRole(role)
-      const wrapper = mount(UserView)
-      await flushPromises()
+    setTestUserRole('GESTOR')
+    const wrapper = mount(UserView)
+    await flushPromises()
 
-      expect(wrapper.find('[data-testid="tab-colaboradores"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="tab-matriz"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="tab-auditoria"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="tab-chaves-api"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="tab-chaves-api"]').classes()).toContain('active')
-      expect(wrapper.find('[data-testid="api-keys-tab"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-colaboradores"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-matriz"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-auditoria"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-chaves-api"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-chaves-api"]').classes()).toContain('active')
+    expect(wrapper.find('[data-testid="api-keys-tab"]').exists()).toBe(true)
 
-      expect(usersSpy).not.toHaveBeenCalled()
-      expect(rolesSpy).not.toHaveBeenCalled()
-      expect(eventsSpy).not.toHaveBeenCalled()
-    }
+    expect(usersSpy).not.toHaveBeenCalled()
+    expect(rolesSpy).not.toHaveBeenCalled()
+    expect(eventsSpy).not.toHaveBeenCalled()
   })
 
   it('usa mapCustomUserPermissionsToFront no loginWithCredentials quando permissoes_customizadas é array e sincroniza sessão ao atualizar/resetar permissões', async () => {

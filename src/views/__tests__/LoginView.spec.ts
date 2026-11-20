@@ -114,4 +114,19 @@ describe('LoginView - Autenticação JWT Real', () => {
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('Network Error')
   })
+
+  it('exibe apenas os 5 botões de acesso rápido dos perfis oficiais', () => {
+    const wrapper = mount(LoginView)
+    const quickButtons = wrapper.findAll('.roles-container button')
+    const labels = quickButtons.map((b) => b.text().trim())
+
+    expect(quickButtons).toHaveLength(5)
+    expect(labels).toEqual([
+      'Entrar Operador',
+      'Entrar Analista',
+      'Entrar Auditor',
+      'Entrar Gestor',
+      'Entrar Administrador',
+    ])
+  })
 })

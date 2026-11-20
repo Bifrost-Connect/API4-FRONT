@@ -19,6 +19,8 @@ import {
   isAuditorReadOnlyLocked,
   homeFor,
   getVisibleMenuItems,
+  STANDARD_ROLES,
+  normalizeRoleKey,
 } from '@/utils/rbac'
 import { ROLE_DEFAULT_PERMISSIONS } from '@/types/access'
 
@@ -151,19 +153,17 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).not.toContain('Upload de carga')
     })
 
-    it('exibe Catálogo de Bases, Mapa, Perfil e Gestão de Chaves API para o Integrador Externo, ocultando Dashboard e Upload', () => {
-      setTestUserRole('INTEGRADOR_EXTERNO')
-      const user = userService.getCurrentUser()
-      const menu = getVisibleMenuItems(user)
-      const labels = menu.map((m) => m.label)
+    it('unifica os 5 perfis oficiais e concede API:* apenas para ADMIN e GESTOR por padrão', () => {
+      expect(STANDARD_ROLES).toEqual(['ADMIN', 'OPERADOR_DADOS', 'ANALISTA', 'AUDITOR', 'GESTOR'])
+      expect(normalizeRoleKey('INTEGRADOR')).toBe('INTEGRADOR')
 
-      expect(labels).toContain('Catálogo de Bases')
-      expect(labels).toContain('Mapa operacional')
-      expect(labels).toContain('Perfil do usuário')
-      expect(labels).toContain('Gerenciamento de usuários')
-      expect(labels).not.toContain('Dashboard')
-      expect(labels).not.toContain('Upload de carga')
-      expect(homeFor(user)).toBe('/catalogo')
+      for (const apiPerm of ['API:VISUALIZAR_CHAVES', 'API:GERAR_CHAVE', 'API:REVOGAR_CHAVE']) {
+        expect(ROLE_DEFAULT_PERMISSIONS.ADMIN).toContain(apiPerm)
+        expect(ROLE_DEFAULT_PERMISSIONS.GESTOR).toContain(apiPerm)
+        expect(ROLE_DEFAULT_PERMISSIONS.ANALISTA).not.toContain(apiPerm)
+        expect(ROLE_DEFAULT_PERMISSIONS.OPERADOR_DADOS).not.toContain(apiPerm)
+        expect(ROLE_DEFAULT_PERMISSIONS.AUDITOR).not.toContain(apiPerm)
+      }
     })
 
     it('reflete dinamicamente as permissões concedidas a uma role customizada', () => {

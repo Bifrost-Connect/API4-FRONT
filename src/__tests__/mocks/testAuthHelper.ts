@@ -8,7 +8,6 @@ const ROLE_DISPLAY_META: Record<StandardRole, { id: number; name: string; email:
   ANALISTA: { id: 3, name: 'Mariana Duarte', email: 'analista@georural.com.br', label: 'Analista' },
   AUDITOR: { id: 4, name: 'Daniel Natan', email: 'auditor@georural.com.br', label: 'Auditor' },
   GESTOR: { id: 5, name: 'Fernanda Rocha', email: 'gestor@georural.com.br', label: 'Gestor' },
-  INTEGRADOR_EXTERNO: { id: 6, name: 'Parceiro Integrador', email: 'integrador@georural.com.br', label: 'Integrador' },
 }
 
 export function setTestUserRole(role: string, token = 'test-jwt-token'): UserSession {

@@ -33,7 +33,6 @@ import { catalogoService, type CatalogoBase } from '@/services/catalogo'
 import type { CatalogoItem, CatalogoKpis, CatalogoSortOption, ViewMode } from '@/types/catalogo'
 import { uiPreferencesStorage } from '@/services/storage/uiPreferencesStorage'
 import { userService } from '@/services/user'
-import { normalizeRoleKey } from '@/utils/rbac'
 import {
   QUARANTINE_TOOLTIP,
   isBaseDisponivel,
@@ -52,9 +51,7 @@ const canViewProcesses = computed(() =>
   userService.canAny(['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS']),
 )
 const canLoadFilterOptions = computed(
-  () =>
-    normalizeRoleKey(userService.getCurrentUser().role) !== 'INTEGRADOR_EXTERNO' &&
-    (canViewProcesses.value || userService.can('ANALISE_TERRITORIAL:CONSULTAR_RESULTADO')),
+  () => canViewProcesses.value || userService.can('ANALISE_TERRITORIAL:CONSULTAR_RESULTADO'),
 )
 const canExportReports = computed(
   () =>

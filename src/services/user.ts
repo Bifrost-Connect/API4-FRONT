@@ -48,7 +48,7 @@ import {
 
 export { DuplicateEmailError }
 export type { UserItem, SystemRole, StandardRole, RoleDef, PermissionDefinition, RoleOption, SecurityEvent, UserSession }
-export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | 'Integrador' | string
+export type UserRole = 'Operador' | 'Auditor' | 'Analista' | 'Administrador' | 'Gestor' | string
 
 const defaultSession: UserSession = {
   id: undefined,

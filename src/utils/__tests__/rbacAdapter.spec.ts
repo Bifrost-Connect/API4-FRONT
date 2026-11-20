@@ -19,7 +19,6 @@ describe('rbacAdapter', () => {
       expect(mapBackendRoleToFront('AUDITOR')).toBe('AUDITOR')
       expect(mapBackendRoleToFront('GESTOR')).toBe('GESTOR')
       expect(mapBackendRoleToFront('ANALISTA')).toBe('ANALISTA')
-      expect(mapBackendRoleToFront('INTEGRADOR_EXTERNO')).toBe('INTEGRADOR_EXTERNO')
     })
 
     it('converte chaves do front-end para os nomes de enum esperados pelo back-end', () => {
@@ -30,7 +29,6 @@ describe('rbacAdapter', () => {
       expect(mapFrontRoleToBackend('AUDITOR')).toBe('AUDITOR')
       expect(mapFrontRoleToBackend('GESTOR')).toBe('GESTOR')
       expect(mapFrontRoleToBackend('ANALISTA')).toBe('ANALISTA')
-      expect(mapFrontRoleToBackend('INTEGRADOR_EXTERNO')).toBe('INTEGRADOR_EXTERNO')
     })
   })
 
@@ -108,20 +106,32 @@ describe('rbacAdapter', () => {
       expect(mapped).not.toContain('AUDITORIA:VISUALIZAR_PROCESSAMENTOS')
     })
 
-    it('inclui permissões de gestão de chaves de API (US12) para GESTOR e INTEGRADOR_EXTERNO e bloqueia para AUDITOR', () => {
+    it('inclui permissões de gestão de chaves de API (US12) apenas para ADMIN e GESTOR e bloqueia para ANALISTA, OPERADOR_DADOS e AUDITOR', () => {
+      const mappedAdmin = mapBackendPermissionsToFront(['USUARIO_GERENCIAR'], 'ADMINISTRADOR')
+      expect(mappedAdmin).toContain('API:VISUALIZAR_CHAVES')
+      expect(mappedAdmin).toContain('API:GERAR_CHAVE')
+      expect(mappedAdmin).toContain('API:REVOGAR_CHAVE')
+
       const mappedGestor = mapBackendPermissionsToFront(['CATALOGO_CONSULTAR', 'CARGA_APROVAR'], 'GESTOR')
       expect(mappedGestor).toContain('API:VISUALIZAR_CHAVES')
       expect(mappedGestor).toContain('API:GERAR_CHAVE')
       expect(mappedGestor).toContain('API:REVOGAR_CHAVE')
 
-      const mappedIntegrador = mapBackendPermissionsToFront(
-        ['CATALOGO_CONSULTAR', 'MAPA_CONSULTAR'],
-        'INTEGRADOR_EXTERNO',
+      const mappedAnalista = mapBackendPermissionsToFront(
+        ['CATALOGO_CONSULTAR', 'MAPA_CONSULTAR', 'ANALISE_EXECUTAR'],
+        'ANALISTA',
       )
-      expect(mappedIntegrador).toContain('API:VISUALIZAR_CHAVES')
-      expect(mappedIntegrador).toContain('API:GERAR_CHAVE')
-      expect(mappedIntegrador).toContain('API:REVOGAR_CHAVE')
-      expect(mappedIntegrador).not.toContain('MAPA:COMPARAR_SAFRAS')
+      expect(mappedAnalista).not.toContain('API:VISUALIZAR_CHAVES')
+      expect(mappedAnalista).not.toContain('API:GERAR_CHAVE')
+      expect(mappedAnalista).not.toContain('API:REVOGAR_CHAVE')
+
+      const mappedOperador = mapBackendPermissionsToFront(
+        ['CARGA_ENVIAR', 'CARGA_CONSULTAR', 'CATALOGO_CONSULTAR'],
+        'OPERADOR',
+      )
+      expect(mappedOperador).not.toContain('API:VISUALIZAR_CHAVES')
+      expect(mappedOperador).not.toContain('API:GERAR_CHAVE')
+      expect(mappedOperador).not.toContain('API:REVOGAR_CHAVE')
 
       const mappedAuditor = mapBackendPermissionsToFront(['CATALOGO_CONSULTAR'], 'AUDITOR')
       expect(mappedAuditor).not.toContain('API:VISUALIZAR_CHAVES')
@@ -172,12 +182,12 @@ describe('rbacAdapter', () => {
       expect(customGestor).not.toContain('API:GERAR_CHAVE')
       expect(customGestor).not.toContain('API:REVOGAR_CHAVE')
 
-      const customIntegrador = mapCustomUserPermissionsToFront(
+      const customAnalista = mapCustomUserPermissionsToFront(
         ['MAPA:COMPARAR_SAFRAS', 'CHAVE_API_GERENCIAR'],
-        'INTEGRADOR_EXTERNO',
+        'ANALISTA',
       )
-      expect(customIntegrador).toContain('MAPA:COMPARAR_SAFRAS')
-      expect(customIntegrador).toContain('API:VISUALIZAR_CHAVES')
+      expect(customAnalista).toContain('MAPA:COMPARAR_SAFRAS')
+      expect(customAnalista).toContain('API:VISUALIZAR_CHAVES')
     })
 
     it('mantém trava estrita read-only para AUDITOR mesmo com permissões customizadas', () => {

@@ -45,13 +45,6 @@ export const MOCK_ROLES: RoleDef[] = [
     padrao: true,
     permissions: [...ROLE_DEFAULT_PERMISSIONS.GESTOR],
   },
-  {
-    id: 'INTEGRADOR_EXTERNO',
-    nome: 'Integrador Externo',
-    descricao: 'Consulta via catálogo, mapa e chaves de API.',
-    padrao: true,
-    permissions: [...ROLE_DEFAULT_PERMISSIONS.INTEGRADOR_EXTERNO],
-  },
 ]
 
 export const MOCK_USERS_LIST: UserItem[] = [

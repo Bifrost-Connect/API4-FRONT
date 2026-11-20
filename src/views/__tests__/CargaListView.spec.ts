@@ -500,61 +500,6 @@ describe('Catálogo de Bases Geoespaciais', () => {
   })
 
   describe('Controle de Acesso RBAC por Perfil (Catálogo via /catalogo/bases)', () => {
-    it('INTEGRADOR_EXTERNO carrega bases publicadas via catalogoService.listarBases sem chamar processos, métricas ou filtros de domínio', async () => {
-      setTestUserRole('INTEGRADOR_EXTERNO')
-
-      const getProcessesSpy = vi.spyOn(dashboardService, 'getDashboardProcesses')
-      const getSummarySpy = vi.spyOn(dashboardService, 'getDashboardSummary').mockResolvedValue([])
-      const getFilterOptionsSpy = vi.spyOn(dashboardService, 'getFilterOptions')
-      const listarBasesSpy = vi.spyOn(catalogoService, 'listarBases').mockResolvedValueOnce([
-        {
-          id: 201,
-          conjunto_id: 1,
-          conjunto: 'Imóveis Rurais (CAR)',
-          orgao_sigla: 'INCRA',
-          ano_safra: '2026',
-          versao_oficial: 'v1.0 (Oficial)',
-          data_publicacao: '19/10/2026 20:05',
-          epsg_destino: 'EPSG:4674',
-          total_feicoes: 1420,
-        },
-        {
-          id: 202,
-          conjunto_id: 2,
-          conjunto: 'Reserva Legal',
-          orgao_sigla: 'SICAR',
-          ano_safra: '2025',
-          versao_oficial: 'v2.1 (Oficial)',
-          data_publicacao: '15/08/2025 14:20',
-          epsg_destino: 'EPSG:4674',
-          total_feicoes: 890,
-        },
-      ])
-
-      const wrapper = mount(CargaListView)
-      await flushPromises()
-
-      expect(listarBasesSpy).toHaveBeenCalled()
-      expect(getProcessesSpy).not.toHaveBeenCalled()
-      expect(getSummarySpy).not.toHaveBeenCalled()
-      expect(getFilterOptionsSpy).not.toHaveBeenCalled()
-
-      expect(wrapper.find('[data-testid="kpi-value-total"]').text()).toBe('2')
-      expect(wrapper.find('[data-testid="kpi-value-prontas"]').text()).toBe('2')
-      expect(wrapper.find('[data-testid="kpi-value-processamento"]').text()).toBe('0')
-
-      const cards = wrapper.findAll('[data-testid="catalog-card"]')
-      expect(cards.length).toBe(2)
-      expect(wrapper.text()).toContain('Imóveis Rurais (CAR)')
-      expect(wrapper.text()).toContain('Reserva Legal')
-      expect(wrapper.text()).toContain('INCRA')
-      expect(wrapper.text()).toContain('SICAR')
-
-      await cards[0]!.find('[data-testid="btn-inspect-base"]').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('[data-testid="catalog-detail-drawer"]').exists()).toBe(true)
-    })
-
     it('ANALISTA sem permissão de processos carrega catálogo via catalogoService.listarBases sem chamar /processos nem métricas, mas pode carregar filtros de domínio', async () => {
       setTestUserRole('ANALISTA')
 
@@ -590,7 +535,7 @@ describe('Catálogo de Bases Geoespaciais', () => {
     })
 
     it('exibe alerta de erro quando catalogoService.listarBases falhar para perfil sem acesso a processos', async () => {
-      setTestUserRole('INTEGRADOR_EXTERNO')
+      setTestUserRole('ANALISTA')
       vi.spyOn(catalogoService, 'listarBases').mockRejectedValueOnce(new Error('Falha de rede'))
 
       const wrapper = mount(CargaListView)

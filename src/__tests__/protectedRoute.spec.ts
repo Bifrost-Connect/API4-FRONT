@@ -1,6 +1,6 @@
 /**
  * Suíte de Testes de Proteção de Rotas (ProtectedRoute) e Controle de Acessos por Perfil.
- * Valida o cruzamento de acesso a URLs para todos os 6 perfis padrão do GeoRural.
+ * Valida o cruzamento de acesso a URLs para todos os 5 perfis padrão do GeoRural.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 import router from '@/router'
@@ -199,41 +199,6 @@ describe('Proteção de Rotas e Controle de Acesso por Perfil (ProtectedRoute)',
       await router.push('/comparacao-temporal')
       expect(router.currentRoute.value.name).toBe('comparacao-temporal')
       expect(router.currentRoute.value.path).toBe('/comparacao-temporal')
-
-      await router.push('/profile')
-      await router.push('/users')
-      expect(router.currentRoute.value.name).toBe('users')
-      expect(router.currentRoute.value.path).toBe('/users')
-    })
-  })
-
-  describe('Perfil Integrador Externo (INTEGRADOR_EXTERNO)', () => {
-    it('bloqueia /upload, /, /analise-territorial e /comparacao-temporal, permitindo /catalogo, /mapa e /users (Chaves de API)', async () => {
-      setTestUserRole('INTEGRADOR_EXTERNO')
-
-      const forbiddenRoutes = [
-        '/upload',
-        '/',
-        '/analise-territorial',
-        '/comparacao-temporal',
-      ]
-
-      for (const path of forbiddenRoutes) {
-        await router.push('/profile')
-        await router.push(path)
-        expect(router.currentRoute.value.name).toBe('forbidden')
-        expect(router.currentRoute.value.path).toBe('/acesso-negado')
-      }
-
-      await router.push('/profile')
-      await router.push('/catalogo')
-      expect(router.currentRoute.value.name).toBe('catalogo')
-      expect(router.currentRoute.value.path).toBe('/catalogo')
-
-      await router.push('/profile')
-      await router.push('/mapa')
-      expect(router.currentRoute.value.name).toBe('mapa')
-      expect(router.currentRoute.value.path).toBe('/mapa')
 
       await router.push('/profile')
       await router.push('/users')

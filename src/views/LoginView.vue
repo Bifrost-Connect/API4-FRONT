@@ -22,7 +22,6 @@ const SEED_CREDENTIALS: Record<string, { email: string; password: string }> = {
   Analista: { email: 'analista@georural.com.br', password: 'Troca123' },
   Administrador: { email: 'admin@georural.com.br', password: 'Troca123' },
   Gestor: { email: 'gestor@georural.com.br', password: 'Troca123' },
-  Integrador: { email: 'integrador@georural.com.br', password: 'Troca123' },
 }
 
 const fillLogin = (role: string) => {
@@ -212,14 +211,6 @@ const handleLogin = async () => {
           @click="fillLogin('Administrador')"
         >
           Entrar Administrador
-        </button>
-        <button
-          type="button"
-          class="btn btn_outline"
-          :class="{ 'role-selected': selectedRole === 'Integrador' }"
-          @click="fillLogin('Integrador')"
-        >
-          Entrar Integrador
         </button>
       </div>
     </div>

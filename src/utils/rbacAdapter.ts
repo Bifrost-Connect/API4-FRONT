@@ -56,8 +56,6 @@ const BACKEND_TO_FRONT_ROLE: Record<string, string> = {
   AUDITOR: 'AUDITOR',
   GESTOR: 'GESTOR',
   ANALISTA: 'ANALISTA',
-  INTEGRADOR_EXTERNO: 'INTEGRADOR_EXTERNO',
-  INTEGRADOR: 'INTEGRADOR_EXTERNO',
 }
 
 const FRONT_TO_BACKEND_ROLE: Record<string, string> = {
@@ -68,8 +66,6 @@ const FRONT_TO_BACKEND_ROLE: Record<string, string> = {
   AUDITOR: 'AUDITOR',
   GESTOR: 'GESTOR',
   ANALISTA: 'ANALISTA',
-  INTEGRADOR_EXTERNO: 'INTEGRADOR_EXTERNO',
-  INTEGRADOR: 'INTEGRADOR_EXTERNO',
 }
 
 /**
@@ -233,11 +229,7 @@ export function mapBackendPermissionsToFront(
   const frontRole = perfil ? mapBackendRoleToFront(perfil) : undefined
   const result = expandPermissionsSet(permissoes, frontRole)
 
-  if (frontRole === 'INTEGRADOR_EXTERNO') {
-    result.delete('MAPA:COMPARAR_SAFRAS')
-  }
-
-  if (frontRole === 'ADMIN' || frontRole === 'GESTOR' || frontRole === 'INTEGRADOR_EXTERNO') {
+  if (frontRole === 'ADMIN' || frontRole === 'GESTOR') {
     result.add('API:VISUALIZAR_CHAVES')
     result.add('API:GERAR_CHAVE')
     result.add('API:REVOGAR_CHAVE')

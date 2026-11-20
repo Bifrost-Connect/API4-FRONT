@@ -34,7 +34,6 @@ export const STANDARD_ROLES = [
   'ANALISTA',
   'AUDITOR',
   'GESTOR',
-  'INTEGRADOR_EXTERNO',
 ] as const
 
 export type StandardRole = (typeof STANDARD_ROLES)[number]
@@ -47,7 +46,6 @@ export function normalizeRoleKey(role?: string): string {
   const norm = role.toUpperCase().trim()
   if (norm === 'ADMINISTRADOR') return 'ADMIN'
   if (norm === 'OPERADOR') return 'OPERADOR_DADOS'
-  if (norm === 'INTEGRADOR') return 'INTEGRADOR_EXTERNO'
   return norm
 }
 
