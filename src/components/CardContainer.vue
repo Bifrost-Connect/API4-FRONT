@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FiArrowDown, FiCheck, FiAlertTriangle, FiX } from 'vue-icons-plus/fi'
+import { FiArrowDown, FiCheck, FiAlertTriangle, FiX, FiDatabase, FiClock, FiArchive } from 'vue-icons-plus/fi'
 
 const props = defineProps<{
   title: string
   value: number | string
-  variant: 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'orange'
-  iconType?: 'down' | 'check' | 'warning' | 'error'
+  variant: 'success' | 'warning' | 'danger' | 'info' | 'primary' | 'orange' | 'purple'
+  iconType?: 'down' | 'check' | 'warning' | 'error' | 'database' | 'clock' | 'archive'
+  valueTestId?: string
 }>()
 
 const variantClass = computed(() => {
@@ -23,14 +24,11 @@ const variantClass = computed(() => {
       return 'border-primary text-primary'
     case 'orange':
       return 'border-orange text-orange'
+    case 'purple':
+      return 'border-purple text-purple'
     default:
       return 'border-primary text-primary'
   }
-})
-
-const variableName = computed(() => {
-  if (props.variant === 'orange') return '--vis-brand-orange'
-  return `--vis-c-${props.variant}`
 })
 </script>
 
@@ -46,8 +44,11 @@ const variableName = computed(() => {
         <FiCheck v-else-if="iconType === 'check'" class="stat-icon icon-check" size="32" />
         <FiAlertTriangle v-else-if="iconType === 'warning'" class="stat-icon icon-warning" size="32" />
         <FiX v-else-if="iconType === 'error'" class="stat-icon icon-error" size="32" />
+        <FiDatabase v-else-if="iconType === 'database'" class="stat-icon icon-database" size="32" />
+        <FiClock v-else-if="iconType === 'clock'" class="stat-icon icon-clock" size="32" />
+        <FiArchive v-else-if="iconType === 'archive'" class="stat-icon icon-archive" size="32" />
       </div>
-      <span class="stat-value">{{ value }}</span>
+      <span class="stat-value" :data-testid="valueTestId || undefined">{{ value }}</span>
     </div>
   </div>
 </template>
@@ -134,6 +135,9 @@ const variableName = computed(() => {
 .border-orange {
   border-top-color: var(--vis-brand-orange);
 }
+.border-purple {
+  border-top-color: var(--badge-editor-text);
+}
 
 .icon-down {
   stroke: var(--vis-c-info);
@@ -146,5 +150,14 @@ const variableName = computed(() => {
 }
 .icon-error {
   stroke: var(--vis-c-danger);
+}
+.icon-database {
+  stroke: var(--vis-brand-orange);
+}
+.icon-clock {
+  stroke: var(--vis-c-info);
+}
+.icon-archive {
+  stroke: var(--badge-editor-text);
 }
 </style>

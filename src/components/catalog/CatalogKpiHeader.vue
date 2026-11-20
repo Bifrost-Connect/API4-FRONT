@@ -3,12 +3,7 @@
  * Header de KPIs do Catálogo de Bases (US09 - Tarefa 2).
  * Exibe 4 cards com contadores rápidos e fallback para carregamento via Skeleton.
  */
-import {
-  FiDatabase,
-  FiCheckCircle,
-  FiClock,
-  FiArchive,
-} from 'vue-icons-plus/fi'
+import CardContainer from '@/components/CardContainer.vue'
 import CatalogSkeleton from './CatalogSkeleton.vue'
 import type { CatalogoKpis } from '@/types/catalogo'
 
@@ -29,50 +24,44 @@ withDefaults(
 
     <div v-else class="kpis-grid" data-testid="kpis-header">
       <!-- Card 1: Total de Bases -->
-      <article class="kpi-card kpi-total" data-testid="kpi-total">
-        <div class="kpi-icon-wrapper total-icon">
-          <FiDatabase size="22" aria-hidden="true" />
-        </div>
-        <div class="kpi-content">
-          <span class="kpi-value" data-testid="kpi-value-total">{{ kpis.totalCarregadas }}</span>
-          <span class="kpi-label">Total de Bases</span>
-        </div>
-      </article>
+      <CardContainer
+        title="Total de Bases"
+        :value="kpis.totalCarregadas"
+        variant="orange"
+        icon-type="database"
+        value-test-id="kpi-value-total"
+        data-testid="kpi-total"
+      />
 
       <!-- Card 2: Prontas para Consulta -->
-      <article class="kpi-card kpi-prontas" data-testid="kpi-prontas">
-        <div class="kpi-icon-wrapper prontas-icon">
-          <FiCheckCircle size="22" aria-hidden="true" />
-        </div>
-        <div class="kpi-content">
-          <span class="kpi-value" data-testid="kpi-value-prontas">{{ kpis.prontasConsulta }}</span>
-          <span class="kpi-label">Prontas para Consulta</span>
-        </div>
-      </article>
+      <CardContainer
+        title="Prontas para Consulta"
+        :value="kpis.prontasConsulta"
+        variant="success"
+        icon-type="check"
+        value-test-id="kpi-value-prontas"
+        data-testid="kpi-prontas"
+      />
 
       <!-- Card 3: Em Processamento -->
-      <article class="kpi-card kpi-processamento" data-testid="kpi-processamento">
-        <div class="kpi-icon-wrapper processamento-icon">
-          <FiClock size="22" aria-hidden="true" />
-        </div>
-        <div class="kpi-content">
-          <span class="kpi-value" data-testid="kpi-value-processamento">{{ kpis.emProcessamento }}</span>
-          <span class="kpi-label">Em Processamento</span>
-        </div>
-      </article>
+      <CardContainer
+        title="Em Processamento"
+        :value="kpis.emProcessamento"
+        variant="info"
+        icon-type="clock"
+        value-test-id="kpi-value-processamento"
+        data-testid="kpi-processamento"
+      />
 
       <!-- Card 4: Versões Congeladas -->
-      <article class="kpi-card kpi-congeladas" data-testid="kpi-congeladas">
-        <div class="kpi-icon-wrapper congeladas-icon">
-          <FiArchive size="22" aria-hidden="true" />
-        </div>
-        <div class="kpi-content">
-          <span class="kpi-value" data-testid="kpi-value-congeladas">
-            {{ kpis.historicasCongeladas !== undefined ? kpis.historicasCongeladas : '—' }}
-          </span>
-          <span class="kpi-label">Versões Congeladas</span>
-        </div>
-      </article>
+      <CardContainer
+        title="Versões Congeladas"
+        :value="kpis.historicasCongeladas !== undefined ? kpis.historicasCongeladas : '—'"
+        variant="purple"
+        icon-type="archive"
+        value-test-id="kpi-value-congeladas"
+        data-testid="kpi-congeladas"
+      />
     </div>
   </section>
 </template>
@@ -85,7 +74,7 @@ withDefaults(
 .kpis-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
 
 @media (max-width: 1200px) {
@@ -98,81 +87,5 @@ withDefaults(
   .kpis-grid {
     grid-template-columns: 1fr;
   }
-}
-
-.kpi-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-  min-height: 82px;
-}
-
-.kpi-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-brand);
-}
-
-.kpi-icon-wrapper {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.total-icon {
-  background: var(--badge-info-bg);
-  color: var(--badge-info-text);
-}
-
-.prontas-icon {
-  background: var(--badge-success-bg);
-  color: var(--badge-success-text);
-}
-
-.processamento-icon {
-  background: var(--badge-warning-bg);
-  color: var(--badge-warning-text);
-}
-
-.congeladas-icon {
-  background: var(--badge-editor-bg);
-  color: var(--badge-editor-text);
-}
-
-.kpi-content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.kpi-value {
-  font-size: 1.75rem;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--color-heading);
-  letter-spacing: -0.02em;
-}
-
-.kpi-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  margin-top: 4px;
-  line-height: 1.3;
-  white-space: normal;
-  word-break: normal;
-  overflow: visible;
-  text-overflow: clip;
 }
 </style>

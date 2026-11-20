@@ -148,6 +148,7 @@ describe('Catálogo de Bases Geoespaciais', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="kpis-header"]').exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid="kpis-header"] .stat-card')).toHaveLength(4)
       expect(wrapper.find('[data-testid="kpi-value-total"]').text()).toBe('5')
       expect(wrapper.find('[data-testid="kpi-value-prontas"]').text()).toBe('2')
       expect(wrapper.find('[data-testid="kpi-value-processamento"]').text()).toBe('3')
