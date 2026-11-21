@@ -10,6 +10,130 @@ export interface FormatoConfig {
   tag: string
 }
 
+export interface UploadFormOptions {
+  anos: string[]
+  epsgs: { id: string; label: string }[]
+  orgaos: { id: string | number; label: string }[]
+  conjuntos: { id: string | number; label: string }[]
+}
+
+export type TipoProtocoloConector = 'OGC_WFS' | 'HTTP_DIRECT' | 'GOOGLE_DRIVE' | 'ARCGIS_REST'
+export type DestinoConector = 'CARGA' | 'REFERENCIA'
+export type FormatoDadosConector = 'SHAPE-ZIP' | 'GEOJSON' | 'CSV' | 'GPKG'
+export type TipoAutenticacaoConector =
+  | 'NONE'
+  | 'API_KEY_HEADER'
+  | 'API_KEY_QUERY'
+  | 'BEARER_TOKEN'
+  | 'BASIC_AUTH'
+  | 'SERVICE_ACCOUNT_JSON'
+export type PeriodicidadeConector = 'MANUAL' | 'HORARIA' | 'DIARIA' | 'SEMANAL' | 'MENSAL' | 'CRON'
+export type EtapaIngestaoUi = 'PENDENTE' | 'BAIXANDO' | 'PROCESSANDO_POSTGIS' | 'CONCLUIDO' | 'ERRO'
+
+export interface ConectorTemplate {
+  codigo: string
+  nome: string
+  descricao: string
+  tipoProtocolo: TipoProtocoloConector
+  urlBase: string
+  destino: DestinoConector
+  fonteReferencia: string | null
+  nomeCamadaExibicao: string | null
+  formatoDados: FormatoDadosConector
+  epsgOrigem: string
+  colunaIdentificador: string
+  parametrosJson: Record<string, unknown>
+  tipoAutenticacao: TipoAutenticacaoConector
+  nomeCredencial: string | null
+  periodicidade: PeriodicidadeConector
+}
+
+export interface ConectorFonteDados {
+  id: number
+  nome: string
+  descricao: string | null
+  tipoProtocolo: TipoProtocoloConector
+  urlBase: string
+  destino: DestinoConector
+  fonteReferencia: string | null
+  nomeCamadaExibicao: string | null
+  orgaoId: number | null
+  orgaoSigla: string | null
+  conjuntoId: number | null
+  conjuntoNome: string | null
+  formatoDados: FormatoDadosConector
+  epsgOrigem: string
+  colunaIdentificador: string
+  parametrosJson: Record<string, unknown>
+  tipoAutenticacao: TipoAutenticacaoConector
+  nomeCredencial: string | null
+  prefixoCredencial: string | null
+  possuiCredencial: boolean
+  periodicidade: PeriodicidadeConector
+  expressaoCron: string | null
+  ativo: boolean
+  ultimaExecucaoEm: string | null
+  proximaExecucaoEm: string | null
+  ultimoStatus: string | null
+  criadoPorId: number | null
+  dataCriacao: string | null
+  dataAtualizacao: string | null
+}
+
+export interface ConectorFontePayload {
+  nome: string
+  descricao?: string | null
+  tipoProtocolo: TipoProtocoloConector
+  urlBase: string
+  destino: DestinoConector
+  fonteReferencia?: string | null
+  nomeCamadaExibicao?: string | null
+  orgaoId?: number | null
+  conjuntoId?: number | null
+  formatoDados: FormatoDadosConector
+  epsgOrigem?: string | null
+  colunaIdentificador?: string | null
+  parametrosJson?: Record<string, unknown>
+  tipoAutenticacao: TipoAutenticacaoConector
+  nomeCredencial?: string | null
+  credencial?: string | null
+  periodicidade: PeriodicidadeConector
+  expressaoCron?: string | null
+  ativo?: boolean
+}
+
+export interface TesteConexaoResponse {
+  sucesso: boolean
+  statusHttp: number | null
+  mensagem: string
+  tempoMs: number
+}
+
+export interface IngestaoExecucaoItem {
+  id: number
+  conectorId: number | null
+  conectorNome: string | null
+  dagRunId: string | null
+  nomeArquivo: string | null
+  driveCaminho: string | null
+  destino: string | null
+  fonte: string | null
+  statusBanco: string | null
+  etapaUi: EtapaIngestaoUi
+  processoId: number | null
+  etapaProcesso: string | null
+  situacaoProcesso: string | null
+  linhasCarregadas: number | null
+  linhasDescartadas: number | null
+  tamanhoBytes: number | null
+  hashSha256: string | null
+  md5Drive: string | null
+  mensagem: string | null
+  dataInicio: string | null
+  dataFim: string | null
+  duracaoSegundos: number | null
+}
+
 export const UPLOAD_FORMATO_OPTIONS = ['GeoJSON', 'Shapefile (ZIP)', 'CSV', 'GeoPackage', 'KML']
 export const UPLOAD_CLASSIFICACAO_OPTIONS = ['Público', 'Restrito', 'Confidencial']
 
@@ -167,6 +291,58 @@ export const uploadService = {
     const res = await api.post('/carga/referencias/importar', null, {
       params: { fonte, limitePorFonte },
     })
+    return res.data
+  },
+
+  async listarTemplatesConectores(): Promise<ConectorTemplate[]> {
+    const res = await api.get<ConectorTemplate[]>('/conectores/templates')
+    return res.data
+  },
+
+  async listarConectores(): Promise<ConectorFonteDados[]> {
+    const res = await api.get<ConectorFonteDados[]>('/conectores')
+    return res.data
+  },
+
+  async criarConector(payload: ConectorFontePayload): Promise<ConectorFonteDados> {
+    const res = await api.post<ConectorFonteDados>('/conectores', payload)
+    return res.data
+  },
+
+  async atualizarConector(id: number, payload: ConectorFontePayload): Promise<ConectorFonteDados> {
+    const res = await api.put<ConectorFonteDados>(`/conectores/${id}`, payload)
+    return res.data
+  },
+
+  async alternarAtivoConector(id: number, ativo: boolean): Promise<ConectorFonteDados> {
+    const res = await api.patch<ConectorFonteDados>(`/conectores/${id}/ativo`, { ativo })
+    return res.data
+  },
+
+  async excluirConector(id: number): Promise<void> {
+    await api.delete(`/conectores/${id}`)
+  },
+
+  async testarConector(id: number): Promise<TesteConexaoResponse> {
+    const res = await api.post<TesteConexaoResponse>(`/conectores/${id}/testar`)
+    return res.data
+  },
+
+  async executarConector(
+    id: number,
+    payload?: { parametrosOverride?: Record<string, unknown>; forcarReprocessamento?: boolean },
+  ): Promise<IngestaoExecucaoItem> {
+    const res = await api.post<IngestaoExecucaoItem>(`/conectores/${id}/executar`, payload ?? {})
+    return res.data
+  },
+
+  async listarExecucoesIngestao(params?: {
+    conectorId?: number
+    destino?: string
+    status?: string
+    limit?: number
+  }): Promise<IngestaoExecucaoItem[]> {
+    const res = await api.get<IngestaoExecucaoItem[]>('/conectores/execucoes', { params })
     return res.data
   },
 }
