@@ -13,7 +13,7 @@ const route = useRoute()
 // Mapeamento de títulos de tela para o breadcrumb superior
 const pageTitles: Record<string, string> = {
   dashboard: 'Visão geral das cargas',
-  upload: 'Nova carga de dados',
+  upload: 'Ingestão de Carga',
   mapa: 'Mapa operacional',
   styleguide: 'Guia de estilos',
   'process-log': 'Acompanhar processamento de cargas',

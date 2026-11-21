@@ -4,7 +4,6 @@ import AutomatedIngestionTab from '../upload/AutomatedIngestionTab.vue'
 import {
   uploadService,
   type ConectorFonteDados,
-  type ConectorTemplate,
   type IngestaoExecucaoItem,
 } from '@/services/upload'
 
@@ -25,43 +24,6 @@ const mockFormOptions = {
     { id: 20, label: 'Áreas Embargadas' },
   ],
 }
-
-const mockTemplates: ConectorTemplate[] = [
-  {
-    codigo: 'SICAR_WFS',
-    nome: 'SICAR Nacional - Imóveis Rurais',
-    descricao: 'Consulta direta ao GeoServer oficial do SICAR.',
-    tipoProtocolo: 'OGC_WFS',
-    urlBase: 'https://geoserver.car.gov.br/geoserver/sicar/wfs',
-    destino: 'CARGA',
-    fonteReferencia: null,
-    nomeCamadaExibicao: 'Imóveis Rurais SICAR (WFS)',
-    formatoDados: 'SHAPE-ZIP',
-    epsgOrigem: '4674',
-    colunaIdentificador: 'cod_imovel,cod_imovel_,cod_car',
-    parametrosJson: { version: '1.0.0', typeName: 'sicar:sicar_imoveis_pr', uf: 'PR', maxFeatures: 5000 },
-    tipoAutenticacao: 'NONE',
-    nomeCredencial: null,
-    periodicidade: 'MANUAL',
-  },
-  {
-    codigo: 'NASA_FIRMS_API',
-    nome: 'NASA FIRMS - Focos de Calor Ativos VIIRS',
-    descricao: 'Focos ativos de calor VIIRS NRT Brasil via API REST da NASA FIRMS.',
-    tipoProtocolo: 'HTTP_DIRECT',
-    urlBase: 'https://firms.modaps.eosdis.nasa.gov/api/country/csv/{API_KEY}/VIIRS_SNPP_NRT/BRA/1',
-    destino: 'REFERENCIA',
-    fonteReferencia: 'INPE_QUEIMADA',
-    nomeCamadaExibicao: 'Focos de Calor Ativos VIIRS (NASA FIRMS)',
-    formatoDados: 'CSV',
-    epsgOrigem: '4326',
-    colunaIdentificador: 'latitude,acq_date',
-    parametrosJson: {},
-    tipoAutenticacao: 'API_KEY_QUERY',
-    nomeCredencial: 'MAP_KEY',
-    periodicidade: 'MANUAL',
-  },
-]
 
 const baseConector: ConectorFonteDados = {
   id: 1,
@@ -137,7 +99,7 @@ describe('AutomatedIngestionTab', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     vi.useRealTimers()
-    vi.spyOn(uploadService, 'listarTemplatesConectores').mockResolvedValue(mockTemplates)
+    vi.spyOn(uploadService, 'listarTemplatesConectores').mockResolvedValue([])
     vi.spyOn(uploadService, 'listarConectores').mockResolvedValue([baseConector])
     vi.spyOn(uploadService, 'listarExecucoesIngestao').mockResolvedValue([baseExecucaoConcluida])
   })
@@ -146,46 +108,92 @@ describe('AutomatedIngestionTab', () => {
     vi.useRealTimers()
   })
 
-  it('carrega templates, conectores e KPIs na inicialização', async () => {
+  it('carrega conectores e execuções sem templates rápidos, exibe KPIs, tabelas na ordem correta e modal fechado inicialmente', async () => {
     const wrapper = mountTab()
     await flushPromises()
 
-    expect(uploadService.listarTemplatesConectores).toHaveBeenCalledTimes(1)
+    expect(uploadService.listarTemplatesConectores).not.toHaveBeenCalled()
     expect(uploadService.listarConectores).toHaveBeenCalledTimes(1)
     expect(uploadService.listarExecucoesIngestao).toHaveBeenCalledTimes(1)
 
+    expect(wrapper.find('[data-testid^="template-btn-"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Templates Públicos')
+
     expect(wrapper.text()).toContain('Conectores Ativos')
-    expect(wrapper.text()).toContain('Agendados (Automáticos)')
-    expect(wrapper.text()).toContain('Em Execução na DAG')
-    expect(wrapper.text()).toContain('Concluídas no PostGIS')
+    expect(wrapper.text()).toContain('Agendados')
+    expect(wrapper.text()).toContain('Em Execução')
+    expect(wrapper.text()).toContain('Concluídas')
+
+    expect(wrapper.find('[data-testid="conector-modal"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-adicionar-fonte"]').exists()).toBe(true)
+
+    const html = wrapper.html()
+    const posConectores = html.indexOf('data-testid="tabela-conectores"')
+    const posExecucoes = html.indexOf('data-testid="tabela-execucoes"')
+    expect(posConectores).toBeGreaterThan(-1)
+    expect(posExecucoes).toBeGreaterThan(posConectores)
     expect(wrapper.get('[data-testid="tabela-conectores"]').text()).toContain('NASA FIRMS Diário')
   })
 
-  it('aplica template SICAR_WFS autopreenchendo WFS e órgão/conjunto de CARGA e limpa com Conector Personalizado', async () => {
+  it('abre modal ao clicar em Adicionar Fonte, alterna placeholder por protocolo e valida URL antes de testar ou salvar', async () => {
     const wrapper = mountTab()
     await flushPromises()
 
-    await wrapper.get('[data-testid="template-btn-SICAR_WFS"]').trigger('click')
+    await wrapper.get('[data-testid="btn-adicionar-fonte"]').trigger('click')
     await flushPromises()
 
-    expect((wrapper.get('[data-testid="conector-nome"]').element as HTMLInputElement).value).toBe(
-      'SICAR Nacional - Imóveis Rurais',
-    )
-    expect((wrapper.get('[data-testid="conector-destino"]').element as HTMLSelectElement).value).toBe('CARGA')
-    expect((wrapper.get('[data-testid="conector-protocolo"]').element as HTMLSelectElement).value).toBe('OGC_WFS')
-    expect((wrapper.get('[data-testid="conector-wfs-typename"]').element as HTMLInputElement).value).toBe(
-      'sicar:sicar_imoveis_pr',
-    )
-    expect((wrapper.get('[data-testid="conector-wfs-uf"]').element as HTMLSelectElement).value).toBe('PR')
-    expect((wrapper.get('[data-testid="conector-orgao"]').element as HTMLSelectElement).value).toBe('1')
-    expect((wrapper.get('[data-testid="conector-conjunto"]').element as HTMLSelectElement).value).toBe('10')
+    const modal = wrapper.get('[data-testid="conector-modal"]')
+    expect(modal.isVisible()).toBe(true)
 
-    await wrapper.get('[data-testid="template-btn-CUSTOM"]').trigger('click')
-    expect((wrapper.get('[data-testid="conector-nome"]').element as HTMLInputElement).value).toBe('')
-    expect((wrapper.get('[data-testid="conector-url"]').element as HTMLInputElement).value).toBe('')
+    const protocoloSelect = modal.get('[data-testid="conector-protocolo"]')
+    const urlInput = modal.get('[data-testid="conector-url"]')
+
+    await protocoloSelect.setValue('OGC_WFS')
+    expect(urlInput.attributes('placeholder')).toContain('geoserver')
+
+    await protocoloSelect.setValue('GOOGLE_DRIVE')
+    expect(urlInput.attributes('placeholder')).toContain('drive.google.com')
+
+    await protocoloSelect.setValue('HTTP_DIRECT')
+    await urlInput.setValue('ftp://invalido')
+    await flushPromises()
+
+    expect(modal.find('[data-testid="conector-url-error"]').exists()).toBe(true)
+    expect((modal.get('[data-testid="btn-testar-conexao-modal"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect((modal.get('[data-testid="btn-salvar-conector"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect((modal.get('[data-testid="btn-salvar-executar"]').element as HTMLButtonElement).disabled).toBe(true)
+
+    await urlInput.setValue('https://geoserver.car.gov.br/geoserver/sicar/wfs')
+    await flushPromises()
+
+    expect(modal.find('[data-testid="conector-url-error"]').exists()).toBe(false)
+    expect((modal.get('[data-testid="btn-testar-conexao-modal"]').element as HTMLButtonElement).disabled).toBe(false)
+    expect((modal.get('[data-testid="btn-salvar-conector"]').element as HTMLButtonElement).disabled).toBe(false)
+
+    // Google Drive aceita ID de pasta não vazio
+    await protocoloSelect.setValue('GOOGLE_DRIVE')
+    await urlInput.setValue('1AbCDefGhIjKlMnOpQrStUvWxYz')
+    await flushPromises()
+    expect(modal.find('[data-testid="conector-url-error"]').exists()).toBe(false)
+    expect((modal.get('[data-testid="btn-salvar-conector"]').element as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('cadastra conector NASA_FIRMS_API com chave de API e agendamento CRON', async () => {
+  it('testa conexão ad-hoc dentro do modal antes de salvar e fecha modal após cadastrar fonte', async () => {
+    const testarAdHocSpy = vi
+      .spyOn(uploadService, 'testarConectorAdHoc')
+      .mockResolvedValueOnce({
+        sucesso: true,
+        statusHttp: 200,
+        mensagem: 'Endpoint WFS respondeu Capabilities com sucesso.',
+        tempoMs: 135,
+      })
+      .mockResolvedValueOnce({
+        sucesso: false,
+        statusHttp: 401,
+        mensagem: 'Token ausente ou inválido.',
+        tempoMs: 54,
+      })
+
     const createdConector: ConectorFonteDados = {
       ...baseConector,
       id: 2,
@@ -198,12 +206,46 @@ describe('AutomatedIngestionTab', () => {
     const wrapper = mountTab()
     await flushPromises()
 
-    await wrapper.get('[data-testid="template-btn-NASA_FIRMS_API"]').trigger('click')
+    await wrapper.get('[data-testid="btn-adicionar-fonte"]').trigger('click')
+    await flushPromises()
+
     await wrapper.get('[data-testid="conector-nome"]').setValue('NASA FIRMS Cron')
+    await wrapper.get('[data-testid="conector-destino"]').setValue('REFERENCIA')
+    await wrapper.get('[data-testid="conector-fonte-ref"]').setValue('INPE_QUEIMADA')
+    await wrapper.get('[data-testid="conector-protocolo"]').setValue('HTTP_DIRECT')
+    await wrapper.get('[data-testid="conector-url"]').setValue(
+      'https://firms.modaps.eosdis.nasa.gov/api/country/csv/{API_KEY}/VIIRS_SNPP_NRT/BRA/1',
+    )
+    await wrapper.get('[data-testid="conector-auth-tipo"]').setValue('API_KEY_QUERY')
+    await wrapper.get('[data-testid="conector-cred-nome"]').setValue('MAP_KEY')
     await wrapper.get('[data-testid="conector-cred-valor"]').setValue('super-secret-map-key')
     await wrapper.get('[data-testid="conector-periodicidade"]').setValue('CRON')
     await wrapper.get('[data-testid="conector-cron"]').setValue('0 2 * * *')
 
+    // Teste ad-hoc antes de salvar
+    await wrapper.get('[data-testid="btn-testar-conexao-modal"]').trigger('click')
+    await flushPromises()
+
+    expect(testarAdHocSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nome: 'NASA FIRMS Cron',
+        tipoProtocolo: 'HTTP_DIRECT',
+        urlBase: 'https://firms.modaps.eosdis.nasa.gov/api/country/csv/{API_KEY}/VIIRS_SNPP_NRT/BRA/1',
+        credencial: 'super-secret-map-key',
+      }),
+    )
+    const statusBox = wrapper.get('[data-testid="modal-teste-resultado"]')
+    expect(statusBox.text()).toContain('200')
+    expect(statusBox.text()).toContain('135')
+    expect(statusBox.text()).toContain('Endpoint WFS respondeu Capabilities com sucesso.')
+
+    // Segundo teste retornando erro
+    await wrapper.get('[data-testid="btn-testar-conexao-modal"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="modal-teste-resultado"]').text()).toContain('401')
+    expect(wrapper.get('[data-testid="modal-teste-resultado"]').text()).toContain('Token ausente ou inválido.')
+
+    // Salva fonte e fecha modal
     await wrapper.get('[data-testid="btn-salvar-conector"]').trigger('click')
     await flushPromises()
 
@@ -220,9 +262,11 @@ describe('AutomatedIngestionTab', () => {
         expressaoCron: '0 2 * * *',
       }),
     )
+    expect(wrapper.find('[data-testid="conector-modal"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="tabela-conectores"]').text()).toContain('NASA FIRMS Cron')
   })
 
-  it('edita conector existente preservando credencial quando campo é mantido em branco e alterna visibilidade da senha', async () => {
+  it('edita conector existente no modal preservando credencial em branco, alterna visibilidade da senha e fecha após atualizar', async () => {
     const atualizarSpy = vi.spyOn(uploadService, 'atualizarConector').mockResolvedValue({
       ...baseConector,
       nome: 'NASA FIRMS Atualizado',
@@ -234,9 +278,10 @@ describe('AutomatedIngestionTab', () => {
     await wrapper.get('[data-testid="btn-editar-conector-1"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="conector-modal"]').exists()).toBe(true)
     const credInput = wrapper.get('[data-testid="conector-cred-valor"]')
     expect((credInput.element as HTMLInputElement).type).toBe('password')
-    expect(wrapper.text()).toContain('nasa****')
+    expect(wrapper.get('[data-testid="conector-modal"]').text()).toContain('nasa****')
 
     await wrapper.get('[data-testid="btn-toggle-cred-visibility"]').trigger('click')
     expect((credInput.element as HTMLInputElement).type).toBe('text')
@@ -252,9 +297,10 @@ describe('AutomatedIngestionTab', () => {
         credencial: undefined,
       }),
     )
+    expect(wrapper.find('[data-testid="conector-modal"]').exists()).toBe(false)
   })
 
-  it('testa conexão do conector e exibe resultado de sucesso e falha', async () => {
+  it('testa conexão do conector na tabela e exibe resultado de sucesso e falha', async () => {
     const testarSpy = vi
       .spyOn(uploadService, 'testarConector')
       .mockResolvedValueOnce({

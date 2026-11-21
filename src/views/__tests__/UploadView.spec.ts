@@ -26,12 +26,11 @@ describe('UploadView', () => {
       orgaos: [{ id: 1, label: 'SICAR' }],
       conjuntos: [{ id: 1, label: 'Imóveis Rurais' }],
     })
-    vi.spyOn(uploadService, 'listarTemplatesConectores').mockResolvedValue([])
     vi.spyOn(uploadService, 'listarConectores').mockResolvedValue([])
     vi.spyOn(uploadService, 'listarExecucoesIngestao').mockResolvedValue([])
   })
 
-  it('inicia na aba de Upload Manual preservando o stepper e formulário original', async () => {
+  it('exibe cabeçalho Ingestão de Carga, rótulos padronizados nas abas e inicia em Ingestão Manual', async () => {
     const wrapper = mount(UploadView, {
       global: {
         stubs: {
@@ -41,15 +40,22 @@ describe('UploadView', () => {
     })
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="tab-upload-manual"]').classes()).toContain('active')
-    expect(wrapper.get('[data-testid="tab-upload-automatizada"]').classes()).not.toContain('active')
+    const manualTab = wrapper.get('[data-testid="tab-upload-manual"]')
+    const autoTab = wrapper.get('[data-testid="tab-upload-automatizada"]')
+
+    expect(wrapper.get('h1').text()).toBe('Ingestão de Carga')
+    expect(manualTab.text()).toContain('Ingestão Manual')
+    expect(autoTab.text()).toContain('Ingestão Automática')
+    expect(autoTab.text()).not.toContain('Airflow')
+    expect(manualTab.classes()).toContain('active')
+    expect(autoTab.classes()).not.toContain('active')
     expect(wrapper.find('#upload-nome').exists()).toBe(true)
     expect(wrapper.find('#upload-orgao').exists()).toBe(true)
     expect(wrapper.find('#upload-conjunto').exists()).toBe(true)
     expect(wrapper.find('[data-testid="automated-ingestion-tab"]').exists()).toBe(false)
   })
 
-  it('alterna para a aba de Fontes Externas & Ingestão Automatizada ao clicar na aba', async () => {
+  it('alterna para a aba de Ingestão Automática ao clicar na aba', async () => {
     const wrapper = mount(UploadView, {
       global: {
         stubs: {

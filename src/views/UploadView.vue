@@ -303,7 +303,7 @@ const resetForm = () => {
 <template>
   <main class="upload-view" :class="{ 'upload-view--wide': activeTab === 'automatizada' }">
     <div class="upload-header">
-      <h1>Nova Carga de Dados</h1>
+      <h1>Ingestão de Carga</h1>
     </div>
 
     <div class="tabs-nav" data-testid="upload-tabs-nav">
@@ -315,7 +315,7 @@ const resetForm = () => {
         @click="activeTab = 'manual'"
       >
         <FiUploadCloud size="16" />
-        <span>Upload Manual de Arquivo</span>
+        <span>Ingestão Manual</span>
       </button>
 
       <button
@@ -326,7 +326,7 @@ const resetForm = () => {
         @click="activeTab = 'automatizada'"
       >
         <FiDatabase size="16" />
-        <span>Fontes Externas & Ingestão Automatizada (Airflow)</span>
+        <span>Ingestão Automática</span>
       </button>
     </div>
 

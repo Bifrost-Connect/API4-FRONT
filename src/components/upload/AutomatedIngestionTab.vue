@@ -15,7 +15,7 @@ import {
   FiPlus,
   FiRefreshCw,
   FiTrash2,
-  FiZap,
+  FiX,
 } from 'vue-icons-plus/fi'
 import CardContainer from '@/components/CardContainer.vue'
 import DataTable, { type Column } from '@/components/DataTable.vue'
@@ -23,7 +23,6 @@ import {
   uploadService,
   type ConectorFonteDados,
   type ConectorFontePayload,
-  type ConectorTemplate,
   type DestinoConector,
   type EtapaIngestaoUi,
   type FormatoDadosConector,
@@ -60,15 +59,16 @@ const FONTES_REFERENCIA_SUGESTOES = [
 
 const ACTIVE_ETAPAS: EtapaIngestaoUi[] = ['PENDENTE', 'BAIXANDO', 'PROCESSANDO_POSTGIS']
 
-const templates = ref<ConectorTemplate[]>([])
 const conectores = ref<ConectorFonteDados[]>([])
 const execucoes = ref<IngestaoExecucaoItem[]>([])
 
 const isLoadingData = ref(false)
 const isSaving = ref(false)
+const isTestingModal = ref(false)
+const isModalOpen = ref(false)
+const urlTouched = ref(false)
 const testingId = ref<number | null>(null)
 const executingId = ref<number | null>(null)
-const selectedTemplateCode = ref<string>('CUSTOM')
 
 const editingId = ref<number | null>(null)
 const editingPossuiCredencial = ref(false)
@@ -77,7 +77,9 @@ const showCredencial = ref(false)
 
 const feedbackErro = ref<string | null>(null)
 const feedbackSucesso = ref<string | null>(null)
+const modalErro = ref<string | null>(null)
 const testeResultado = ref<(TesteConexaoResponse & { conectorNome: string }) | null>(null)
+const modalTesteResultado = ref<TesteConexaoResponse | null>(null)
 const latestTriggeredRunId = ref<number | null>(null)
 
 let pollingTimer: ReturnType<typeof setInterval> | null = null
@@ -164,7 +166,7 @@ const execucoesColumns: Column[] = [
   { key: 'nomeArquivo', label: 'Arquivo / Fonte' },
   { key: 'destino', label: 'Destino' },
   { key: 'linhasCarregadas', label: 'Feições' },
-  { key: 'etapaUi', label: 'Status da DAG' },
+  { key: 'etapaUi', label: 'Status' },
   { key: 'duracaoSegundos', label: 'Duração' },
   { key: 'acoes', label: 'Ações' },
 ]
@@ -188,6 +190,67 @@ const activeTrackerExecution = computed<IngestaoExecucaoItem | null>(() => {
   }
   return null
 })
+
+const urlPlaceholder = computed(() => {
+  const map: Record<TipoProtocoloConector, string> = {
+    OGC_WFS: 'https://geoserver.car.gov.br/geoserver/sicar/wfs',
+    HTTP_DIRECT: 'https://api.exemplo.gov.br/dados/camada.geojson',
+    ARCGIS_REST: 'https://services.arcgis.com/.../FeatureServer/0/query',
+    GOOGLE_DRIVE: 'https://drive.google.com/drive/folders/... ou ID da pasta',
+  }
+  return map[form.tipoProtocolo]
+})
+
+const validarUrl = (
+  rawUrl: string,
+  protocolo: TipoProtocoloConector,
+): { valid: boolean; error: string | null } => {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) {
+    return {
+      valid: false,
+      error:
+        protocolo === 'GOOGLE_DRIVE'
+          ? 'Informe a URL ou ID da pasta/arquivo no Google Drive.'
+          : 'Informe uma URL válida iniciando com http:// ou https://.',
+    }
+  }
+  if (protocolo === 'GOOGLE_DRIVE') {
+    if (/^[a-zA-Z]+:\/\//.test(trimmed) && !/^https?:\/\//i.test(trimmed)) {
+      return {
+        valid: false,
+        error: 'Para Google Drive, informe uma URL https:// ou o ID da pasta/arquivo.',
+      }
+    }
+    return { valid: true, error: null }
+  }
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return {
+        valid: false,
+        error: 'A URL deve iniciar com http:// ou https://.',
+      }
+    }
+    if (!parsed.hostname) {
+      return {
+        valid: false,
+        error: 'Informe um endereço com domínio ou IP válido.',
+      }
+    }
+    return { valid: true, error: null }
+  } catch {
+    return {
+      valid: false,
+      error: 'URL inválida. Use o formato completo com http:// ou https://.',
+    }
+  }
+}
+
+const urlValidation = computed(() => validarUrl(form.urlBase, form.tipoProtocolo))
+const showUrlError = computed(
+  () => !urlValidation.value.valid && (urlTouched.value || form.urlBase.trim().length > 0),
+)
 
 const periodicidadeBadgeInfo = computed(() => {
   const map: Record<PeriodicidadeConector, string> = {
@@ -301,7 +364,9 @@ const resetForm = () => {
   editingPossuiCredencial.value = false
   editingPrefixoCredencial.value = null
   showCredencial.value = false
-  selectedTemplateCode.value = 'CUSTOM'
+  urlTouched.value = false
+  modalErro.value = null
+  modalTesteResultado.value = null
 
   form.nome = ''
   form.descricao = ''
@@ -324,35 +389,15 @@ const resetForm = () => {
   syncProtocolFieldsFromJson('HTTP_DIRECT', {})
 }
 
-const applyTemplate = (tpl: ConectorTemplate) => {
-  editingId.value = null
-  editingPossuiCredencial.value = false
-  editingPrefixoCredencial.value = null
-  showCredencial.value = false
-  selectedTemplateCode.value = tpl.codigo
-  feedbackErro.value = null
-
-  form.nome = tpl.nome
-  form.descricao = tpl.descricao || ''
-  form.tipoProtocolo = tpl.tipoProtocolo
-  form.urlBase = tpl.urlBase
-  form.destino = tpl.destino
-  form.fonteReferencia = tpl.fonteReferencia || ''
-  form.nomeCamadaExibicao = tpl.nomeCamadaExibicao || ''
-  form.orgaoId = ''
-  form.conjuntoId = ''
-  form.formatoDados = tpl.formatoDados
-  form.epsgOrigem = tpl.epsgOrigem || '4674'
-  form.colunaIdentificador = tpl.colunaIdentificador || 'cod_imovel,ogc_fid'
-  form.tipoAutenticacao = tpl.tipoAutenticacao || 'NONE'
-  form.nomeCredencial = tpl.nomeCredencial || ''
-  form.credencial = ''
-  form.periodicidade = tpl.periodicidade || 'MANUAL'
-  form.expressaoCron = ''
-  form.ativo = true
-
-  syncProtocolFieldsFromJson(tpl.tipoProtocolo, tpl.parametrosJson)
+const openCreateModal = () => {
+  resetForm()
   autoSelectCargaOptions()
+  isModalOpen.value = true
+}
+
+const closeModal = () => {
+  isModalOpen.value = false
+  resetForm()
 }
 
 const editConector = (item: ConectorFonteDados) => {
@@ -360,9 +405,11 @@ const editConector = (item: ConectorFonteDados) => {
   editingPossuiCredencial.value = item.possuiCredencial
   editingPrefixoCredencial.value = item.prefixoCredencial
   showCredencial.value = false
-  selectedTemplateCode.value = 'CUSTOM'
+  urlTouched.value = false
   feedbackErro.value = null
   feedbackSucesso.value = null
+  modalErro.value = null
+  modalTesteResultado.value = null
 
   form.nome = item.nome
   form.descricao = item.descricao || ''
@@ -384,6 +431,7 @@ const editConector = (item: ConectorFonteDados) => {
   form.ativo = item.ativo
 
   syncProtocolFieldsFromJson(item.tipoProtocolo, item.parametrosJson)
+  isModalOpen.value = true
 }
 
 const buildPayload = (): ConectorFontePayload => {
@@ -443,12 +491,10 @@ const refreshExecucoes = async () => {
 const loadAll = async () => {
   isLoadingData.value = true
   try {
-    const [tpls, conns, execs] = await Promise.all([
-      uploadService.listarTemplatesConectores(),
+    const [conns, execs] = await Promise.all([
       uploadService.listarConectores(),
       uploadService.listarExecucoesIngestao({ limit: 50 }),
     ])
-    templates.value = tpls
     conectores.value = conns
     execucoes.value = execs
     ensurePollingState()
@@ -459,15 +505,45 @@ const loadAll = async () => {
   }
 }
 
+const testModalConexao = async () => {
+  modalErro.value = null
+  modalTesteResultado.value = null
+  urlTouched.value = true
+  if (!urlValidation.value.valid) {
+    return
+  }
+
+  isTestingModal.value = true
+  try {
+    const payload = buildPayload()
+    modalTesteResultado.value = await uploadService.testarConectorAdHoc(payload)
+  } catch (err: any) {
+    modalTesteResultado.value = {
+      sucesso: false,
+      statusHttp: err?.response?.status ?? null,
+      mensagem: extractErrorMessage(err),
+      tempoMs: 0,
+    }
+  } finally {
+    isTestingModal.value = false
+  }
+}
+
 const saveConector = async (executarAposSalvar = false) => {
   feedbackErro.value = null
   feedbackSucesso.value = null
+  modalErro.value = null
+  urlTouched.value = true
+
+  if (!urlValidation.value.valid) {
+    return
+  }
   if (!form.nome.trim() || !form.urlBase.trim()) {
-    feedbackErro.value = 'Preencha os campos obrigatórios: Nome do Conector e URL Base.'
+    modalErro.value = 'Preencha os campos obrigatórios: Nome da Fonte e URL Base.'
     return
   }
   if (form.destino === 'REFERENCIA' && !form.fonteReferencia.trim()) {
-    feedbackErro.value = 'Informe o Código da Fonte de Referência para conectores do tipo REFERENCIA.'
+    modalErro.value = 'Informe o Código da Fonte de Referência para conectores do tipo REFERENCIA.'
     return
   }
 
@@ -478,19 +554,19 @@ const saveConector = async (executarAposSalvar = false) => {
     if (editingId.value !== null) {
       saved = await uploadService.atualizarConector(editingId.value, payload)
       conectores.value = conectores.value.map((c) => (c.id === saved.id ? saved : c))
-      feedbackSucesso.value = `Conector "${saved.nome}" atualizado com sucesso.`
+      feedbackSucesso.value = `Fonte "${saved.nome}" atualizada com sucesso.`
     } else {
       saved = await uploadService.criarConector(payload)
       conectores.value = [saved, ...conectores.value]
-      feedbackSucesso.value = `Conector "${saved.nome}" cadastrado com sucesso.`
+      feedbackSucesso.value = `Fonte "${saved.nome}" cadastrada com sucesso.`
     }
-    resetForm()
+    closeModal()
 
     if (executarAposSalvar) {
       await runConector(saved)
     }
   } catch (err) {
-    feedbackErro.value = extractErrorMessage(err)
+    modalErro.value = extractErrorMessage(err)
   } finally {
     isSaving.value = false
   }
@@ -519,7 +595,7 @@ const runConector = async (item: ConectorFonteDados) => {
     latestTriggeredRunId.value = exec.id
     execucoes.value = [exec, ...execucoes.value.filter((e) => e.id !== exec.id)]
     ensurePollingState()
-    feedbackSucesso.value = `Execução da DAG disparada para "${item.nome}".`
+    feedbackSucesso.value = `Execução disparada para "${item.nome}".`
   } catch (err) {
     feedbackErro.value = extractErrorMessage(err)
   } finally {
@@ -543,7 +619,7 @@ const removeConector = async (item: ConectorFonteDados) => {
     await uploadService.excluirConector(item.id)
     conectores.value = conectores.value.filter((c) => c.id !== item.id)
     if (editingId.value === item.id) {
-      resetForm()
+      closeModal()
     }
   } catch (err) {
     feedbackErro.value = extractErrorMessage(err)
@@ -601,7 +677,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="automated-ingestion-tab" data-testid="automated-ingestion-tab">
-    <!-- KPIs Row -->
+    <!-- 1. KPIs Row -->
     <div class="kpi-grid">
       <CardContainer
         title="Conectores Ativos"
@@ -611,21 +687,21 @@ onBeforeUnmount(() => {
         valueTestId="kpi-conectores-ativos"
       />
       <CardContainer
-        title="Agendados (Automáticos)"
+        title="Agendados"
         :value="kpiAgendados"
         variant="info"
         iconType="clock"
         valueTestId="kpi-agendados"
       />
       <CardContainer
-        title="Em Execução na DAG"
+        title="Em Execução"
         :value="kpiEmExecucao"
         variant="orange"
         iconType="down"
         valueTestId="kpi-em-execucao"
       />
       <CardContainer
-        title="Concluídas no PostGIS"
+        title="Concluídas"
         :value="kpiConcluidas"
         variant="success"
         iconType="check"
@@ -660,614 +736,30 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Tracker em Tempo Real da DAG -->
-    <div
-      v-if="activeTrackerExecution"
-      class="upload-card tracker-card"
-      data-testid="dag-realtime-tracker"
-    >
-      <div class="tracker-header">
-        <div>
-          <h3 class="section-title">
-            <FiActivity size="18" />
-            Acompanhamento em Tempo Real da DAG
-          </h3>
-          <p class="section-subtitle">
-            Conector: <strong>{{ activeTrackerExecution.conectorNome || 'Execução Manual' }}</strong>
-            <span v-if="activeTrackerExecution.dagRunId">
-              • Run: <code>{{ activeTrackerExecution.dagRunId }}</code>
-            </span>
-          </p>
-        </div>
-        <span :class="formatEtapaBadgeClass(activeTrackerExecution.etapaUi)">
-          {{ formatEtapaLabel(activeTrackerExecution.etapaUi) }}
-        </span>
-      </div>
-
-      <div class="dag-steps">
-        <div class="dag-step" :class="`dag-step--${trackerStepState('PENDENTE')}`">
-          <span class="dag-step__dot">1</span>
-          <span class="dag-step__label">Pendente</span>
-        </div>
-        <div class="dag-step" :class="`dag-step--${trackerStepState('BAIXANDO')}`">
-          <span class="dag-step__dot">2</span>
-          <span class="dag-step__label">Baixando</span>
-        </div>
-        <div class="dag-step" :class="`dag-step--${trackerStepState('PROCESSANDO_POSTGIS')}`">
-          <span class="dag-step__dot">3</span>
-          <span class="dag-step__label">Processando PostGIS</span>
-        </div>
-        <div class="dag-step" :class="`dag-step--${trackerStepState('CONCLUIDO')}`">
-          <span class="dag-step__dot">4</span>
-          <span class="dag-step__label">
-            {{ activeTrackerExecution.etapaUi === 'ERRO' ? 'Erro' : 'Concluído' }}
-          </span>
-        </div>
-      </div>
-
-      <p v-if="activeTrackerExecution.mensagem" class="tracker-message">
-        {{ activeTrackerExecution.mensagem }}
-      </p>
-    </div>
-
-    <!-- Seletor de Templates Públicos (1-Click Presets) -->
+    <!-- 2. Conexões Cadastradas (PRIMEIRO) -->
     <div class="upload-card">
       <div class="section-header">
         <div>
-          <h3 class="section-title">
-            <FiZap size="18" />
-            Templates Públicos (1-Clique)
-          </h3>
+          <h3 class="section-title">Conexões Cadastradas</h3>
           <p class="section-subtitle">
-            Escolha um conector pré-configurado para fontes governamentais ou comece um conector personalizado.
+            Gerencie fontes externas, valide conectividade e configure agendamentos de ingestão.
           </p>
         </div>
-      </div>
-
-      <div class="templates-grid">
-        <button
-          v-for="tpl in templates"
-          :key="tpl.codigo"
-          type="button"
-          class="template-chip"
-          :class="{ 'template-chip--active': selectedTemplateCode === tpl.codigo }"
-          :data-testid="`template-btn-${tpl.codigo}`"
-          @click="applyTemplate(tpl)"
-        >
-          <strong>{{ tpl.nome }}</strong>
-          <span class="template-chip__meta">{{ tpl.tipoProtocolo }} • {{ tpl.destino }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="template-chip"
-          :class="{ 'template-chip--active': selectedTemplateCode === 'CUSTOM' && editingId === null }"
-          data-testid="template-btn-CUSTOM"
-          @click="resetForm"
-        >
-          <strong>Conector Personalizado</strong>
-          <span class="template-chip__meta">HTTP / OGC WFS / ArcGIS REST / Drive</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Formulário de Cadastro / Edição de Conector -->
-    <div class="upload-card">
-      <div class="section-header">
-        <div>
-          <h3 class="section-title">
-            <FiPlus v-if="editingId === null" size="18" />
-            <FiEdit2 v-else size="18" />
-            {{ editingId === null ? 'Cadastrar Novo Conector Externo' : `Editando Conector #${editingId}` }}
-          </h3>
-          <p class="section-subtitle">
-            Configure o protocolo, destino no GeoDataHub, credenciais cifradas e periodicidade de ingestão no Airflow.
-          </p>
-        </div>
-        <button
-          v-if="editingId !== null"
-          type="button"
-          class="btn btn_outline btn-sm"
-          data-testid="btn-cancelar-edicao"
-          @click="resetForm"
-        >
-          Cancelar Edição
-        </button>
-      </div>
-
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="label" for="conector-nome">Nome do Conector *</label>
-          <input
-            id="conector-nome"
-            v-model="form.nome"
-            type="text"
-            class="input"
-            data-testid="conector-nome"
-            placeholder="Ex: SICAR Imóveis PR ou NASA FIRMS Diário"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-destino">Destino no GeoDataHub *</label>
-          <select
-            id="conector-destino"
-            v-model="form.destino"
-            class="input"
-            data-testid="conector-destino"
-            @change="autoSelectCargaOptions"
+        <div class="section-header-actions">
+          <button
+            type="button"
+            class="btn btn-sm"
+            data-testid="btn-adicionar-fonte"
+            @click="openCreateModal"
           >
-            <option value="CARGA">CARGA (Esteira de Processamento)</option>
-            <option value="REFERENCIA">REFERENCIA (Camada Territorial de Referência)</option>
-          </select>
+            <FiPlus size="14" />
+            Adicionar Fonte
+          </button>
+          <button type="button" class="btn btn_outline btn-sm" @click="loadAll">
+            <FiRefreshCw size="14" />
+            Atualizar
+          </button>
         </div>
-
-        <template v-if="form.destino === 'CARGA'">
-          <div class="form-group">
-            <label class="label" for="conector-orgao">Órgão Emissor</label>
-            <select
-              id="conector-orgao"
-              v-model="form.orgaoId"
-              class="input"
-              data-testid="conector-orgao"
-            >
-              <option value="">Selecione o órgão</option>
-              <option v-for="orgao in formOptions.orgaos" :key="orgao.id" :value="orgao.id">
-                {{ orgao.label }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-conjunto">Conjunto de Dados</label>
-            <select
-              id="conector-conjunto"
-              v-model="form.conjuntoId"
-              class="input"
-              data-testid="conector-conjunto"
-            >
-              <option value="">Selecione o conjunto</option>
-              <option v-for="conj in formOptions.conjuntos" :key="conj.id" :value="conj.id">
-                {{ conj.label }}
-              </option>
-            </select>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="form-group">
-            <label class="label" for="conector-fonte-ref">Código da Fonte de Referência *</label>
-            <input
-              id="conector-fonte-ref"
-              v-model="form.fonteReferencia"
-              type="text"
-              class="input"
-              list="fontes-referencia-sugestoes"
-              data-testid="conector-fonte-ref"
-              placeholder="Ex: INPE_QUEIMADA"
-            />
-            <datalist id="fontes-referencia-sugestoes">
-              <option v-for="f in FONTES_REFERENCIA_SUGESTOES" :key="f" :value="f" />
-            </datalist>
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-nome-camada">Nome da Camada</label>
-            <input
-              id="conector-nome-camada"
-              v-model="form.nomeCamadaExibicao"
-              type="text"
-              class="input"
-              data-testid="conector-nome-camada"
-              placeholder="Nome amigável de exibição no catálogo"
-            />
-          </div>
-        </template>
-
-        <div class="form-group">
-          <label class="label" for="conector-protocolo">Protocolo *</label>
-          <select
-            id="conector-protocolo"
-            v-model="form.tipoProtocolo"
-            class="input"
-            data-testid="conector-protocolo"
-          >
-            <option value="OGC_WFS">OGC WFS (GeoServer / OWS)</option>
-            <option value="HTTP_DIRECT">HTTP Direct / API REST</option>
-            <option value="ARCGIS_REST">ArcGIS FeatureServer REST</option>
-            <option value="GOOGLE_DRIVE">Google Drive Institucional</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-formato">Formato de Dados *</label>
-          <select
-            id="conector-formato"
-            v-model="form.formatoDados"
-            class="input"
-            data-testid="conector-formato"
-          >
-            <option value="SHAPE-ZIP">Shapefile (SHAPE-ZIP)</option>
-            <option value="GEOJSON">GeoJSON</option>
-            <option value="CSV">CSV (Coordenadas)</option>
-            <option value="GPKG">GeoPackage (GPKG)</option>
-          </select>
-        </div>
-
-        <div class="form-group form-group--full">
-          <label class="label" for="conector-url">URL Base / Endpoint *</label>
-          <input
-            id="conector-url"
-            v-model="form.urlBase"
-            type="url"
-            class="input"
-            data-testid="conector-url"
-            placeholder="https://..."
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-epsg">EPSG de Origem</label>
-          <input
-            id="conector-epsg"
-            v-model="form.epsgOrigem"
-            type="text"
-            class="input"
-            data-testid="conector-epsg"
-            placeholder="4674"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-colunas-id">Coluna(s) Identificadora(s)</label>
-          <input
-            id="conector-colunas-id"
-            v-model="form.colunaIdentificador"
-            type="text"
-            class="input"
-            data-testid="conector-colunas-id"
-            placeholder="cod_imovel,ogc_fid"
-          />
-        </div>
-
-        <!-- Autenticação & Chave de API -->
-        <div class="form-section-divider form-group--full">
-          <FiKey size="16" />
-          <span>Autenticação & Chave de API</span>
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-auth-tipo">Tipo de Autenticação</label>
-          <select
-            id="conector-auth-tipo"
-            v-model="form.tipoAutenticacao"
-            class="input"
-            data-testid="conector-auth-tipo"
-          >
-            <option value="NONE">Sem Autenticação (Público)</option>
-            <option value="API_KEY_HEADER">API Key via Header HTTP</option>
-            <option value="API_KEY_QUERY">API Key via Query / Path ({API_KEY})</option>
-            <option value="BEARER_TOKEN">Bearer Token</option>
-            <option value="BASIC_AUTH">Basic Auth (usuário:senha)</option>
-            <option value="SERVICE_ACCOUNT_JSON">Google Service Account (JSON)</option>
-          </select>
-        </div>
-
-        <template v-if="form.tipoAutenticacao !== 'NONE'">
-          <div class="form-group">
-            <label class="label" for="conector-cred-nome">Nome do Header / Parâmetro</label>
-            <input
-              id="conector-cred-nome"
-              v-model="form.nomeCredencial"
-              type="text"
-              class="input"
-              data-testid="conector-cred-nome"
-              placeholder="Ex: X-API-Key ou MAP_KEY"
-            />
-          </div>
-
-          <div class="form-group form-group--full">
-            <label class="label" for="conector-cred-valor">Chave de API / Token / Segredo</label>
-            <div class="password-field">
-              <input
-                id="conector-cred-valor"
-                v-model="form.credencial"
-                :type="showCredencial ? 'text' : 'password'"
-                class="input"
-                data-testid="conector-cred-valor"
-                autocomplete="new-password"
-                :placeholder="
-                  editingId !== null && editingPossuiCredencial
-                    ? 'Deixe em branco para manter a chave atual'
-                    : 'Informe o token, API key ou segredo'
-                "
-              />
-              <button
-                type="button"
-                class="btn btn_outline btn-icon"
-                data-testid="btn-toggle-cred-visibility"
-                :title="showCredencial ? 'Ocultar credencial' : 'Exibir credencial'"
-                @click="showCredencial = !showCredencial"
-              >
-                <FiEyeOff v-if="showCredencial" size="16" />
-                <FiEye v-else size="16" />
-              </button>
-            </div>
-            <small v-if="editingId !== null && editingPossuiCredencial" class="field-hint">
-              Credencial salva ({{ editingPrefixoCredencial || '****' }}). Deixe em branco para manter a chave atual.
-            </small>
-          </div>
-        </template>
-
-        <!-- Parâmetros Dinâmicos por Protocolo -->
-        <div class="form-section-divider form-group--full">
-          <FiDatabase size="16" />
-          <span>Parâmetros do Protocolo ({{ form.tipoProtocolo }})</span>
-        </div>
-
-        <template v-if="form.tipoProtocolo === 'OGC_WFS'">
-          <div class="form-group">
-            <label class="label" for="conector-wfs-typename">Camada (typeName)</label>
-            <input
-              id="conector-wfs-typename"
-              v-model="form.wfsTypeName"
-              type="text"
-              class="input"
-              data-testid="conector-wfs-typename"
-              placeholder="Ex: sicar:sicar_imoveis_pr"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-wfs-uf">UF (Opcional — atualiza sicar_imoveis_&lt;uf&gt;)</label>
-            <select
-              id="conector-wfs-uf"
-              v-model="form.wfsUf"
-              class="input"
-              data-testid="conector-wfs-uf"
-              @change="onWfsUfChange"
-            >
-              <option value="">Todas / Não especificar</option>
-              <option v-for="uf in UFS_BRASIL" :key="uf" :value="uf">{{ uf }}</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-wfs-municipio">Município ou Cód. IBGE</label>
-            <input
-              id="conector-wfs-municipio"
-              v-model="form.wfsMunicipio"
-              type="text"
-              class="input"
-              data-testid="conector-wfs-municipio"
-              placeholder="Ex: Goiânia ou 5208707"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-wfs-car">Código CAR (cod_imovel)</label>
-            <input
-              id="conector-wfs-car"
-              v-model="form.wfsCar"
-              type="text"
-              class="input"
-              data-testid="conector-wfs-car"
-              placeholder="Ex: PR-4106902-..."
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-wfs-situacao">Situação do Imóvel</label>
-            <select
-              id="conector-wfs-situacao"
-              v-model="form.wfsSituacao"
-              class="input"
-              data-testid="conector-wfs-situacao"
-            >
-              <option value="">Todas</option>
-              <option value="AT">AT - Ativo</option>
-              <option value="PE">PE - Pendente</option>
-              <option value="SU">SU - Suspenso</option>
-              <option value="CA">CA - Cancelado</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-wfs-max">Limite de Feições (maxFeatures)</label>
-            <input
-              id="conector-wfs-max"
-              v-model="form.wfsMaxFeatures"
-              type="number"
-              min="1"
-              class="input"
-              data-testid="conector-wfs-max"
-            />
-          </div>
-
-          <div class="form-group form-group--full">
-            <label class="label" for="conector-wfs-cql">Filtro CQL Customizado</label>
-            <input
-              id="conector-wfs-cql"
-              v-model="form.wfsCql"
-              type="text"
-              class="input"
-              data-testid="conector-wfs-cql"
-              placeholder="Ex: ind_status='AT' AND num_area > 50"
-            />
-          </div>
-        </template>
-
-        <template v-else-if="form.tipoProtocolo === 'GOOGLE_DRIVE'">
-          <div class="form-group">
-            <label class="label" for="conector-drive-id">ID da Pasta / Arquivo</label>
-            <input
-              id="conector-drive-id"
-              v-model="form.driveFolderId"
-              type="text"
-              class="input"
-              data-testid="conector-drive-id"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-drive-subfolder">Subpasta</label>
-            <input
-              id="conector-drive-subfolder"
-              v-model="form.driveSubfolder"
-              type="text"
-              class="input"
-              data-testid="conector-drive-subfolder"
-            />
-          </div>
-
-          <div class="form-group form-group--full">
-            <label class="label" for="conector-drive-regex">Regex de Arquivo</label>
-            <input
-              id="conector-drive-regex"
-              v-model="form.driveRegex"
-              type="text"
-              class="input"
-              data-testid="conector-drive-regex"
-              placeholder="Ex: .*\.zip$"
-            />
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="form-group">
-            <label class="label" for="conector-helper-where">Filtro where (opcional)</label>
-            <input
-              id="conector-helper-where"
-              v-model="form.helperWhere"
-              type="text"
-              class="input"
-              placeholder="Ex: 1=1"
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="label" for="conector-helper-lat">Coluna Latitude / Longitude (CSV)</label>
-            <div class="inline-pair">
-              <input
-                id="conector-helper-lat"
-                v-model="form.helperLatColumn"
-                type="text"
-                class="input"
-                placeholder="latColumn"
-              />
-              <input
-                v-model="form.helperLonColumn"
-                type="text"
-                class="input"
-                placeholder="lonColumn"
-              />
-            </div>
-          </div>
-
-          <div class="form-group form-group--full">
-            <label class="label" for="conector-extra-json">Parâmetros JSON / Query Extras</label>
-            <textarea
-              id="conector-extra-json"
-              v-model="form.extraJsonText"
-              class="input textarea"
-              rows="3"
-              data-testid="conector-extra-json"
-            ></textarea>
-          </div>
-        </template>
-
-        <!-- Periodicidade e Agendamento -->
-        <div class="form-section-divider form-group--full">
-          <FiClock size="16" />
-          <span>Periodicidade e Agendamento</span>
-        </div>
-
-        <div class="form-group">
-          <label class="label" for="conector-periodicidade">Periodicidade *</label>
-          <select
-            id="conector-periodicidade"
-            v-model="form.periodicidade"
-            class="input"
-            data-testid="conector-periodicidade"
-          >
-            <option value="MANUAL">Manual (Sob Demanda)</option>
-            <option value="HORARIA">Horária</option>
-            <option value="DIARIA">Diária</option>
-            <option value="SEMANAL">Semanal</option>
-            <option value="MENSAL">Mensal</option>
-            <option value="CRON">Cron Personalizado</option>
-          </select>
-        </div>
-
-        <div v-if="form.periodicidade === 'CRON'" class="form-group">
-          <label class="label" for="conector-cron">Expressão Cron</label>
-          <input
-            id="conector-cron"
-            v-model="form.expressaoCron"
-            type="text"
-            class="input"
-            data-testid="conector-cron"
-            placeholder="0 2 * * *"
-          />
-        </div>
-
-        <div v-else class="form-group">
-          <span class="label">Regra de Disparo</span>
-          <div class="cron-info-badge">
-            <span class="badge badge_info">{{ periodicidadeBadgeInfo }}</span>
-          </div>
-        </div>
-
-        <div class="form-group form-group--full">
-          <label class="checkbox-label">
-            <input
-              v-model="form.ativo"
-              type="checkbox"
-              class="checkbox"
-              data-testid="conector-ativo"
-            />
-            <span>Agendamento Ativo</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <button
-          type="button"
-          class="btn"
-          :disabled="isSaving"
-          data-testid="btn-salvar-conector"
-          @click="saveConector(false)"
-        >
-          {{ editingId === null ? 'Salvar Conector' : 'Atualizar Conector' }}
-        </button>
-
-        <button
-          type="button"
-          class="btn btn_success"
-          :disabled="isSaving"
-          data-testid="btn-salvar-executar"
-          @click="saveConector(true)"
-        >
-          <FiPlay size="15" />
-          Salvar e Executar Agora
-        </button>
-      </div>
-    </div>
-
-    <!-- Tabela de Conectores Cadastrados -->
-    <div class="upload-card">
-      <div class="section-header">
-        <div>
-          <h3 class="section-title">Conectores Cadastrados</h3>
-          <p class="section-subtitle">
-            Gerencie fontes externas, teste conectividade HTTP/WFS e dispare ingestões manuais no Airflow.
-          </p>
-        </div>
-        <button type="button" class="btn btn_outline btn-sm" @click="loadAll">
-          <FiRefreshCw size="14" />
-          Atualizar
-        </button>
       </div>
 
       <DataTable
@@ -1379,18 +871,68 @@ onBeforeUnmount(() => {
         </template>
 
         <template #empty>
-          Nenhum conector cadastrado ainda. Escolha um template acima para iniciar.
+          Nenhuma fonte cadastrada ainda. Clique em "+ Adicionar Fonte" para iniciar.
         </template>
       </DataTable>
     </div>
 
-    <!-- Histórico de Execuções / Cargas Importadas -->
+    <!-- 3. Tracker em Tempo Real + Logs de Execução (SEGUNDO) -->
+    <div
+      v-if="activeTrackerExecution"
+      class="upload-card tracker-card"
+      data-testid="dag-realtime-tracker"
+    >
+      <div class="tracker-header">
+        <div>
+          <h3 class="section-title">
+            <FiActivity size="18" />
+            Acompanhamento em Tempo Real
+          </h3>
+          <p class="section-subtitle">
+            Fonte: <strong>{{ activeTrackerExecution.conectorNome || 'Execução Manual' }}</strong>
+            <span v-if="activeTrackerExecution.dagRunId">
+              • Run: <code>{{ activeTrackerExecution.dagRunId }}</code>
+            </span>
+          </p>
+        </div>
+        <span :class="formatEtapaBadgeClass(activeTrackerExecution.etapaUi)">
+          {{ formatEtapaLabel(activeTrackerExecution.etapaUi) }}
+        </span>
+      </div>
+
+      <div class="dag-steps">
+        <div class="dag-step" :class="`dag-step--${trackerStepState('PENDENTE')}`">
+          <span class="dag-step__dot">1</span>
+          <span class="dag-step__label">Pendente</span>
+        </div>
+        <div class="dag-step" :class="`dag-step--${trackerStepState('BAIXANDO')}`">
+          <span class="dag-step__dot">2</span>
+          <span class="dag-step__label">Baixando</span>
+        </div>
+        <div class="dag-step" :class="`dag-step--${trackerStepState('PROCESSANDO_POSTGIS')}`">
+          <span class="dag-step__dot">3</span>
+          <span class="dag-step__label">Processando PostGIS</span>
+        </div>
+        <div class="dag-step" :class="`dag-step--${trackerStepState('CONCLUIDO')}`">
+          <span class="dag-step__dot">4</span>
+          <span class="dag-step__label">
+            {{ activeTrackerExecution.etapaUi === 'ERRO' ? 'Erro' : 'Concluído' }}
+          </span>
+        </div>
+      </div>
+
+      <p v-if="activeTrackerExecution.mensagem" class="tracker-message">
+        {{ activeTrackerExecution.mensagem }}
+      </p>
+    </div>
+
+    <!-- Logs de Execução -->
     <div class="upload-card">
       <div class="section-header">
         <div>
-          <h3 class="section-title">Histórico de Execuções / Cargas Importadas</h3>
+          <h3 class="section-title">Logs de Execução</h3>
           <p class="section-subtitle">
-            Clique em uma linha para inspecionar SHA-256, MD5, URL/caminho, ID da DAG e log detalhado.
+            Clique em uma linha para inspecionar SHA-256, MD5, URL/caminho, ID da execução e log detalhado.
           </p>
         </div>
       </div>
@@ -1450,7 +992,7 @@ onBeforeUnmount(() => {
         <template #expanded-row="{ item }">
           <div class="expanded-details-grid">
             <div>
-              <span class="detail-label">DAG Run ID</span>
+              <span class="detail-label">Run ID</span>
               <code>{{ item.dagRunId || '—' }}</code>
             </div>
             <div>
@@ -1476,6 +1018,574 @@ onBeforeUnmount(() => {
           Nenhuma execução registrada até o momento.
         </template>
       </DataTable>
+    </div>
+
+    <!-- Modal de Cadastro / Edição de Fonte Externa -->
+    <div
+      v-if="isModalOpen"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      data-testid="conector-modal"
+      @click.self="closeModal"
+    >
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <div class="modal-icon-wrap" aria-hidden="true">
+              <FiPlus v-if="editingId === null" size="18" />
+              <FiEdit2 v-else size="18" />
+            </div>
+            <div>
+              <h3>{{ editingId === null ? 'Adicionar Fonte Externa' : `Editar Fonte #${editingId}` }}</h3>
+              <p class="modal-subtitle">
+                Configure o protocolo, endpoint, credenciais e agendamento da fonte de dados.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn-modal-close"
+            aria-label="Fechar"
+            @click="closeModal"
+          >
+            <FiX size="18" />
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div v-if="modalErro" class="alert-banner alert-banner--error modal-alert" role="alert">
+            <FiAlertCircle size="18" />
+            <span>{{ modalErro }}</span>
+          </div>
+
+          <div
+            v-if="modalTesteResultado"
+            class="alert-banner modal-alert"
+            :class="modalTesteResultado.sucesso ? 'alert-banner--success' : 'alert-banner--error'"
+            data-testid="modal-teste-resultado"
+          >
+            <FiCheck v-if="modalTesteResultado.sucesso" size="18" />
+            <FiAlertCircle v-else size="18" />
+            <div>
+              <strong>{{ modalTesteResultado.sucesso ? 'Conexão bem-sucedida' : 'Falha na conexão' }}:</strong>
+              <span>
+                HTTP {{ modalTesteResultado.statusHttp ?? 'N/A' }} • {{ modalTesteResultado.tempoMs }} ms —
+                {{ modalTesteResultado.mensagem }}
+              </span>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="label" for="conector-nome">Nome da Fonte *</label>
+              <input
+                id="conector-nome"
+                v-model="form.nome"
+                type="text"
+                class="input"
+                data-testid="conector-nome"
+                placeholder="Ex: SICAR Imóveis PR ou NASA FIRMS Diário"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-destino">Destino *</label>
+              <select
+                id="conector-destino"
+                v-model="form.destino"
+                class="input"
+                data-testid="conector-destino"
+                @change="autoSelectCargaOptions"
+              >
+                <option value="CARGA">CARGA (Esteira de Processamento)</option>
+                <option value="REFERENCIA">REFERENCIA (Camada Territorial de Referência)</option>
+              </select>
+            </div>
+
+            <template v-if="form.destino === 'CARGA'">
+              <div class="form-group">
+                <label class="label" for="conector-orgao">Órgão Emissor</label>
+                <select
+                  id="conector-orgao"
+                  v-model="form.orgaoId"
+                  class="input"
+                  data-testid="conector-orgao"
+                >
+                  <option value="">Selecione o órgão</option>
+                  <option v-for="orgao in formOptions.orgaos" :key="orgao.id" :value="orgao.id">
+                    {{ orgao.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-conjunto">Conjunto de Dados</label>
+                <select
+                  id="conector-conjunto"
+                  v-model="form.conjuntoId"
+                  class="input"
+                  data-testid="conector-conjunto"
+                >
+                  <option value="">Selecione o conjunto</option>
+                  <option v-for="conj in formOptions.conjuntos" :key="conj.id" :value="conj.id">
+                    {{ conj.label }}
+                  </option>
+                </select>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="form-group">
+                <label class="label" for="conector-fonte-ref">Código da Fonte de Referência *</label>
+                <input
+                  id="conector-fonte-ref"
+                  v-model="form.fonteReferencia"
+                  type="text"
+                  class="input"
+                  list="fontes-referencia-sugestoes"
+                  data-testid="conector-fonte-ref"
+                  placeholder="Ex: INPE_QUEIMADA"
+                />
+                <datalist id="fontes-referencia-sugestoes">
+                  <option v-for="f in FONTES_REFERENCIA_SUGESTOES" :key="f" :value="f" />
+                </datalist>
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-nome-camada">Nome da Camada</label>
+                <input
+                  id="conector-nome-camada"
+                  v-model="form.nomeCamadaExibicao"
+                  type="text"
+                  class="input"
+                  data-testid="conector-nome-camada"
+                  placeholder="Nome amigável de exibição no catálogo"
+                />
+              </div>
+            </template>
+
+            <div class="form-group">
+              <label class="label" for="conector-protocolo">Protocolo *</label>
+              <select
+                id="conector-protocolo"
+                v-model="form.tipoProtocolo"
+                class="input"
+                data-testid="conector-protocolo"
+              >
+                <option value="OGC_WFS">OGC WFS (GeoServer / OWS)</option>
+                <option value="HTTP_DIRECT">HTTP Direct / API REST</option>
+                <option value="ARCGIS_REST">ArcGIS FeatureServer REST</option>
+                <option value="GOOGLE_DRIVE">Google Drive Institucional</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-formato">Formato de Dados *</label>
+              <select
+                id="conector-formato"
+                v-model="form.formatoDados"
+                class="input"
+                data-testid="conector-formato"
+              >
+                <option value="SHAPE-ZIP">Shapefile (SHAPE-ZIP)</option>
+                <option value="GEOJSON">GeoJSON</option>
+                <option value="CSV">CSV (Coordenadas)</option>
+                <option value="GPKG">GeoPackage (GPKG)</option>
+              </select>
+            </div>
+
+            <div class="form-group form-group--full">
+              <label class="label" for="conector-url">URL Base / Endpoint *</label>
+              <input
+                id="conector-url"
+                v-model="form.urlBase"
+                type="url"
+                class="input"
+                :class="{ 'input-error': showUrlError }"
+                data-testid="conector-url"
+                :placeholder="urlPlaceholder"
+                @input="urlTouched = true"
+                @blur="urlTouched = true"
+              />
+              <small
+                v-if="showUrlError"
+                class="field-error"
+                data-testid="conector-url-error"
+              >
+                {{ urlValidation.error }}
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-epsg">EPSG de Origem</label>
+              <input
+                id="conector-epsg"
+                v-model="form.epsgOrigem"
+                type="text"
+                class="input"
+                data-testid="conector-epsg"
+                placeholder="4674"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-colunas-id">Coluna(s) Identificadora(s)</label>
+              <input
+                id="conector-colunas-id"
+                v-model="form.colunaIdentificador"
+                type="text"
+                class="input"
+                data-testid="conector-colunas-id"
+                placeholder="cod_imovel,ogc_fid"
+              />
+            </div>
+
+            <!-- Autenticação & Chave de API -->
+            <div class="form-section-divider form-group--full">
+              <FiKey size="16" />
+              <span>Autenticação & Chave de API</span>
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-auth-tipo">Tipo de Autenticação</label>
+              <select
+                id="conector-auth-tipo"
+                v-model="form.tipoAutenticacao"
+                class="input"
+                data-testid="conector-auth-tipo"
+              >
+                <option value="NONE">Sem Autenticação (Público)</option>
+                <option value="API_KEY_HEADER">API Key via Header HTTP</option>
+                <option value="API_KEY_QUERY">API Key via Query / Path ({API_KEY})</option>
+                <option value="BEARER_TOKEN">Bearer Token</option>
+                <option value="BASIC_AUTH">Basic Auth (usuário:senha)</option>
+                <option value="SERVICE_ACCOUNT_JSON">Google Service Account (JSON)</option>
+              </select>
+            </div>
+
+            <template v-if="form.tipoAutenticacao !== 'NONE'">
+              <div class="form-group">
+                <label class="label" for="conector-cred-nome">Nome do Header / Parâmetro</label>
+                <input
+                  id="conector-cred-nome"
+                  v-model="form.nomeCredencial"
+                  type="text"
+                  class="input"
+                  data-testid="conector-cred-nome"
+                  placeholder="Ex: X-API-Key ou MAP_KEY"
+                />
+              </div>
+
+              <div class="form-group form-group--full">
+                <label class="label" for="conector-cred-valor">Chave de API / Token / Segredo</label>
+                <div class="password-field">
+                  <input
+                    id="conector-cred-valor"
+                    v-model="form.credencial"
+                    :type="showCredencial ? 'text' : 'password'"
+                    class="input"
+                    data-testid="conector-cred-valor"
+                    autocomplete="new-password"
+                    :placeholder="
+                      editingId !== null && editingPossuiCredencial
+                        ? 'Deixe em branco para manter a chave atual'
+                        : 'Informe o token, API key ou segredo'
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="btn btn_outline btn-icon"
+                    data-testid="btn-toggle-cred-visibility"
+                    :title="showCredencial ? 'Ocultar credencial' : 'Exibir credencial'"
+                    @click="showCredencial = !showCredencial"
+                  >
+                    <FiEyeOff v-if="showCredencial" size="16" />
+                    <FiEye v-else size="16" />
+                  </button>
+                </div>
+                <small v-if="editingId !== null && editingPossuiCredencial" class="field-hint">
+                  Credencial salva ({{ editingPrefixoCredencial || '****' }}). Deixe em branco para manter a chave atual.
+                </small>
+              </div>
+            </template>
+
+            <!-- Parâmetros Dinâmicos por Protocolo -->
+            <div class="form-section-divider form-group--full">
+              <FiDatabase size="16" />
+              <span>Parâmetros do Protocolo ({{ form.tipoProtocolo }})</span>
+            </div>
+
+            <template v-if="form.tipoProtocolo === 'OGC_WFS'">
+              <div class="form-group">
+                <label class="label" for="conector-wfs-typename">Camada (typeName)</label>
+                <input
+                  id="conector-wfs-typename"
+                  v-model="form.wfsTypeName"
+                  type="text"
+                  class="input"
+                  data-testid="conector-wfs-typename"
+                  placeholder="Ex: sicar:sicar_imoveis_pr"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-wfs-uf">UF (Opcional — atualiza sicar_imoveis_&lt;uf&gt;)</label>
+                <select
+                  id="conector-wfs-uf"
+                  v-model="form.wfsUf"
+                  class="input"
+                  data-testid="conector-wfs-uf"
+                  @change="onWfsUfChange"
+                >
+                  <option value="">Todas / Não especificar</option>
+                  <option v-for="uf in UFS_BRASIL" :key="uf" :value="uf">{{ uf }}</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-wfs-municipio">Município ou Cód. IBGE</label>
+                <input
+                  id="conector-wfs-municipio"
+                  v-model="form.wfsMunicipio"
+                  type="text"
+                  class="input"
+                  data-testid="conector-wfs-municipio"
+                  placeholder="Ex: Goiânia ou 5208707"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-wfs-car">Código CAR (cod_imovel)</label>
+                <input
+                  id="conector-wfs-car"
+                  v-model="form.wfsCar"
+                  type="text"
+                  class="input"
+                  data-testid="conector-wfs-car"
+                  placeholder="Ex: PR-4106902-..."
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-wfs-situacao">Situação do Imóvel</label>
+                <select
+                  id="conector-wfs-situacao"
+                  v-model="form.wfsSituacao"
+                  class="input"
+                  data-testid="conector-wfs-situacao"
+                >
+                  <option value="">Todas</option>
+                  <option value="AT">AT - Ativo</option>
+                  <option value="PE">PE - Pendente</option>
+                  <option value="SU">SU - Suspenso</option>
+                  <option value="CA">CA - Cancelado</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-wfs-max">Limite de Feições (maxFeatures)</label>
+                <input
+                  id="conector-wfs-max"
+                  v-model="form.wfsMaxFeatures"
+                  type="number"
+                  min="1"
+                  class="input"
+                  data-testid="conector-wfs-max"
+                />
+              </div>
+
+              <div class="form-group form-group--full">
+                <label class="label" for="conector-wfs-cql">Filtro CQL Customizado</label>
+                <input
+                  id="conector-wfs-cql"
+                  v-model="form.wfsCql"
+                  type="text"
+                  class="input"
+                  data-testid="conector-wfs-cql"
+                  placeholder="Ex: ind_status='AT' AND num_area > 50"
+                />
+              </div>
+            </template>
+
+            <template v-else-if="form.tipoProtocolo === 'GOOGLE_DRIVE'">
+              <div class="form-group">
+                <label class="label" for="conector-drive-id">ID da Pasta / Arquivo</label>
+                <input
+                  id="conector-drive-id"
+                  v-model="form.driveFolderId"
+                  type="text"
+                  class="input"
+                  data-testid="conector-drive-id"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-drive-subfolder">Subpasta</label>
+                <input
+                  id="conector-drive-subfolder"
+                  v-model="form.driveSubfolder"
+                  type="text"
+                  class="input"
+                  data-testid="conector-drive-subfolder"
+                />
+              </div>
+
+              <div class="form-group form-group--full">
+                <label class="label" for="conector-drive-regex">Regex de Arquivo</label>
+                <input
+                  id="conector-drive-regex"
+                  v-model="form.driveRegex"
+                  type="text"
+                  class="input"
+                  data-testid="conector-drive-regex"
+                  placeholder="Ex: .*\.zip$"
+                />
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="form-group">
+                <label class="label" for="conector-helper-where">Filtro where (opcional)</label>
+                <input
+                  id="conector-helper-where"
+                  v-model="form.helperWhere"
+                  type="text"
+                  class="input"
+                  placeholder="Ex: 1=1"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="label" for="conector-helper-lat">Coluna Latitude / Longitude (CSV)</label>
+                <div class="inline-pair">
+                  <input
+                    id="conector-helper-lat"
+                    v-model="form.helperLatColumn"
+                    type="text"
+                    class="input"
+                    placeholder="latColumn"
+                  />
+                  <input
+                    v-model="form.helperLonColumn"
+                    type="text"
+                    class="input"
+                    placeholder="lonColumn"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group form-group--full">
+                <label class="label" for="conector-extra-json">Parâmetros JSON / Query Extras</label>
+                <textarea
+                  id="conector-extra-json"
+                  v-model="form.extraJsonText"
+                  class="input textarea"
+                  rows="3"
+                  data-testid="conector-extra-json"
+                ></textarea>
+              </div>
+            </template>
+
+            <!-- Periodicidade e Agendamento -->
+            <div class="form-section-divider form-group--full">
+              <FiClock size="16" />
+              <span>Periodicidade e Agendamento</span>
+            </div>
+
+            <div class="form-group">
+              <label class="label" for="conector-periodicidade">Periodicidade *</label>
+              <select
+                id="conector-periodicidade"
+                v-model="form.periodicidade"
+                class="input"
+                data-testid="conector-periodicidade"
+              >
+                <option value="MANUAL">Manual (Sob Demanda)</option>
+                <option value="HORARIA">Horária</option>
+                <option value="DIARIA">Diária</option>
+                <option value="SEMANAL">Semanal</option>
+                <option value="MENSAL">Mensal</option>
+                <option value="CRON">Cron Personalizado</option>
+              </select>
+            </div>
+
+            <div v-if="form.periodicidade === 'CRON'" class="form-group">
+              <label class="label" for="conector-cron">Expressão Cron</label>
+              <input
+                id="conector-cron"
+                v-model="form.expressaoCron"
+                type="text"
+                class="input"
+                data-testid="conector-cron"
+                placeholder="0 2 * * *"
+              />
+            </div>
+
+            <div v-else class="form-group">
+              <span class="label">Regra de Disparo</span>
+              <div class="cron-info-badge">
+                <span class="badge badge_info">{{ periodicidadeBadgeInfo }}</span>
+              </div>
+            </div>
+
+            <div class="form-group form-group--full">
+              <label class="checkbox-label">
+                <input
+                  v-model="form.ativo"
+                  type="checkbox"
+                  class="checkbox"
+                  data-testid="conector-ativo"
+                />
+                <span>Agendamento Ativo</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn_outline"
+            data-testid="btn-cancelar-conector"
+            @click="closeModal"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            class="btn btn_outline"
+            :disabled="isTestingModal || isSaving || !urlValidation.valid"
+            data-testid="btn-testar-conexao-modal"
+            @click="testModalConexao"
+          >
+            <FiActivity size="15" />
+            {{ isTestingModal ? 'Testando...' : 'Testar Conexão' }}
+          </button>
+
+          <button
+            type="button"
+            class="btn"
+            :disabled="isSaving || !urlValidation.valid"
+            data-testid="btn-salvar-conector"
+            @click="saveConector(false)"
+          >
+            Salvar Fonte
+          </button>
+
+          <button
+            type="button"
+            class="btn btn_success"
+            :disabled="isSaving || !urlValidation.valid"
+            data-testid="btn-salvar-executar"
+            @click="saveConector(true)"
+          >
+            <FiPlay size="15" />
+            Salvar e Executar
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -1507,6 +1617,13 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .section-title {
@@ -1546,39 +1663,8 @@ onBeforeUnmount(() => {
   border: 1px solid var(--badge-success-border);
 }
 
-.templates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 0.75rem;
-}
-
-.template-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.85rem 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface-soft);
-  color: var(--color-heading);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.template-chip:hover {
-  border-color: var(--color-brand);
-}
-
-.template-chip--active {
-  border-color: var(--color-brand);
-  background-color: var(--color-brand-soft);
-}
-
-.template-chip__meta {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+.modal-alert {
+  margin-bottom: 1rem;
 }
 
 .form-grid {
@@ -1606,6 +1692,17 @@ onBeforeUnmount(() => {
   font-weight: 700;
   font-size: 0.9rem;
   color: var(--color-heading);
+}
+
+.input-error {
+  border-color: var(--color-danger);
+}
+
+.field-error {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--color-danger);
+  font-weight: 600;
 }
 
 .password-field {
@@ -1642,15 +1739,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--color-border);
-}
-
 .btn-sm {
   padding: 0.45rem 0.9rem;
   font-size: 0.8rem;
@@ -1682,6 +1770,103 @@ onBeforeUnmount(() => {
 
 .actions-wrap {
   flex-wrap: wrap;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--color-overlay);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-dialog {
+  max-width: 780px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.modal-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.btn-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-modal-close:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-heading);
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
 }
 
 /* Tracker em Tempo Real */

@@ -328,6 +328,11 @@ export const uploadService = {
     return res.data
   },
 
+  async testarConectorAdHoc(payload: ConectorFontePayload): Promise<TesteConexaoResponse> {
+    const res = await api.post<TesteConexaoResponse>('/conectores/testar', payload)
+    return res.data
+  },
+
   async executarConector(
     id: number,
     payload?: { parametrosOverride?: Record<string, unknown>; forcarReprocessamento?: boolean },
