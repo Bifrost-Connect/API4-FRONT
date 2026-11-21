@@ -54,7 +54,6 @@ const catalogTableColumns: Column[] = [
   { key: 'dataset', label: 'Conjunto de Dados' },
   { key: 'source', label: 'Órgão Emissor' },
   { key: 'year', label: 'Safra' },
-  { key: 'version', label: 'Versão Oficial' },
   { key: 'registros', label: 'Registros' },
   { key: 'status', label: 'Situação Operacional' },
   { key: 'actions', label: 'Ações Analíticas' },
@@ -1105,10 +1104,6 @@ const openReportExport = (base: CatalogoItem) => {
             <span data-testid="table-year">{{ item.year }}</span>
           </template>
 
-          <template #cell-version="{ item }">
-            <span data-testid="table-version">{{ item.versao_oficial || 'v1.0' }}</span>
-          </template>
-
           <template #cell-registros="{ item }">
             <span data-testid="table-registros">
               {{ item.total_feicoes ? item.total_feicoes.toLocaleString('pt-BR') : '—' }}
@@ -1726,17 +1721,40 @@ button:disabled {
   border-radius: 8px;
 }
 
+.catalog-table-container :deep(.component-table th) {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.catalog-table-container :deep(.component-table td) {
+  padding: 0.55rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.catalog-table-container :deep(.component-table th:nth-child(4)),
+.catalog-table-container :deep(.component-table td:nth-child(4)),
+.catalog-table-container :deep(.component-table th:nth-child(5)),
+.catalog-table-container :deep(.component-table td:nth-child(5)),
+.catalog-table-container :deep(.component-table th:last-child),
+.catalog-table-container :deep(.component-table td:last-child) {
+  text-align: center;
+}
+
 .td-id {
   font-weight: 700;
   color: var(--color-text-muted);
 }
 
 .td-dataset {
-  min-width: 180px;
+  min-width: 150px;
+  max-width: 260px;
 }
 
 .td-dataset strong {
   display: block;
+  font-size: 0.85rem;
   color: var(--color-heading);
 }
 
@@ -1745,16 +1763,20 @@ button:disabled {
   color: var(--color-text-muted);
 }
 
-.table-actions-group {
-  display: inline-flex;
-  gap: 6px;
-  white-space: nowrap;
+.table-actions.table-actions-group {
+  display: grid;
+  grid-template-columns: repeat(2, 28px);
+  grid-template-rows: repeat(2, 28px);
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
 }
 
 .btn-table-action {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
   border: 1px solid var(--color-border);
   background: var(--color-surface-soft);
   color: var(--color-heading);
