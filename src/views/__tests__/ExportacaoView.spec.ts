@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AxiosResponse } from 'axios'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import api from '@/services/api'
 import { exportacaoService } from '@/services/exportacao'
 import { processService } from '@/services/process'
@@ -39,6 +39,8 @@ const tick = async () => {
   await new Promise((resolve) => setTimeout(resolve, 280))
   await flushPromises()
 }
+
+enableAutoUnmount(afterEach)
 
 describe('ExportacaoView', () => {
   beforeEach(() => {
@@ -130,5 +132,70 @@ describe('ExportacaoView', () => {
     expect(wrapper.find('[data-testid="export-download-csv"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="export-download-geojson"]').exists()).toBe(false)
     expect(exportacaoService.preview).not.toHaveBeenCalled()
+  })
+
+  it('alterar formato para geojson atualiza a estimativa de tamanho sem chamar preview novamente', async () => {
+    const previewSpy = vi.mocked(exportacaoService.preview).mockResolvedValue({
+      processo_id: 42,
+      versao_oficial: 'v2',
+      filtros: {},
+      total_registros: 10000,
+      tamanho_amostra: 1,
+      amostra: [sample],
+    })
+    const wrapper = mount(ExportacaoView)
+    await flushPromises()
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(1)
+    const csvEstimate = wrapper.get('[data-testid="export-size-estimate"]').text()
+
+    await wrapper.get('[data-testid="export-format-select"]').setValue('geojson')
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(1)
+    const geojsonEstimate = wrapper.get('[data-testid="export-size-estimate"]').text()
+    expect(geojsonEstimate).not.toBe(csvEstimate)
+  })
+
+  it('reutiliza o previewCache em memória ao retornar para filtros já consultados', async () => {
+    const previewSpy = vi.mocked(exportacaoService.preview).mockImplementation(async (filters) => ({
+      processo_id: filters.processo_id,
+      versao_oficial: 'v2',
+      filtros: { ...filters },
+      total_registros: filters.codigo_imovel ? 3 : 15,
+      tamanho_amostra: 1,
+      amostra: [
+        {
+          ...sample,
+          codigo_imovel: filters.codigo_imovel || sample.codigo_imovel,
+        },
+      ],
+    }))
+
+    const wrapper = mount(ExportacaoView)
+    await flushPromises()
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="export-result-count"]').text()).toBe('15')
+
+    await wrapper.get('[data-testid="export-property-filter"]').setValue('CAR-MS-0002')
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-testid="export-result-count"]').text()).toBe('3')
+
+    await wrapper.get('[data-testid="export-property-filter"]').setValue('')
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-testid="export-result-count"]').text()).toBe('15')
+
+    await wrapper.get('[data-testid="export-property-filter"]').setValue('CAR-MS-0002')
+    await tick()
+
+    expect(previewSpy).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-testid="export-result-count"]').text()).toBe('3')
   })
 })
