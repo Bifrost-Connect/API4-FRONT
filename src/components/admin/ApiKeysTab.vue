@@ -1134,8 +1134,18 @@ const closeLogsModal = () => {
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   box-shadow: var(--shadow-lg);
+}
+
+.modal-dialog form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .modal-dialog-sm {
@@ -1152,6 +1162,7 @@ const closeLogsModal = () => {
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .modal-title-group {
@@ -1192,6 +1203,24 @@ const closeLogsModal = () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
 }
 
 .modal-footer {
@@ -1201,6 +1230,7 @@ const closeLogsModal = () => {
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-soft);
+  flex-shrink: 0;
 }
 
 .form-group {

@@ -1226,7 +1226,7 @@ const openReportExport = (base: CatalogoItem) => {
 .page-heading {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 24px;
 }
 
@@ -1416,21 +1416,9 @@ const openReportExport = (base: CatalogoItem) => {
 /* Seletores Combinados */
 .selectors-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   padding: 6px 14px 12px;
-}
-
-@media (max-width: 1200px) {
-  .selectors-row {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .selectors-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 .filter-field {

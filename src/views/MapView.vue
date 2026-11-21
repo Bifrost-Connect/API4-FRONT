@@ -838,7 +838,13 @@ onBeforeUnmount(() => {
   gap: 24px;
 }
 
-.page-heading,
+.page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
 .panel-heading,
 .search-controls {
   display: flex;
@@ -910,6 +916,8 @@ h2 {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0.6rem 1.1rem;
 }
 
 .map-toolbar {
@@ -1250,6 +1258,12 @@ h2 {
   .location-list {
     grid-template-columns: 1fr;
   }
+
+  .cache-status-bar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin: 0;
+  }
 }
 
 .cache-status-bar {
@@ -1257,7 +1271,7 @@ h2 {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 12px;
+  margin: -8px 0 0;
 }
 
 .cache-badge {
