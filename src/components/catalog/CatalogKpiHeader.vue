@@ -68,13 +68,13 @@ withDefaults(
 
 <style scoped>
 .kpis-section {
-  margin: 16px 0 20px;
+  margin: 12px 0 16px;
 }
 
 .kpis-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 
 @media (max-width: 1200px) {

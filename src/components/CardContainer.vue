@@ -57,12 +57,12 @@ const variantClass = computed(() => {
 .stat-card {
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
+  padding: 1.15rem;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   width: 100%;
-  min-width: 200px;
+  min-width: 170px;
   box-shadow: var(--shadow-sm);
   transition:
     transform 0.2s ease,
@@ -76,11 +76,11 @@ const variantClass = computed(() => {
 }
 
 .stat-header {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .stat-title {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--color-text-muted);
@@ -90,12 +90,12 @@ const variantClass = computed(() => {
 .stat-body {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.85rem;
+  margin-bottom: 0.5rem;
 }
 
 .stat-value {
-  font-size: 2.5rem;
+  font-size: 2.1rem;
   font-weight: 800;
   color: var(--color-heading);
   line-height: 1;

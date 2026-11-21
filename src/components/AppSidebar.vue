@@ -62,12 +62,12 @@ const handleLogout = async () => {
 
 <style scoped>
 .sidebar {
-  width: 252px;
+  width: 228px;
   height: 100vh;
   position: sticky;
   top: 0;
   overflow-y: auto;
-  padding: 28px 16px 20px;
+  padding: 22px 12px 16px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -80,7 +80,7 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 12px 32px;
+  padding: 0 10px 24px;
 }
 
 .brand-mark {
@@ -125,13 +125,13 @@ const handleLogout = async () => {
 
 .navigation-link,
 .login-link {
-  min-height: 46px;
+  min-height: 40px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 12px;
+  gap: 10px;
+  padding: 0 10px;
   color: var(--vis-c-text-light-2);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   text-decoration: none;
   border-left: 3px solid transparent;
   transition:

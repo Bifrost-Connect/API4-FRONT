@@ -51,7 +51,7 @@ watch(
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 32px;
+  padding: 20px 24px;
 }
 
 @media (max-width: 760px) {

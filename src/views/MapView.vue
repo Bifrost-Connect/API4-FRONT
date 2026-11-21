@@ -835,7 +835,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-view {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .page-heading {
@@ -868,7 +868,7 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
   font-weight: 750;
 }
 

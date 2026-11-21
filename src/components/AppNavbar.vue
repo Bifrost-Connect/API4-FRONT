@@ -60,12 +60,12 @@ const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
   top: 0;
   z-index: 100;
   width: 100%;
-  min-height: 76px;
-  padding: 0 32px;
+  min-height: 62px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }

@@ -1242,12 +1242,13 @@ const openReportExport = (base: CatalogoItem) => {
 .page-title {
   margin: 0;
   color: var(--color-heading);
-  font-size: 1.8rem;
+  font-size: 1.6rem;
 }
 
 .page-subtitle {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--color-text-muted);
+  font-size: 0.88rem;
 }
 
 .heading-controls {
