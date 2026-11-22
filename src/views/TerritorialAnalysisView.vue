@@ -37,16 +37,18 @@ let activeBaseLayer: L.TileLayer | null = null
 let renderedLayers: L.Layer[] = []
 let mapRequestSequence = 0
 let mapRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let programmaticMoveTimer: ReturnType<typeof setTimeout> | null = null
+let isInitializing = false
+let lastFittedCarId = ''
+let isProgrammaticMove = false
 
-const carDocuments = computed(() =>
-  documents.value.filter(
-    (item) => item.category === 'CAR' || item.zone === 'PUBLICADA' || /^\d+$/.test(item.id),
-  ),
-)
+const carDocuments = computed(() => {
+  const cars = documents.value.filter((item) => item.category === 'CAR')
+  if (cars.length > 0) return cars
+  return documents.value.filter((item) => item.zone === 'PUBLICADA' || item.localOnly)
+})
 const restrictionDocuments = computed(() =>
-  documents.value.filter(
-    (item) => item.zone !== 'PUBLICADA' && (!/^\d+$/.test(item.id) || item.category !== 'CAR'),
-  ),
+  documents.value.filter((item) => !carDocuments.value.some((c) => c.id === item.id)),
 )
 const selectedCar = computed(() => carDocuments.value.find((item) => item.id === selectedCarId.value))
 const selectedRestrictions = computed(() =>
@@ -175,6 +177,17 @@ const addIntersectionPattern = () => {
   defs.append(pattern)
 }
 
+const fitMapToBounds = (bounds: L.LatLngBounds) => {
+  if (!map) return
+  isProgrammaticMove = true
+  if (programmaticMoveTimer) clearTimeout(programmaticMoveTimer)
+  programmaticMoveTimer = setTimeout(() => {
+    isProgrammaticMove = false
+    programmaticMoveTimer = null
+  }, 400)
+  map.fitBounds(bounds, { maxZoom: 14 })
+}
+
 const updateMapLayers = async () => {
   if (!map) return
   const requestId = ++mapRequestSequence
@@ -189,54 +202,63 @@ const updateMapLayers = async () => {
     renderedLayers.push(layer)
   }
 
+  const bbox = map.getBounds().toBBoxString()
+  const carDoc = showCarLayer.value ? selectedCar.value : undefined
+  const restrictionDocs = showRestrictionLayers.value ? [...selectedRestrictions.value] : []
+
   try {
-    if (showCarLayer.value && selectedCar.value) {
-      const geometry = await spatialAnalysisService.getDocumentGeoJSON(
-        selectedCar.value.id,
-        map.getBounds().toBBoxString(),
-      )
-      if (!map || requestId !== mapRequestSequence) return
-      addLayer(
-        L.geoJSON(geometry, {
-          style: {
-            color: getThemeColor('--map-layer-car-stroke'),
-            weight: 2,
-            fillColor: getThemeColor('--map-layer-car-fill'),
-            fillOpacity: 0.16,
-          },
-          onEachFeature: (feature, layer) => {
-            layer.bindTooltip(selectedCar.value?.name ?? 'Imóvel CAR')
-            if (selectedCar.value) {
-              layer.bindPopup(() => createCarPopup(feature, selectedCar.value as SpatialAnalysisDocument))
-            }
-          },
-        }),
-      )
+    const carPromise = carDoc
+      ? spatialAnalysisService.getDocumentGeoJSON(carDoc.id, bbox)
+      : Promise.resolve<GeoJSON.GeoJsonObject | null>(null)
+    const restrictionPromises = restrictionDocs.map(async (restriction) => ({
+      restriction,
+      geometry: await spatialAnalysisService.getDocumentGeoJSON(restriction.id, bbox),
+    }))
+
+    if (!map || requestId !== mapRequestSequence) return
+    const [carGeometry, restrictionEntries] = await Promise.all([
+      carPromise,
+      Promise.all(restrictionPromises),
+    ])
+    if (!map || requestId !== mapRequestSequence) return
+
+    if (carDoc && carGeometry) {
+      const carLayer = L.geoJSON(carGeometry, {
+        style: {
+          color: getThemeColor('--map-layer-car-stroke'),
+          weight: 2,
+          fillColor: getThemeColor('--map-layer-car-fill'),
+          fillOpacity: 0.16,
+        },
+        onEachFeature: (feature, layer) => {
+          layer.bindTooltip(carDoc.name ?? 'Imóvel CAR')
+          layer.bindPopup(() => createCarPopup(feature, carDoc))
+        },
+      })
+      addLayer(carLayer)
+      if (carLayer.getBounds().isValid() && carDoc.id !== lastFittedCarId) {
+        lastFittedCarId = carDoc.id
+        fitMapToBounds(carLayer.getBounds().pad(0.12))
+      }
     }
 
-    if (showRestrictionLayers.value) {
-      for (const restriction of selectedRestrictions.value) {
-        if (!map || requestId !== mapRequestSequence) return
-        const geometry = await spatialAnalysisService.getDocumentGeoJSON(
-          restriction.id,
-          map.getBounds().toBBoxString(),
-        )
-        if (!map || requestId !== mapRequestSequence) return
-        const colors: Record<SpatialAnalysisDocument['category'], string> = {
-          CAR: getThemeColor('--map-layer-car-stroke'),
-          ALERTA: getThemeColor('--map-layer-restriction-stroke'),
-          APP: getThemeColor('--map-layer-app'),
-          RESERVA_LEGAL: getThemeColor('--map-layer-reserva'),
-          TERRA_INDIGENA: getThemeColor('--map-layer-indigena'),
-        }
-        const color = colors[restriction.category]
-        addLayer(
-          L.geoJSON(geometry, {
-            style: { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: '5 4' },
-            onEachFeature: (_feature, layer) => layer.bindTooltip(restriction.name),
-          }),
-        )
-      }
+    const colors: Record<SpatialAnalysisDocument['category'], string> = {
+      CAR: getThemeColor('--map-layer-car-stroke'),
+      ALERTA: getThemeColor('--map-layer-restriction-stroke'),
+      APP: getThemeColor('--map-layer-app'),
+      RESERVA_LEGAL: getThemeColor('--map-layer-reserva'),
+      TERRA_INDIGENA: getThemeColor('--map-layer-indigena'),
+    }
+
+    for (const { restriction, geometry } of restrictionEntries) {
+      if (!map || requestId !== mapRequestSequence) return
+      const color = colors[restriction.category]
+      addLayer(
+        L.geoJSON(geometry, {
+          style: { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: '5 4' },
+          onEachFeature: (_feature, layer) => layer.bindTooltip(restriction.name),
+        }),
+      )
     }
 
     if (showIntersectionLayer.value) {
@@ -298,7 +320,7 @@ const updateMapLayers = async () => {
 
 const fitToLayer = (layer: L.Layer) => {
   if (layer instanceof L.GeoJSON && layer.getBounds().isValid()) {
-    map?.fitBounds(layer.getBounds().pad(0.12), { maxZoom: 14 })
+    fitMapToBounds(layer.getBounds().pad(0.12))
   }
 }
 
@@ -453,13 +475,30 @@ const addGeoJSONDocument = async (event: Event) => {
 
 const initializeMap = () => {
   if (!mapElement.value || map) return
-  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.79, -47.91], 11)
+  map = L.map(mapElement.value, { zoomControl: false }).setView([-15.78, -47.93], 4)
   L.control.zoom({ position: 'bottomright' }).addTo(map)
   setBaseLayer()
   map.on('moveend zoomend', scheduleVisibleMapRefresh)
+  setTimeout(() => {
+    map?.invalidateSize()
+  }, 200)
 }
 
-const scheduleVisibleMapRefresh = () => {
+const handleResize = () => {
+  map?.invalidateSize()
+}
+
+const scheduleVisibleMapRefresh = (event?: { type?: string }) => {
+  if (isProgrammaticMove) {
+    if (!event || event.type === 'moveend') {
+      isProgrammaticMove = false
+      if (programmaticMoveTimer) {
+        clearTimeout(programmaticMoveTimer)
+        programmaticMoveTimer = null
+      }
+    }
+    return
+  }
   if (mapRefreshTimer) clearTimeout(mapRefreshTimer)
   mapRefreshTimer = setTimeout(() => {
     mapRefreshTimer = null
@@ -469,11 +508,15 @@ const scheduleVisibleMapRefresh = () => {
 
 watch(
   [selectedCarId, selectedRestrictionIds, showCarLayer, showRestrictionLayers, showIntersectionLayer, analysisResults],
-  () => void updateMapLayers(),
+  () => {
+    if (isInitializing) return
+    void updateMapLayers()
+  },
 )
 
 watch(baseMap, setBaseLayer)
 watch(selectedCarId, () => {
+  if (isInitializing) return
   const matchingRestrictions = restrictionDocuments.value.filter(
     (document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year,
   )
@@ -488,26 +531,38 @@ watch(selectedCarId, () => {
 })
 
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
   const scrollContainer = document.querySelector('.content-scroll-container')
   if (scrollContainer) {
     scrollContainer.scrollTop = 0
   }
   initializeMap()
   try {
-    documents.value = await spatialAnalysisService.listDocuments()
-    const targetBaseId = route.query.baseId ? String(route.query.baseId) : ''
-    const targetSafra = route.query.safra ? String(route.query.safra) : ''
-    const matchingDoc = targetBaseId
-      ? carDocuments.value.find((d) => String(d.id) === targetBaseId)
-      : (targetSafra ? carDocuments.value.find((d) => String(d.year) === targetSafra) : null)
-    selectedCarId.value = matchingDoc?.id ?? carDocuments.value[0]?.id ?? ''
-    selectedRestrictionIds.value = restrictionDocuments.value
-      .filter((document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year)
-      .slice(0, 3)
-      .map((document) => document.id)
+    isInitializing = true
+    try {
+      documents.value = await spatialAnalysisService.listDocuments()
+      const targetBaseId = route.query.baseId ? String(route.query.baseId) : ''
+      const targetSafra = route.query.safra ? String(route.query.safra) : ''
+      const matchingDoc = targetBaseId
+        ? carDocuments.value.find((d) => String(d.id) === targetBaseId)
+        : (targetSafra ? carDocuments.value.find((d) => String(d.year) === targetSafra) : null)
+      selectedCarId.value = matchingDoc?.id ?? carDocuments.value[0]?.id ?? ''
+      const compatibleRestrictions = restrictionDocuments.value.filter(
+        (document) => !document.year || !selectedCar.value?.year || document.year === selectedCar.value?.year,
+      )
+      const preferredRestriction =
+        compatibleRestrictions.find((document) => String(document.id).startsWith('ref-')) ??
+        compatibleRestrictions[0]
+      selectedRestrictionIds.value = preferredRestriction ? [preferredRestriction.id] : []
+      await nextTick()
+    } finally {
+      isInitializing = false
+    }
     await updateMapLayers()
     await nextTick()
-    map?.invalidateSize()
+    setTimeout(() => {
+      map?.invalidateSize()
+    }, 200)
   } catch (error) {
     console.error('Não foi possível carregar os documentos espaciais:', error)
     loadError.value = 'Não foi possível carregar os documentos territoriais disponíveis.'
@@ -517,10 +572,18 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
   ++mapRequestSequence
+  isInitializing = false
+  lastFittedCarId = ''
+  isProgrammaticMove = false
   if (mapRefreshTimer) {
     clearTimeout(mapRefreshTimer)
     mapRefreshTimer = null
+  }
+  if (programmaticMoveTimer) {
+    clearTimeout(programmaticMoveTimer)
+    programmaticMoveTimer = null
   }
   map?.remove()
   map = null
@@ -567,9 +630,9 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="isLoadingDocuments" class="empty-state">Carregando documentos espaciais…</div>
-      <div v-else-if="documents.length === 0" class="empty-state" style="text-align: center; padding: 2rem;">
-        <strong style="color: var(--color-heading); font-size: 1rem;">Nenhuma base homologada disponível</strong>
-        <p style="margin-top: 0.5rem; color: var(--color-text-muted); font-size: 0.85rem;">
+      <div v-else-if="documents.length === 0" class="empty-state empty-state-centered">
+        <strong>Nenhuma base homologada disponível</strong>
+        <p>
           Para realizar cálculos de sobreposição territorial, cadastre e homologue as bases oficiais no sistema ou importe uma prévia GeoJSON acima.
         </p>
       </div>
@@ -582,25 +645,27 @@ onBeforeUnmount(() => {
               {{ document.name }} · Safra {{ document.year }}{{ document.localOnly ? ' · prévia local' : '' }}
             </option>
           </select>
-          <small v-if="selectedCar">{{ selectedCar.source }} · {{ selectedCar.featureCount }} feição(ões) · {{ selectedCar.zone === 'LOCAL' ? 'somente nesta sessão' : 'Zona Tratada' }}</small>
+          <small v-if="selectedCar" class="car-meta-card">{{ selectedCar.source }} · {{ selectedCar.featureCount }} feição(ões) · {{ selectedCar.zone === 'LOCAL' ? 'somente nesta sessão' : 'Zona Tratada' }}</small>
         </div>
 
         <fieldset class="form-field restriction-field">
           <legend>Camadas de restrição · Safra {{ selectedCar?.year ?? '—' }}</legend>
-          <label v-for="document in restrictionDocuments" :key="document.id" class="document-option">
-            <input
-              type="checkbox"
-              :checked="selectedRestrictionIds.includes(document.id)"
-              :disabled="!!selectedCar && !!document.year && document.year !== selectedCar.year"
-              @change="toggleRestriction(document.id)"
-            />
-            <span class="document-option-copy">
-              <strong>{{ document.name }}</strong>
-              <small>{{ document.source }} · {{ document.featureCount }} feição(ões){{ document.localOnly ? ' · prévia local' : '' }}</small>
-            </span>
-            <span class="category-tag">{{ categoryName(document.category) }}</span>
-          </label>
-          <p v-if="restrictionDocuments.length === 0" class="field-hint">Nenhuma camada de restrição disponível.</p>
+          <div class="restriction-options">
+            <label v-for="document in restrictionDocuments" :key="document.id" class="document-option">
+              <input
+                type="checkbox"
+                :checked="selectedRestrictionIds.includes(document.id)"
+                :disabled="!!selectedCar && !!document.year && document.year !== selectedCar.year"
+                @change="toggleRestriction(document.id)"
+              />
+              <span class="document-option-copy">
+                <strong>{{ document.name }}</strong>
+                <small>{{ document.source }} · {{ document.featureCount }} feição(ões){{ document.localOnly ? ' · prévia local' : '' }}</small>
+              </span>
+              <span class="category-tag">{{ categoryName(document.category) }}</span>
+            </label>
+            <p v-if="restrictionDocuments.length === 0" class="field-hint">Nenhuma camada de restrição disponível.</p>
+          </div>
         </fieldset>
       </div>
 
@@ -681,9 +746,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.analysis-page { display: grid; gap: 20px; max-width: 1500px; margin: 0 auto; color: var(--color-text); }
-.analysis-header, .section-heading, .selection-footer, .map-toolbar, .results-heading, .result-item-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.analysis-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: 100%; max-width: 1440px; margin: 0 auto; padding: 28px; box-sizing: border-box; color: var(--color-text); }
+.analysis-header, .section-heading, .selection-footer, .map-toolbar, .results-heading, .result-item-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
 .analysis-header { align-items: flex-end; }
+.analysis-header > div, .section-heading > div, .selection-footer > p, .map-title, .results-heading > div { min-width: 0; }
 .eyebrow { margin: 0 0 5px; color: var(--vis-brand-orange); font-size: .72rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
 h1, h2 { margin: 0; color: var(--color-heading); }
 h1 { font-size: clamp(1.45rem, 2.5vw, 1.95rem); }
@@ -693,22 +759,24 @@ h2 { font-size: 1.05rem; }
 .feedback { padding: 11px 14px; border-radius: 6px; font-size: .86rem; }
 .feedback-error { color: var(--badge-danger-text); background: var(--badge-danger-bg); border: 1px solid var(--badge-danger-border); }
 .feedback-success { color: var(--badge-success-text); background: var(--badge-success-bg); border: 1px solid var(--badge-success-border); }
-.selection-panel, .map-panel, .results-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; }
+.selection-panel, .map-panel, .results-panel { min-width: 0; max-width: 100%; box-sizing: border-box; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: var(--shadow-sm); }
 .selection-panel { padding: 18px 20px; }
 .section-heading { align-items: flex-start; margin-bottom: 18px; }
-.import-control { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.import-control { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 7px; min-width: 0; }
 .import-control label, .base-map-select { color: var(--color-text-muted); font-size: .76rem; font-weight: 700; }
-.import-control select, .base-map-select select, .form-field select { min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 5px; }
+.import-control select, .base-map-select select, .form-field select, .car-field select { max-width: 100%; box-sizing: border-box; min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 5px; }
 .button-secondary { min-height: 38px; padding: 0 12px; color: var(--color-brand); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 5px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .button-secondary:hover { background: var(--color-surface-soft); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
-.document-grid { display: grid; grid-template-columns: minmax(250px, .9fr) minmax(350px, 1.4fr); gap: 18px; }
+.document-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.35fr); gap: 20px; align-items: start; min-width: 0; }
 .form-field { min-width: 0; margin: 0; padding: 0; border: 0; }
 .form-field > label, .form-field legend { display: block; margin-bottom: 8px; color: var(--color-heading); font-size: .8rem; font-weight: 700; }
+.car-field { min-width: 0; }
 .car-field select { width: 100%; }
-.form-field > small { display: block; margin-top: 7px; color: var(--color-text-muted); font-size: .74rem; }
-.restriction-field { display: grid; align-content: start; gap: 7px; }
-.restriction-field legend { float: left; width: 100%; }
+.car-meta-card { display: block; margin-top: 10px; padding: 10px 12px; color: var(--color-text-muted); background: var(--color-surface-soft); border: 1px solid var(--color-border); border-radius: 8px; font-size: .74rem; line-height: 1.45; overflow-wrap: anywhere; }
+.restriction-field { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.restriction-field legend { width: 100%; }
+.restriction-options { display: grid; gap: 8px; align-content: start; max-height: 280px; overflow-y: auto; padding-right: 4px; min-width: 0; }
 .document-option { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 9px; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; }
 .document-option:has(input:disabled) { opacity: .55; cursor: not-allowed; }
 .document-option input, .map-layer-controls input { accent-color: var(--color-brand); }
@@ -720,15 +788,15 @@ h2 { font-size: 1.05rem; }
 .field-hint { margin: 0; color: var(--color-text-muted); font-size: .74rem; line-height: 1.45; }
 .calculate-button { flex-shrink: 0; min-height: 42px; padding: 0 18px; color: var(--color-brand-contrast); background: var(--color-brand); border: 0; border-radius: 6px; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; }
 .calculate-button:disabled { opacity: .5; cursor: not-allowed; }
-.analysis-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 610px; gap: 16px; }
-.map-panel { display: flex; min-width: 0; flex-direction: column; overflow: hidden; }
+.analysis-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(290px, 340px); gap: 20px; align-items: stretch; min-width: 0; }
+.map-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; min-height: 580px; }
 .map-toolbar { min-height: 54px; padding: 9px 14px; border-bottom: 1px solid var(--color-border); }
-.map-title { display: grid; gap: 2px; }
+.map-title { display: grid; gap: 2px; min-width: 0; }
 .map-title strong { color: var(--color-heading); font-size: .86rem; }
 .map-title span { color: var(--color-text-muted); font-size: .68rem; }
-.base-map-select { display: flex; align-items: center; gap: 7px; }
+.base-map-select { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .base-map-select select { min-height: 32px; }
-.map-canvas { z-index: 0; min-height: 490px; flex: 1; }
+.map-canvas { z-index: 0; width: 100%; min-height: 460px; flex: 1; }
 .map-layer-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 11px 14px; border-top: 1px solid var(--color-border); }
 .map-layer-controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text); font-size: .73rem; cursor: pointer; }
 .legend-swatch { width: 12px; height: 12px; border: 2px solid; border-radius: 3px; }
@@ -736,41 +804,47 @@ h2 { font-size: 1.05rem; }
 .swatch-restriction { border-color: var(--map-layer-restriction-stroke); background: var(--map-layer-restriction-fill); }
 .swatch-intersection { border-color: var(--map-layer-intersection-stroke); background: var(--map-layer-intersection-fill); }
 .map-error { margin: 0; padding: 8px 14px; color: var(--color-danger); font-size: .78rem; }
-.results-panel { display: flex; min-width: 0; flex-direction: column; padding: 17px 15px; }
+.results-panel { display: flex; flex-direction: column; min-width: 0; padding: 18px 16px; min-height: 580px; }
 .results-heading { padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
-.result-count { display: grid; width: 28px; height: 28px; place-items: center; color: var(--color-brand-contrast); background: var(--color-brand); border-radius: 50%; font-size: .77rem; font-weight: 800; }
+.result-count { display: grid; flex-shrink: 0; width: 28px; height: 28px; place-items: center; color: var(--color-brand-contrast); background: var(--color-brand); border-radius: 50%; font-size: .77rem; font-weight: 800; }
 .result-summary { margin: 12px 0 8px; color: var(--color-text-muted); font-size: .72rem; line-height: 1.4; }
-.result-list { display: grid; max-height: 310px; gap: 7px; overflow-y: auto; }
-.result-item { display: grid; gap: 5px; padding: 10px; color: var(--color-text); text-align: left; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; }
+.result-list { display: grid; max-height: 310px; gap: 7px; overflow-y: auto; min-width: 0; }
+.result-item { display: grid; gap: 5px; min-width: 0; padding: 10px; color: var(--color-text); text-align: left; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; }
 .result-item:hover, .result-item-active { border-color: var(--color-brand); background: var(--color-surface-soft); }
 .result-item-failed { border-left: 3px solid var(--vis-c-danger); }
-.result-item-heading strong { color: var(--color-heading); font-size: .73rem; }
-.result-item-heading span { color: var(--color-brand); font-size: .78rem; font-weight: 800; }
+.result-item-heading strong { overflow: hidden; color: var(--color-heading); font-size: .73rem; text-overflow: ellipsis; white-space: nowrap; }
+.result-item-heading span { flex-shrink: 0; color: var(--color-brand); font-size: .78rem; font-weight: 800; }
 .result-metrics, .result-year { color: var(--color-text-muted); font-size: .68rem; line-height: 1.35; }
 .result-year { font-weight: 700; }
-.selected-result-card { display: grid; gap: 5px; margin-top: auto; padding: 11px; background: var(--color-surface-soft); border-left: 3px solid var(--vis-brand-orange); border-radius: 4px; }
+.selected-result-card { display: grid; gap: 5px; margin-top: auto; padding: 11px; background: var(--color-surface-soft); border-left: 3px solid var(--vis-brand-orange); border-radius: 4px; min-width: 0; }
 .selected-result-card strong { margin-bottom: 2px; color: var(--color-text-muted); font-size: .67rem; text-transform: uppercase; }
-.selected-result-card span { color: var(--color-heading); font-size: .78rem; font-weight: 700; }
+.selected-result-card span { color: var(--color-heading); font-size: .78rem; font-weight: 700; overflow-wrap: anywhere; }
 .selected-result-card small { color: var(--color-text); font-size: .7rem; }
 .precision-note { margin: 14px 0 0; color: var(--color-text-muted); font-size: .66rem; }
 .empty-state { padding: 15px 12px; color: var(--color-text-muted); font-size: .76rem; }
+.empty-state-centered { padding: 2rem; text-align: center; }
+.empty-state-centered strong { color: var(--color-heading); font-size: 1rem; }
+.empty-state-centered p { margin: 0.5rem 0 0; color: var(--color-text-muted); font-size: 0.85rem; }
 .results-empty { display: grid; gap: 7px; margin: auto 0; text-align: center; }
 .results-empty strong { color: var(--color-heading); }
-@media (max-width: 1050px) {
+@media (max-width: 1280px) {
   .analysis-workspace { grid-template-columns: minmax(0, 1fr) 300px; }
-  .document-grid { grid-template-columns: 1fr; }
+  .document-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 800px) {
-  .analysis-workspace { grid-template-columns: 1fr; }
-  .map-canvas { min-height: 420px; }
-  .results-panel { min-height: 280px; }
+@media (max-width: 1080px) {
+  .analysis-workspace { grid-template-columns: minmax(0, 1fr); }
+  .results-panel { min-height: 320px; }
+  .map-panel { min-height: 500px; }
 }
-@media (max-width: 620px) {
-  .analysis-header, .section-heading, .selection-footer { align-items: stretch; flex-direction: column; }
-  .import-control { justify-content: flex-start; }
+@media (max-width: 760px) {
+  .analysis-page { padding: 18px 12px; }
+  .selection-panel { padding: 16px; }
+}
+@media (max-width: 640px) {
+  .analysis-header, .section-heading, .selection-footer, .map-toolbar { align-items: stretch; flex-direction: column; }
+  .import-control { width: 100%; justify-content: flex-start; }
   .calculate-button { width: 100%; }
-  .map-toolbar { align-items: flex-start; flex-direction: column; }
   .base-map-select { width: 100%; justify-content: space-between; }
-  .map-layer-controls { display: grid; }
+  .map-layer-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
 }
 </style>

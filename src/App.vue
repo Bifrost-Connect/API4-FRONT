@@ -50,7 +50,8 @@ watch(
 .content-scroll-container {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
+  overflow-x: hidden;
+  padding: 20px 24px;
 }
 
 @media (max-width: 760px) {

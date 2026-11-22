@@ -1,43 +1,51 @@
 <script setup lang="ts">
 /**
- * Barra de navegação superior (Navbar) com breadcrumbs,
+ * Barra de navegação superior (Navbar) com breadcrumbs dinâmicos,
  * atalhos rápidos de mapa/upload e alternância de tema.
  */
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeButton from './ThemeButton.vue'
 import { userService } from '@/services/user'
+import { buildBreadcrumbs } from '@/utils/breadcrumbs'
 
 const route = useRoute()
 
-// Mapeamento de títulos de tela para o breadcrumb superior
-const pageTitles: Record<string, string> = {
-  dashboard: 'Visão geral das cargas',
-  upload: 'Nova carga de dados',
-  mapa: 'Mapa operacional',
-  styleguide: 'Guia de estilos',
-  'process-log': 'Acompanhar processamento de cargas',
-  'analise-territorial': 'Análise territorial',
-  'comparacao-temporal': 'Comparação temporal de safras',
-  catalogo: 'Catálogo de bases geoespaciais',
-  profile: 'Meu perfil',
-  users: 'Gerenciamento de usuários',
-  forbidden: 'Acesso restrito (403)',
-}
-
-const currentPageTitle = computed(() => pageTitles[route.name?.toString() ?? ''] ?? 'API4')
+const breadcrumbs = computed(() => buildBreadcrumbs(route))
 const canMapa = computed(() => userService.can('MAPA:VISUALIZAR'))
 const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
 </script>
 
 <template>
-  <nav class="navbar" aria-label="Navegação contextual">
+  <div class="navbar">
     <!-- Breadcrumb da tela atual -->
-    <div class="breadcrumb">
-      <span class="breadcrumb-root">API4</span>
-      <span class="breadcrumb-separator" aria-hidden="true">/</span>
-      <strong>{{ currentPageTitle }}</strong>
-    </div>
+    <nav class="breadcrumb" aria-label="Navegação contextual">
+      <ol class="breadcrumb-list">
+        <li
+          v-for="(item, index) in breadcrumbs"
+          :key="`${item.label}-${index}`"
+          class="breadcrumb-item"
+        >
+          <span v-if="index > 0" class="breadcrumb-separator" aria-hidden="true">/</span>
+          <RouterLink
+            v-if="item.to && !item.isCurrent"
+            :to="item.to"
+            class="breadcrumb-link"
+            :class="{ 'breadcrumb-root': index === 0 }"
+          >
+            {{ item.label }}
+          </RouterLink>
+          <strong
+            v-else
+            class="breadcrumb-current"
+            :class="{ 'breadcrumb-root': index === 0 && breadcrumbs.length === 1 }"
+            aria-current="page"
+          >
+            {{ item.label }}
+          </strong>
+        </li>
+      </ol>
+    </nav>
 
     <!-- Atalhos rápidos da barra superior filtrados por permissão (Tarefa 6) -->
     <div class="navbar-actions">
@@ -51,7 +59,7 @@ const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
       </RouterLink>
       <ThemeButton />
     </div>
-  </nav>
+  </div>
 </template>
 
 <style scoped>
@@ -60,12 +68,12 @@ const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
   top: 0;
   z-index: 100;
   width: 100%;
-  min-height: 76px;
-  padding: 0 32px;
+  min-height: 62px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -78,26 +86,59 @@ const canUpload = computed(() => userService.can('INGESTAO:UPLOAD'))
 }
 
 .breadcrumb {
-  gap: 10px;
   min-width: 0;
   color: var(--color-heading);
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+  min-width: 0;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.breadcrumb-link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: color 0.15s ease;
+}
+
+.breadcrumb-link:hover {
+  color: var(--vis-brand-orange);
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: var(--color-border-hover);
+  font-size: 0.85rem;
+  user-select: none;
+}
+
+.breadcrumb-current {
+  color: var(--color-heading);
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb-root {
   color: var(--color-brand);
   font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.breadcrumb-separator {
-  color: var(--color-border-hover);
-}
-
-.breadcrumb strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.92rem;
+  letter-spacing: 0.05em;
 }
 
 .navbar-actions {

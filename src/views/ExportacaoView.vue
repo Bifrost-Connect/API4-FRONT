@@ -127,6 +127,7 @@ function displayFormat(value: string): string {
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewSequence = 0
 let lineageSequence = 0
+const previewCache = new Map<string, ExportPreview>()
 
 async function loadBases() {
   basesLoading.value = true
@@ -145,8 +146,8 @@ async function loadBases() {
       const requestedId = String(route.query.processo_id || '')
       const first = bases.value.find((base) => String(base.id) === requestedId) || bases.value[0]
       if (first) {
-        selectedBaseId.value = String(first.id)
         selectedDatasetId.value = String(first.conjunto_id ?? first.conjunto ?? '')
+        selectedBaseId.value = String(first.id)
       }
     }
   } catch (error) {
@@ -176,12 +177,21 @@ async function loadHistory() {
 async function loadPreview() {
   const sequence = ++previewSequence
   const filters = activeFilters.value
-  preview.value = null
   previewError.value = ''
-  if (!filters || !canExport.value) return
+  if (!filters || !canExport.value) {
+    preview.value = null
+    return
+  }
+  const cacheKey = JSON.stringify(filters)
+  if (previewCache.has(cacheKey)) {
+    preview.value = previewCache.get(cacheKey)!
+    return
+  }
+  preview.value = null
   previewLoading.value = true
   try {
     const result = await exportacaoService.preview(filters)
+    previewCache.set(cacheKey, result)
     if (sequence === previewSequence) preview.value = result
   } catch (error) {
     if (sequence === previewSequence) {
@@ -199,6 +209,15 @@ function schedulePreview() {
   if (previewTimer) clearTimeout(previewTimer)
   previewSequence++
   previewLoading.value = false
+  previewError.value = ''
+  const filters = activeFilters.value
+  if (filters && canExport.value) {
+    const cacheKey = JSON.stringify(filters)
+    if (previewCache.has(cacheKey)) {
+      preview.value = previewCache.get(cacheKey)!
+      return
+    }
+  }
   preview.value = null
   previewTimer = setTimeout(() => void loadPreview(), 250)
 }
@@ -219,6 +238,7 @@ async function loadTraceability() {
 }
 
 function selectDataset() {
+  if (visibleBases.value.some((base) => String(base.id) === selectedBaseId.value)) return
   const first = visibleBases.value[0]
   selectedBaseId.value = first ? String(first.id) : ''
 }
@@ -256,7 +276,7 @@ watch(selectedBaseId, () => {
   void loadTraceability()
   schedulePreview()
 })
-watch([codigoImovel, hectaresMin, fonteCamada, scope, formato], schedulePreview)
+watch([codigoImovel, hectaresMin, fonteCamada, scope], schedulePreview)
 
 onMounted(() => {
   void loadBases()
@@ -267,6 +287,7 @@ onBeforeUnmount(() => {
   if (previewTimer) clearTimeout(previewTimer)
   previewSequence++
   lineageSequence++
+  previewCache.clear()
 })
 </script>
 
@@ -477,18 +498,19 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.export-page { display: grid; gap: 20px; max-width: 1440px; margin: 0 auto; padding: 28px; color: var(--color-text, #182230); }
+.export-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: 100%; max-width: 1440px; margin: 0 auto; padding: 28px; box-sizing: border-box; color: var(--color-text, #182230); }
 .page-heading, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.page-heading > div, .section-heading > div { min-width: 0; }
 .page-heading h1 { margin: 4px 0 8px; font-size: clamp(1.55rem, 2.5vw, 2.1rem); }
 .page-heading > div > p:last-child { margin: 0; color: var(--color-text-muted, #64748b); }
 .eyebrow { margin: 0; color: var(--vis-brand-orange, #d87518); font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
 .official-badge, .status-chip { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border-radius: 999px; color: #24543b; background: #e8f5ec; font-size: .82rem; font-weight: 700; white-space: nowrap; }
-.panel { padding: 22px; border: 1px solid var(--color-border, #dce2e8); border-radius: 14px; background: var(--color-surface, #fff); box-shadow: var(--shadow-sm, 0 2px 8px #1020300d); }
+.panel { min-width: 0; max-width: 100%; padding: 22px; border: 1px solid var(--color-border, #dce2e8); border-radius: 14px; box-sizing: border-box; background: var(--color-surface, #fff); box-shadow: var(--shadow-sm, 0 2px 8px #1020300d); }
 .section-heading { margin-bottom: 18px; }
 .section-heading h2 { margin: 5px 0 0; font-size: 1.2rem; }
 .step-label { color: var(--color-text-muted, #64748b); font-size: .82rem; }
 .filters-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-.field { display: grid; gap: 7px; color: var(--color-heading, #263445); font-size: .86rem; font-weight: 650; }
+.field { display: grid; gap: 7px; min-width: 0; color: var(--color-heading, #263445); font-size: .86rem; font-weight: 650; }
 .field small { color: var(--color-text-muted, #748194); font-weight: 400; }
 .field input, .field select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--color-border, #cbd5df); border-radius: 8px; color: inherit; background: var(--color-surface, #fff); font: inherit; font-weight: 400; }
 .field input:focus, .field select:focus { outline: 2px solid #f29b46; outline-offset: 1px; }
@@ -496,7 +518,7 @@ onBeforeUnmount(() => {
 .dependency-note, .table-footnote { margin: 14px 0 0; color: var(--color-text-muted, #667085); font-size: .8rem; }
 .preview-summary { display: flex; flex-wrap: wrap; gap: 20px; color: var(--color-text-muted, #667085); font-size: .87rem; }
 .preview-summary strong { color: var(--color-heading, #263445); }
-.table-wrap { width: 100%; overflow-x: auto; }
+.table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
 .sample-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .sample-table th, .sample-table td { padding: 11px 12px; border-bottom: 1px solid var(--color-border, #e3e8ee); text-align: left; white-space: nowrap; }
 .sample-table th { color: var(--color-text-muted, #667085); background: var(--color-surface-muted, #f7f8fa); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
@@ -519,6 +541,7 @@ onBeforeUnmount(() => {
 .notice-info { color: #36516e; border: 1px solid #c8d9eb; background: #f1f7fd; }
 .status-chip { padding: 5px 9px; font-size: .74rem; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 1180px) { .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 980px) { .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .export-page { padding: 18px 12px; } .page-heading, .section-heading, .download-actions { align-items: flex-start; flex-direction: column; } .official-badge { align-self: flex-start; } .filters-grid { grid-template-columns: 1fr; } .panel { padding: 16px; } .preview-summary { gap: 8px 16px; } }
 </style>

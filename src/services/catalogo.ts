@@ -6,6 +6,11 @@ import api, { mockactive } from './api'
 export interface CatalogoFilters {
   conjuntoId?: number | string
   anoSafra?: string
+  apenas_disponiveis?: boolean
+  page?: number
+  size?: number
+  sort?: string
+  direcao?: string
 }
 
 export interface CatalogoBase {
@@ -20,6 +25,7 @@ export interface CatalogoBase {
   orgao?: string
   orgao_sigla?: string
   total_feicoes: number
+  pronta_para_consulta?: boolean
 }
 
 export const catalogoService = {
@@ -32,7 +38,16 @@ export const catalogoService = {
       if (response.status === 204 || !response.data) {
         return []
       }
-      return Array.isArray(response.data) ? response.data : []
+      if (Array.isArray(response.data)) {
+        return response.data
+      }
+      if (Array.isArray(response.data.items)) {
+        return response.data.items
+      }
+      if (Array.isArray(response.data.content)) {
+        return response.data.content
+      }
+      return []
     } catch (error: any) {
       if (!mockactive) throw error
       console.warn('Falha ao buscar catálogo de bases da API.', error)

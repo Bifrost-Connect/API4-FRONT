@@ -201,7 +201,7 @@ export const MENU_ITEMS: MenuItem[] = [
     permission: ['INGESTAO:VISUALIZAR_PROCESSAMENTO', 'AUDITORIA:VISUALIZAR_PROCESSAMENTOS'],
   },
   {
-    label: 'Upload de carga',
+    label: 'Ingestão de Carga',
     to: '/upload',
     icon: FiUploadCloud,
     permission: 'INGESTAO:UPLOAD',

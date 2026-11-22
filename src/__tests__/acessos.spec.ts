@@ -92,7 +92,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
 
       expect(labels).toContain('Gerenciamento de usuários')
       expect(labels).toContain('Perfil do usuário')
-      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Ingestão de Carga')
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Catálogo de Bases')
       expect(labels).not.toContain('Mapa operacional')
@@ -105,7 +105,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       const labels = menu.map((m) => m.label)
 
       expect(labels).toContain('Dashboard')
-      expect(labels).toContain('Upload de carga')
+      expect(labels).toContain('Ingestão de Carga')
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).not.toContain('Gerenciamento de usuários')
       expect(labels).not.toContain('Comparação temporal')
@@ -120,7 +120,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
       expect(labels).toContain('Comparação temporal')
-      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Ingestão de Carga')
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
@@ -135,7 +135,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Mapa operacional')
       expect(labels).toContain('Análise territorial')
       expect(labels).not.toContain('Comparação temporal')
-      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Ingestão de Carga')
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
 
@@ -150,7 +150,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       expect(labels).toContain('Análise territorial')
       expect(labels).toContain('Comparação temporal')
       expect(labels).toContain('Gerenciamento de usuários')
-      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Ingestão de Carga')
     })
 
     it('unifica os 5 perfis oficiais e concede API:* apenas para ADMIN e GESTOR por padrão', () => {
@@ -180,7 +180,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
 
       expect(labels).toContain('Catálogo de Bases')
       expect(labels).toContain('Mapa operacional')
-      expect(labels).not.toContain('Upload de carga')
+      expect(labels).not.toContain('Ingestão de Carga')
       expect(labels).not.toContain('Dashboard')
       expect(labels).not.toContain('Gerenciamento de usuários')
     })
@@ -190,7 +190,7 @@ describe('Controle de Acessos e Matriz de Permissões (RBAC)', () => {
       const sidebarWrapper = mount(AppSidebar)
 
       expect(sidebarWrapper.text()).toContain('Gerenciamento de usuários')
-      expect(sidebarWrapper.text()).not.toContain('Upload de carga')
+      expect(sidebarWrapper.text()).not.toContain('Ingestão de Carga')
       expect(sidebarWrapper.text()).not.toContain('Dashboard')
     })
 

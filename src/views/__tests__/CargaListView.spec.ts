@@ -173,6 +173,42 @@ describe('Catálogo de Bases Geoespaciais', () => {
       expect(wrapper.find('[data-testid="catalog-grid"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="catalog-table"]').exists()).toBe(false)
     })
+
+    it('exibe as colunas do modo tabela sem "Versão Oficial" e organiza as ações analíticas em grupo 2x2', async () => {
+      const wrapper = mount(CargaListView)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="toggle-view-table"]').trigger('click')
+
+      const table = wrapper.find('[data-testid="catalog-table"]')
+      expect(table.exists()).toBe(true)
+
+      const headers = table.findAll('thead th').map((th) => th.text().trim())
+      expect(headers).not.toContain('Versão Oficial')
+      expect(headers).toEqual([
+        'ID',
+        'Conjunto de Dados',
+        'Órgão Emissor',
+        'Safra',
+        'Registros',
+        'Situação Operacional',
+        'Ações Analíticas',
+      ])
+      expect(table.find('[data-testid="table-version"]').exists()).toBe(false)
+
+      const firstRow = table.find('[data-testid="catalog-table-row"]')
+      expect(firstRow.exists()).toBe(true)
+
+      const actionsGroup = firstRow.find('.table-actions-group')
+      expect(actionsGroup.exists()).toBe(true)
+
+      const actionButtons = actionsGroup.findAll('.btn-table-action')
+      expect(actionButtons).toHaveLength(4)
+      expect(actionsGroup.find('[data-testid="btn-inspect-base"]').exists()).toBe(true)
+      expect(actionsGroup.find('[data-testid="btn-view-map"]').exists()).toBe(true)
+      expect(actionsGroup.find('[data-testid="btn-compare-safra"]').exists()).toBe(true)
+      expect(actionsGroup.find('[data-testid="btn-audit-process"]').exists()).toBe(true)
+    })
   })
 
   describe('Filtros e Pesquisas Operacionais', () => {

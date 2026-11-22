@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle } from 'vue-icons-plus/fi'
+import { FiUploadCloud, FiCheck, FiInfo, FiAlertCircle, FiDatabase } from 'vue-icons-plus/fi'
 import {
   uploadService,
   UPLOAD_FORMATO_OPTIONS,
@@ -13,11 +13,17 @@ import { processService } from '@/services/process'
 import { userService } from '@/services/user'
 import { userUploadsStorage } from '@/services/storage/userUploadsStorage'
 import Stepper from '@/components/Stepper.vue'
+import AutomatedIngestionTab from '@/components/upload/AutomatedIngestionTab.vue'
 
-// Passos
+// Abas e Passos
+const route = useRoute()
+const initialTab =
+  route.query.tab === 'automatizada' || route.query.tab === 'conectores'
+    ? 'automatizada'
+    : 'manual'
+const activeTab = ref<'manual' | 'automatizada'>(initialTab)
 const currentStep = ref(1)
 const currentProcessoId = ref<number | null>(null)
-const route = useRoute()
 const reprocessId = ref<string | null>(null)
 
 const nextStep = () => {
@@ -295,11 +301,36 @@ const resetForm = () => {
 </script>
 
 <template>
-  <main class="upload-view">
+  <main class="upload-view" :class="{ 'upload-view--wide': activeTab === 'automatizada' }">
     <div class="upload-header">
-      <h1>Nova Carga de Dados</h1>
+      <h1>Ingestão de Carga</h1>
     </div>
 
+    <div class="tabs-nav" data-testid="upload-tabs-nav">
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'manual' }"
+        data-testid="tab-upload-manual"
+        @click="activeTab = 'manual'"
+      >
+        <FiUploadCloud size="16" />
+        <span>Ingestão Manual</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'automatizada' }"
+        data-testid="tab-upload-automatizada"
+        @click="activeTab = 'automatizada'"
+      >
+        <FiDatabase size="16" />
+        <span>Ingestão Automática</span>
+      </button>
+    </div>
+
+    <template v-if="activeTab === 'manual'">
     <Stepper
       :currentStep="currentStep"
       :steps="['Origem dos Dados', 'Upload do Arquivo', 'Confirmação']"
@@ -649,6 +680,9 @@ const resetForm = () => {
         </div>
       </div>
     </div>
+    </template>
+
+    <AutomatedIngestionTab v-else :form-options="formOptions" />
   </main>
 </template>
 
@@ -659,6 +693,45 @@ const resetForm = () => {
   padding: 2rem;
   max-width: 800px;
   margin: 0 auto;
+  transition: max-width 0.25s ease;
+}
+
+.upload-view--wide {
+  max-width: 1200px;
+}
+
+/* Abas de Navegação */
+.tabs-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 4px;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.tab-btn:hover {
+  color: var(--color-heading);
+}
+
+.tab-btn.active {
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand);
 }
 
 /* Cabeçalho */

@@ -282,7 +282,26 @@ const onApply = () => {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.category-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.category-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.category-tabs::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.category-tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
 }
 
 .category-tab-btn {
@@ -323,6 +342,7 @@ const onApply = () => {
   grid-template-columns: 1fr;
   gap: 10px;
   padding: 12px 14px;
+  align-items: center;
 }
 
 @media (min-width: 768px) {
@@ -334,7 +354,7 @@ const onApply = () => {
 @media (min-width: 1200px) {
   .filters-container {
     grid-template-columns: auto 1fr 1fr 1fr auto;
-    align-items: stretch;
+    align-items: center;
   }
 }
 
@@ -347,6 +367,7 @@ const onApply = () => {
   padding: 6px 12px;
   background: var(--color-surface-soft);
   min-width: 0;
+  min-height: 42px;
   transition: border-color 150ms ease;
 }
 
@@ -365,17 +386,28 @@ const onApply = () => {
 }
 
 .filter-dates {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 4px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  min-height: 42px;
 }
 
 .date-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .filter-dates {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
 }
 
 .input-inline {
@@ -403,8 +435,8 @@ const onApply = () => {
 }
 
 .btn-filter {
-  height: 100%;
-  min-height: 40px;
+  height: 42px;
+  min-height: 42px;
   border: 1px solid var(--color-brand);
   color: var(--color-brand-contrast);
   background: var(--color-brand);
@@ -415,6 +447,7 @@ const onApply = () => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .btn-filter:hover {

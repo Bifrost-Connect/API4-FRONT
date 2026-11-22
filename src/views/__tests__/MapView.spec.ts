@@ -7,6 +7,33 @@ import { geojsonCache } from '@/services/storage/geojsonCache'
 
 enableAutoUnmount(afterEach)
 
+const storageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString()
+    },
+    removeItem: (key: string) => {
+      delete store[key]
+    },
+    clear: () => {
+      store = {}
+    },
+  }
+})()
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: storageMock,
+  writable: true,
+})
+if (typeof window !== 'undefined' && window !== globalThis) {
+  Object.defineProperty(window, 'localStorage', {
+    value: storageMock,
+    writable: true,
+  })
+}
+
 const {
   mockRoute,
   mockRouterPush,

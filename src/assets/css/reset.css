@@ -6,6 +6,10 @@
   font-weight: normal;
 }
 
+html {
+  font-size: 14.4px; /* 90% da escala base (16px * 0.9) para compactação global nativa */
+}
+
 body {
   min-height: 100vh;
   color: var(--color-text);
@@ -13,7 +17,7 @@ body {
   transition:
     color 0.5s,
     background-color 0.5s;
-  line-height: 1.6;
+  line-height: 1.5;
   font-family:
     Inter,
     -apple-system,
@@ -27,7 +31,7 @@ body {
     'Droid Sans',
     'Helvetica Neue',
     sans-serif;
-  font-size: 15px;
+  font-size: 0.875rem;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

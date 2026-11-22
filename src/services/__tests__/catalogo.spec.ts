@@ -54,6 +54,32 @@ describe('Catalogo Service', () => {
     expect(resultado).toEqual([])
   })
 
+  it('deve extrair array quando a API responder com objeto paginado contendo items', async () => {
+    const mockBases = [
+      {
+        id: 11,
+        ano_safra: '2026',
+        versao_oficial: 'v1.0',
+        data_publicacao: '2026-10-20',
+        total_feicoes: 505500,
+        conjunto: 'Imóveis rurais',
+      },
+    ]
+
+    vi.mocked(api.get).mockResolvedValueOnce({
+      status: 200,
+      data: {
+        items: mockBases,
+        total_items: 1,
+        page: 0,
+        size: 20,
+      },
+    } as any)
+
+    const resultado = await catalogoService.listarBases()
+    expect(resultado).toEqual(mockBases)
+  })
+
   it('deve propagar erro quando a API falhar e mockactive for false', async () => {
     vi.mocked(api.get).mockRejectedValueOnce(new Error('Erro interno no servidor 500'))
 
