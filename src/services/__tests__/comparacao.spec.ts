@@ -4,6 +4,7 @@ import api from '../api'
 import {
   comparisonService,
   comparisonErrorMessage,
+  normalizeBbox,
   normalizePublishedSeasons,
   readFeatureCollection,
 } from '../comparacao'
@@ -22,7 +23,10 @@ const published = {
 const collection = { type: 'FeatureCollection', features: [] }
 const parameters = { seasonA: '1', seasonB: '2', bbox: '-50,-20,-40,-10' }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  comparisonService.clearCache()
+})
 
 describe('contrato de comparação existente', () => {
   it('exclui versões abertas, reprovadas, não prontas ou com metadados incompletos', () => {
@@ -122,5 +126,188 @@ describe('contrato de comparação existente', () => {
     expect(comparisonErrorMessage(new AxiosError('timeout', 'ECONNABORTED'))).toContain(
       'área menor',
     )
+  })
+})
+
+describe('cache, normalização e deduplicação in-flight', () => {
+  it('normalizeBbox arredonda coordenadas válidas para 4 casas decimais e preserva entradas inválidas', () => {
+    expect(normalizeBbox(' -50,-20,-40,-10 ')).toBe('-50,-20,-40,-10')
+    expect(normalizeBbox('-50.123456,-20.10002,-40.00001,-10.0')).toBe('-50.1235,-20.1,-40,-10')
+    expect(normalizeBbox('')).toBe('')
+    expect(normalizeBbox('  -50,-20,-40  ')).toBe('-50,-20,-40')
+    expect(normalizeBbox('-50,abc,-40,-10')).toBe('-50,abc,-40,-10')
+    expect(normalizeBbox('-50,,-40,-10')).toBe('-50,,-40,-10')
+  })
+
+  it('listPublishedSeasons faz cache em memória, deduplica in-flight e respeita forceRefresh', async () => {
+    let resolveRequest!: (value: unknown) => void
+    vi.mocked(api.get).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const p1 = comparisonService.listPublishedSeasons()
+    const p2 = comparisonService.listPublishedSeasons()
+    expect(api.get).toHaveBeenCalledTimes(1)
+
+    resolveRequest({ data: { items: [published], total_pages: 1 } })
+    const [res1, res2] = await Promise.all([p1, p2])
+    expect(res1).toHaveLength(1)
+    expect(res2).toEqual(res1)
+    expect(res1).not.toBe(res2)
+
+    const res3 = await comparisonService.listPublishedSeasons()
+    expect(res3).toEqual(res1)
+    expect(api.get).toHaveBeenCalledTimes(1)
+
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { items: [{ ...published, id: 99, ano_safra: '2026' }], total_pages: 1 },
+    })
+    const refreshed = await comparisonService.listPublishedSeasons(undefined, { forceRefresh: true })
+    expect(api.get).toHaveBeenCalledTimes(2)
+    expect(refreshed.map((s) => s.id)).toEqual(['99'])
+  })
+
+  it('getPairedLayers normaliza bbox, reutiliza cache, deduplica in-flight e respeita forceRefresh', async () => {
+    let resolveRequest!: (value: unknown) => void
+    vi.mocked(api.get).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const rawParams = {
+      seasonA: '1',
+      seasonB: '2',
+      bbox: '-50.123456,-20.10002,-40.00001,-10.0',
+    }
+    const equivalentParams = {
+      seasonA: '1',
+      seasonB: '2',
+      bbox: '-50.12349,-20.10001,-40.00002,-10',
+    }
+
+    const p1 = comparisonService.getPairedLayers(rawParams)
+    const p2 = comparisonService.getPairedLayers(equivalentParams)
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect(api.get).toHaveBeenCalledWith(
+      '/analise/comparacao/camadas',
+      expect.objectContaining({
+        params: {
+          id_carga_a: '1',
+          id_carga_b: '2',
+          bbox: '-50.1235,-20.1,-40,-10',
+        },
+      }),
+    )
+
+    resolveRequest({ data: { cargaA: collection, cargaB: collection, simplificada: false } })
+    const [res1, res2] = await Promise.all([p1, p2])
+    expect(res1).toEqual(res2)
+
+    const res3 = await comparisonService.getPairedLayers(equivalentParams)
+    expect(res3).toEqual(res1)
+    expect(api.get).toHaveBeenCalledTimes(1)
+
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { cargaA: collection, cargaB: collection, simplificada: true },
+    })
+    const refreshed = await comparisonService.getPairedLayers(rawParams, undefined, {
+      forceRefresh: true,
+    })
+    expect(api.get).toHaveBeenCalledTimes(2)
+    expect(refreshed.simplificada).toBe(true)
+  })
+
+  it('getEvolution normaliza bbox, reutiliza cache, deduplica in-flight e respeita forceRefresh', async () => {
+    const evolutionPayload = {
+      areaSafraAHectares: 40,
+      areaSafraBHectares: 70,
+      saldoVariacaoHectares: 30,
+      areaAumentoHectares: 35,
+      areaReducaoHectares: 5,
+      areaMantidaHectares: 35,
+      geoJsonClassificado: collection,
+    }
+    let resolveRequest!: (value: unknown) => void
+    vi.mocked(api.post).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const rawParams = {
+      seasonA: '1',
+      seasonB: '2',
+      bbox: '-50.123456,-20.10002,-40.00001,-10.0',
+    }
+    const equivalentParams = {
+      seasonA: '1',
+      seasonB: '2',
+      bbox: '-50.12349,-20.10001,-40.00002,-10',
+    }
+
+    const p1 = comparisonService.getEvolution(rawParams)
+    const p2 = comparisonService.getEvolution(equivalentParams)
+    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledWith(
+      '/analise/comparacao/evolucao',
+      {
+        safraAId: 1,
+        safraBId: 2,
+        bbox: '-50.1235,-20.1,-40,-10',
+      },
+      expect.any(Object),
+    )
+
+    resolveRequest({ data: evolutionPayload })
+    const [res1, res2] = await Promise.all([p1, p2])
+    expect(res1).toEqual(res2)
+
+    const res3 = await comparisonService.getEvolution(equivalentParams)
+    expect(res3).toEqual(res1)
+    expect(api.post).toHaveBeenCalledTimes(1)
+
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: { ...evolutionPayload, areaSafraBHectares: 80 },
+    })
+    const refreshed = await comparisonService.getEvolution(rawParams, undefined, {
+      forceRefresh: true,
+    })
+    expect(api.post).toHaveBeenCalledTimes(2)
+    expect(refreshed.areaSafraBHectares).toBe(80)
+  })
+
+  it('respeita AbortSignal em chamadas compartilhadas in-flight sem cancelar os demais chamadores', async () => {
+    let resolveRequest!: (value: unknown) => void
+    vi.mocked(api.get).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve
+        }),
+    )
+
+    const primaryController = new AbortController()
+    const secondaryController = new AbortController()
+    const alreadyAborted = new AbortController()
+    alreadyAborted.abort()
+
+    const p1 = comparisonService.listPublishedSeasons(primaryController.signal)
+    await expect(
+      comparisonService.listPublishedSeasons(alreadyAborted.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+
+    const p2 = comparisonService.listPublishedSeasons(secondaryController.signal)
+    secondaryController.abort()
+    await expect(p2).rejects.toMatchObject({ name: 'AbortError' })
+
+    resolveRequest({ data: { items: [published], total_pages: 1 } })
+    const seasons = await p1
+    expect(seasons).toHaveLength(1)
+    expect(primaryController.signal.aborted).toBe(false)
   })
 })
