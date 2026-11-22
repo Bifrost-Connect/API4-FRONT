@@ -11,7 +11,12 @@ import {
   type PublishedSeason,
   type EvolutionMetrics,
 } from '@/services/comparacao'
-import { featureIdentifier, parseBbox, percentageVariation } from '@/utils/comparacao'
+import {
+  featureIdentifier,
+  normalizeBbox,
+  parseBbox,
+  percentageVariation,
+} from '@/utils/comparacao'
 
 const route = useRoute()
 const seasons = ref<PublishedSeason[]>([])
@@ -36,6 +41,7 @@ const mode = ref<'split' | 'swipe'>('split')
 const showDelta = ref(true)
 const panelOpen = ref(true)
 const selectedId = ref('')
+const mapsRef = ref<InstanceType<typeof TemporalComparisonMaps> | null>(null)
 let requestSequence = 0
 let activeRequest: AbortController | undefined
 let catalogRequest: AbortController | undefined
@@ -69,18 +75,24 @@ const percent = computed(() =>
     ? percentageVariation(metrics.value.areaSafraAHectares, metrics.value.areaSafraBHectares)
     : null,
 )
+function buildFeatureMap(collection: FeatureCollection | null): Map<string, GeoJSON.Feature> {
+  const map = new Map<string, GeoJSON.Feature>()
+  if (!collection) return map
+  for (const feature of collection.features) {
+    const id = featureIdentifier(feature)
+    if (id) map.set(id, feature)
+  }
+  return map
+}
+const featureMapA = computed(() => buildFeatureMap(layersA.value))
+const featureMapB = computed(() => buildFeatureMap(layersB.value))
 const identifiers = computed(() => [
-  ...new Set(
-    [...(layersA.value?.features ?? []), ...(layersB.value?.features ?? [])]
-      .map(featureIdentifier)
-      .filter(Boolean),
-  ),
+  ...new Set([...featureMapA.value.keys(), ...featureMapB.value.keys()]),
 ])
-const selectedFeatures = computed(() =>
-  [layersA.value, layersB.value].map((collection) =>
-    collection?.features.find((f: GeoJSON.Feature) => featureIdentifier(f) === selectedId.value),
-  ),
-)
+const selectedFeatures = computed(() => [
+  featureMapA.value.get(selectedId.value),
+  featureMapB.value.get(selectedId.value),
+])
 const area = (value: number) =>
   value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const signed = (value: number) => `${value > 0 ? '+' : ''}${area(value)}`
@@ -159,7 +171,13 @@ async function executeComparison() {
 }
 
 function useViewport(value: string) {
-  coordinates.value = value.split(',').map((v) => Number(v).toFixed(6))
+  const parts = value.split(',').map(Number)
+  if (parts.length !== 4) return
+  const [west, south, east, north] = parts
+  if (west === undefined || south === undefined || east === undefined || north === undefined)
+    return
+  const normalized = normalizeBbox(west, south, east, north)
+  if (normalized) coordinates.value = normalized
 }
 function rendered(side: 'a' | 'b') {
   if (side === 'a') renderingA.value = false
@@ -277,7 +295,17 @@ onBeforeUnmount(() => {
       </div>
       <fieldset class="region-fields">
         <legend>Região / recorte geográfico</legend>
-        <p>Posicione os mapas e use a área visível, ou informe os limites em graus decimais.</p>
+        <div class="region-header">
+          <p>Posicione os mapas e use a área visível, ou informe os limites em graus decimais.</p>
+          <button
+            type="button"
+            class="btn-secondary btn-capture-viewport"
+            data-testid="btn-capture-viewport"
+            @click="mapsRef?.useViewport()"
+          >
+            Usar área visível do mapa
+          </button>
+        </div>
         <div class="coordinate-inputs">
           <label v-for="(name, index) in coordinateLabels" :key="name"
             >{{ name }}
@@ -344,6 +372,7 @@ onBeforeUnmount(() => {
         >
       </div>
       <TemporalComparisonMaps
+        ref="mapsRef"
         v-model:selected-id="selectedId"
         :layers-a="layersA"
         :layers-b="layersB"
@@ -473,17 +502,26 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .temporal-page {
-  padding: 28px 32px 48px;
-  max-width: 1800px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  width: 100%;
+  max-width: 1440px;
   margin: 0 auto;
+  padding: 28px;
+  box-sizing: border-box;
   color: var(--color-text);
 }
 .page-heading {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 20px;
-  margin-bottom: 24px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+.page-heading > div {
+  min-width: 0;
 }
 .eyebrow {
   color: var(--color-brand);
@@ -505,42 +543,58 @@ h1 {
 }
 .official-badge {
   white-space: nowrap;
+  flex-shrink: 0;
   background: var(--badge-success-bg);
   color: var(--badge-success-text);
   padding: 8px 12px;
   border: 1px solid var(--badge-success-border);
+  border-radius: 999px;
   font-size: 0.75rem;
+  font-weight: 700;
 }
 .parameters,
 .map-section,
 .metrics-panel,
 .inspection-panel {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.parameters,
+.map-section,
+.inspection-panel {
   padding: 20px;
-  margin-bottom: 20px;
 }
 .parameter-selects {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
+  min-width: 0;
 }
 label {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  min-width: 0;
   font-size: 0.84rem;
   font-weight: 600;
 }
 select,
 input[type='number'] {
+  min-width: 0;
   min-height: 42px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   color: var(--color-text);
   background: var(--color-surface);
-  border-radius: 0;
+  border-radius: 6px;
   font: inherit;
   font-weight: 400;
 }
@@ -551,7 +605,9 @@ button:focus-visible {
   outline-offset: 2px;
 }
 .region-fields {
+  min-width: 0;
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   margin: 20px 0 0;
   padding: 14px;
 }
@@ -560,13 +616,25 @@ legend {
   font-weight: 700;
   font-size: 0.86rem;
 }
-.region-fields p {
-  margin: 0 0 12px;
+.region-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.region-header p {
+  margin: 0;
+}
+.btn-capture-viewport {
+  flex-shrink: 0;
 }
 .coordinate-inputs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  min-width: 0;
 }
 .form-footer {
   display: flex;
@@ -581,6 +649,7 @@ legend {
   padding: 10px 16px;
   min-height: 40px;
   border: 1px solid var(--color-border);
+  border-radius: 6px;
   cursor: pointer;
   font: inherit;
   font-size: 0.83rem;
@@ -609,6 +678,8 @@ select:disabled {
 }
 .view-switch {
   display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .view-switch button {
   background: var(--color-surface-soft);
@@ -651,6 +722,7 @@ select:disabled {
 }
 .metrics-panel {
   padding: 0;
+  overflow: hidden;
 }
 .panel-toggle {
   width: 100%;
@@ -672,12 +744,14 @@ select:disabled {
 }
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   background: var(--color-border);
   border: 1px solid var(--color-border);
+  min-width: 0;
 }
 .metric-grid article {
+  min-width: 0;
   background: var(--color-surface);
   padding: 16px;
 }
@@ -709,6 +783,7 @@ select:disabled {
 .inspection-details {
   margin-top: 16px;
   font-size: 0.86rem;
+  overflow-wrap: anywhere;
 }
 .inspection-details p {
   margin: 8px 0;
@@ -716,9 +791,13 @@ select:disabled {
 .error-notice,
 .info-notice {
   padding: 14px 16px;
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 0.86rem;
   border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+.map-section .info-notice {
+  margin-top: 14px;
 }
 .error-notice {
   display: flex;
@@ -745,32 +824,35 @@ select:disabled {
   cursor: pointer;
   margin-left: auto;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
+  .coordinate-inputs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .metric-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1080px) {
+  .parameter-selects {
+    grid-template-columns: minmax(0, 1fr);
   }
   .page-heading {
     flex-direction: column;
+    align-items: flex-start;
   }
 }
 @media (max-width: 760px) {
   .temporal-page {
-    padding: 20px 12px;
-  }
-  .parameter-selects {
-    grid-template-columns: 1fr;
-  }
-  .coordinate-inputs {
-    grid-template-columns: 1fr 1fr;
-  }
-  .form-footer {
-    flex-direction: column;
-    align-items: stretch;
+    padding: 18px 12px;
   }
   .parameters,
   .map-section,
   .inspection-panel {
     padding: 14px;
+  }
+  .form-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
   h1 {
     font-size: 1.45rem;
@@ -778,6 +860,17 @@ select:disabled {
   .view-switch button {
     font-size: 0.74rem;
     padding: 9px;
+  }
+}
+@media (max-width: 640px) {
+  .coordinate-inputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .btn-capture-viewport {
+    width: 100%;
   }
 }
 </style>

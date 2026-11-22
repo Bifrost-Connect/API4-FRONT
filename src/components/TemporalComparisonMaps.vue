@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { featureIdentifier, synchronizeCameras } from '@/utils/comparacao'
+import { featureIdentifier, normalizeBbox, synchronizeCameras } from '@/utils/comparacao'
 import { getThemeColor } from '@/utils/themeTokens'
 
 type Feature = GeoJSON.Feature
@@ -37,25 +37,78 @@ const clip = computed(() => (props.mode === 'swipe' ? `inset(0 0 0 ${divider.val
 let maps: [L.Map, L.Map] | null = null
 const layers: [L.GeoJSON | null, L.GeoJSON | null] = [null, null]
 const deltaLayers: [L.GeoJSON | null, L.GeoJSON | null] = [null, null]
+let featureIndexes: [Map<string, Feature>, Map<string, Feature>] = [new Map(), new Map()]
 let stopSync: (() => void) | undefined
 let resizeObserver: ResizeObserver | undefined
 let disposed = false
 let renderSequence = 0
 
-const colors = {
-  NOVO_ALERTA: getThemeColor('--map-layer-restriction-stroke'),
-  REDUCAO_ALERTA: getThemeColor('--map-layer-car-stroke'),
-  MANTIDO: getThemeColor('--map-layer-delta-kept'),
+interface MapPalette {
+  novoAlerta: string
+  reducaoAlerta: string
+  mantido: string
+  neutral: string
+  selected: string
+  compareA: string
+  compareB: string
 }
-function style(feature: Feature | undefined, side: number): L.PathOptions {
+
+function resolvePalette(): MapPalette {
+  return {
+    novoAlerta: getThemeColor('--map-layer-restriction-stroke'),
+    reducaoAlerta: getThemeColor('--map-layer-car-stroke'),
+    mantido: getThemeColor('--map-layer-delta-kept'),
+    neutral: getThemeColor('--map-layer-neutral'),
+    selected: getThemeColor('--vis-brand-orange'),
+    compareA: getThemeColor('--map-layer-compare-a'),
+    compareB: getThemeColor('--map-layer-compare-b'),
+  }
+}
+
+let activeDeltaPalette: MapPalette = resolvePalette()
+
+function deltaColor(classe: unknown, palette: MapPalette): string {
+  switch (classe) {
+    case 'NOVO_ALERTA':
+      return palette.novoAlerta
+    case 'REDUCAO_ALERTA':
+      return palette.reducaoAlerta
+    case 'MANTIDO':
+      return palette.mantido
+    default:
+      return palette.neutral
+  }
+}
+
+function canUseCanvas(): boolean {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas && typeof canvas.getContext === 'function' && canvas.getContext('2d'))
+  } catch {
+    return false
+  }
+}
+
+function buildFeatureIndex(collection: FeatureCollection | null): Map<string, Feature> {
+  const index = new Map<string, Feature>()
+  if (!collection) return index
+  for (const feature of collection.features) {
+    const id = featureIdentifier(feature)
+    if (id) index.set(id, feature)
+  }
+  return index
+}
+
+function rebuildFeatureIndexes() {
+  featureIndexes = [buildFeatureIndex(props.layersA), buildFeatureIndex(props.layersB)]
+}
+
+function style(feature: Feature | undefined, side: number, palette: MapPalette): L.PathOptions {
   const selected =
     !!feature && !!props.selectedId && featureIdentifier(feature) === props.selectedId
   return {
-    color: selected
-      ? getThemeColor('--vis-brand-orange')
-      : side === 0
-        ? getThemeColor('--map-layer-compare-a')
-        : getThemeColor('--map-layer-compare-b'),
+    color: selected ? palette.selected : side === 0 ? palette.compareA : palette.compareB,
     weight: selected ? 5 : 2,
     fillOpacity: selected ? 0.42 : 0.18,
   }
@@ -67,11 +120,11 @@ function popupContent(identifier: string): HTMLElement {
   const title = document.createElement('strong')
   title.textContent = `Imóvel / feição ${identifier}`
   root.append(title)
-  for (const [label, collection] of [
-    [props.labelA, props.layersA],
-    [props.labelB, props.layersB],
+  for (const [side, label] of [
+    [0, props.labelA],
+    [1, props.labelB],
   ] as const) {
-    const feature = collection?.features.find((item: Feature) => featureIdentifier(item) === identifier)
+    const feature = featureIndexes[side].get(identifier)
     const line = document.createElement('p')
     line.textContent = `${label}: ${feature ? 'presente no recorte' : 'sem correspondente no recorte'}.`
     root.append(line)
@@ -87,10 +140,11 @@ function popupContent(identifier: string): HTMLElement {
 
 function inspect(identifier: string, coordinate?: L.LatLng) {
   if (!maps || !identifier) return
+  const palette = resolvePalette()
   for (const side of [0, 1] as const) {
     const map = maps[side]
     let anchor = coordinate
-    layers[side]?.setStyle((feature) => style(feature, side))
+    layers[side]?.setStyle((feature) => style(feature, side, palette))
     layers[side]?.eachLayer((layer) => {
       if (!('feature' in layer)) return
       if (featureIdentifier(layer.feature as Feature) !== identifier) return
@@ -104,8 +158,9 @@ function inspect(identifier: string, coordinate?: L.LatLng) {
   }
 }
 
-function updateDelta() {
+function updateDelta(resolvedPalette?: MapPalette) {
   if (!maps) return
+  activeDeltaPalette = resolvedPalette ?? resolvePalette()
   for (const side of [0, 1] as const) {
     const map = maps[side]
     try {
@@ -113,9 +168,7 @@ function updateDelta() {
         deltaLayers[side] = L.geoJSON(undefined, {
           interactive: false,
           style: (feature) => ({
-            color:
-              colors[feature?.properties?.classe as keyof typeof colors] ??
-              getThemeColor('--map-layer-neutral'),
+            color: deltaColor(feature?.properties?.classe, activeDeltaPalette),
             weight: 2,
             fillOpacity: 0.5,
           }),
@@ -124,7 +177,14 @@ function updateDelta() {
       }
       const deltaLayer = deltaLayers[side]
       deltaLayer.clearLayers()
-      if (props.showDelta && props.delta) deltaLayer.addData(props.delta)
+      if (props.showDelta && props.delta) {
+        deltaLayer.addData(props.delta)
+        deltaLayer.setStyle((feature) => ({
+          color: deltaColor(feature?.properties?.classe, activeDeltaPalette),
+          weight: 2,
+          fillOpacity: 0.5,
+        }))
+      }
     } catch {
       deltaLayers[side]?.clearLayers()
       emit('renderError', side === 0 ? 'a' : 'b')
@@ -136,6 +196,8 @@ async function renderLayers() {
   const sequence = ++renderSequence
   await nextTick()
   if (!maps || disposed || sequence !== renderSequence) return
+  const palette = resolvePalette()
+  rebuildFeatureIndexes()
   const bounds = L.latLngBounds([])
   for (const side of [0, 1] as const) {
     const map = maps[side]
@@ -145,7 +207,7 @@ async function renderLayers() {
       const collection = side === 0 ? props.layersA : props.layersB
       layers[side] = collection
         ? L.geoJSON(collection, {
-            style: (feature) => style(feature, side),
+            style: (feature) => style(feature, side, palette),
             onEachFeature: (feature, layer) => {
               layer.on('click', (event: L.LeafletMouseEvent) => {
                 const id = featureIdentifier(feature)
@@ -164,7 +226,7 @@ async function renderLayers() {
       emit('renderError', side === 0 ? 'a' : 'b')
     }
   }
-  updateDelta()
+  updateDelta(palette)
   if (bounds.isValid())
     maps[0].fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false })
 }
@@ -180,7 +242,18 @@ function resizeMaps() {
 }
 
 function useViewport() {
-  if (maps) emit('viewport', maps[0].getBounds().toBBoxString())
+  if (!maps) return
+  const bounds = maps[0].getBounds()
+  const sw = bounds.getSouthWest().wrap()
+  const ne = bounds.getNorthEast().wrap()
+  const normalized = normalizeBbox(
+    sw.lng,
+    sw.lat,
+    ne.lng,
+    ne.lat,
+    bounds.getEast() - bounds.getWest(),
+  )
+  if (normalized) emit('viewport', normalized.join(','))
 }
 function moveDivider(event: PointerEvent) {
   if (!dragging.value || !stage.value) return
@@ -205,8 +278,20 @@ function dividerKey(event: KeyboardEvent) {
 
 onMounted(() => {
   if (!elementA.value || !elementB.value) return
+  const preferCanvas = canUseCanvas()
   const create = (element: HTMLElement, side: number) => {
-    const map = L.map(element, { center: [-15.78, -47.93], zoom: 4, zoomControl: false })
+    const map = L.map(element, {
+      center: [-15.78, -47.93],
+      zoom: 4,
+      zoomControl: false,
+      preferCanvas,
+      worldCopyJump: true,
+      maxBounds: [
+        [-90, -180],
+        [90, 180],
+      ],
+      maxBoundsViscosity: 0.8,
+    })
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
@@ -228,16 +313,18 @@ onMounted(() => {
   void renderLayers()
 })
 watch(() => [props.layersA, props.layersB], renderLayers, { flush: 'post' })
-watch(() => [props.showDelta, props.delta], updateDelta, { flush: 'post' })
+watch(() => [props.showDelta, props.delta], () => updateDelta(), { flush: 'post' })
 watch(
   () => props.selectedId,
   (id) => {
     if (id) inspect(id)
-    else
+    else {
+      const palette = resolvePalette()
       maps?.forEach((map, side) => {
         map.closePopup()
-        layers[side]?.setStyle((feature) => style(feature, side))
+        layers[side]?.setStyle((feature) => style(feature, side, palette))
       })
+    }
   },
 )
 watch(
@@ -251,9 +338,13 @@ onBeforeUnmount(() => {
   disposed = true
   stopSync?.()
   resizeObserver?.disconnect()
+  layers.forEach((l) => l?.remove())
+  deltaLayers.forEach((l) => l?.remove())
+  featureIndexes = [new Map(), new Map()]
   maps?.forEach((map) => map.remove())
   maps = null
 })
+defineExpose({ useViewport })
 </script>
 
 <template>
@@ -319,12 +410,15 @@ onBeforeUnmount(() => {
   padding: 12px 0;
   font-size: 0.83rem;
   color: var(--color-text-muted);
+  box-sizing: border-box;
+  min-width: 0;
 }
 .map-toolbar button {
   flex-shrink: 0;
   padding: 10px 16px;
   min-height: 40px;
   border: 1px solid var(--color-border);
+  border-radius: 6px;
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
@@ -341,13 +435,17 @@ onBeforeUnmount(() => {
   isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   background: var(--color-surface-soft);
+  box-sizing: border-box;
+  min-width: 0;
 }
 .map-shell {
   position: relative;
   width: 50%;
   min-width: 0;
   height: 100%;
+  box-sizing: border-box;
 }
 .map-shell + .map-shell {
   border-left: 2px solid var(--color-border);
@@ -368,10 +466,14 @@ onBeforeUnmount(() => {
   padding: 7px 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: 6px;
   color: var(--color-heading);
   font-weight: 700;
   font-size: 0.82rem;
   pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .map-loading {
   position: absolute;
