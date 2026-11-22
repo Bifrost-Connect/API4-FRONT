@@ -132,7 +132,7 @@ const confirmPublishAndClose = async () => {
     await processService.publishAndCloseVersion(
       props.details.id,
       {
-        gestorId: 1,
+        gestorId: userService.getCurrentUser().id ?? 0,
         parecer: 'Publicação oficial homologada pelo gestor.',
       },
       () =>
@@ -192,7 +192,7 @@ const confirmReject = async () => {
   try {
     if (/^\d+$/.test(String(props.details.id))) {
       await processService.registrarDecisaoGestor(props.details.id, {
-        gestorId: 1,
+        gestorId: userService.getCurrentUser().id ?? 0,
         etapa: 'PUBLICACAO',
         decisao: 'REPROVADO',
         parecer: rejectionReason.value.trim(),
