@@ -115,4 +115,16 @@ describe('LoginView - Autenticação JWT Real', () => {
     expect(wrapper.find('.roles-container').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Acesso Rápido')
   })
+
+  it('exibe o nome GeodataHub e o logo do favicon na tela de login', () => {
+    const wrapper = mount(LoginView)
+
+    const logo = wrapper.find('img[src="/favicon.png"]')
+    expect(logo.exists()).toBe(true)
+    expect(logo.attributes('alt')?.trim()).toBeTruthy()
+
+    const brand = wrapper.find('[data-testid="login-brand"]')
+    expect(brand.exists()).toBe(true)
+    expect(brand.text()).toContain('GeodataHub')
+  })
 })

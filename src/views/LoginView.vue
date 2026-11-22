@@ -106,7 +106,24 @@ const handleLogin = async () => {
 <template>
   <div class="login-view">
     <div class="login-card">
-      <h2>Login</h2>
+      <div class="login-brand" data-testid="login-brand">
+        <img
+          src="/favicon.png"
+          alt="Logo GeodataHub"
+          class="brand-logo"
+          width="44"
+          height="44"
+        />
+        <div class="brand-info">
+          <span class="brand-title">GeodataHub</span>
+          <span class="brand-subtitle">Plataforma de Dados Geoespaciais</span>
+        </div>
+      </div>
+
+      <div class="login-card-header">
+        <h2>Login</h2>
+        <p class="login-subtitle">Informe suas credenciais de acesso</p>
+      </div>
 
       <div
         v-if="loginError"
@@ -126,6 +143,7 @@ const handleLogin = async () => {
             type="email"
             name="email"
             class="input"
+            placeholder="nome@dominio.com.br"
             autocomplete="username"
             spellcheck="false"
             autocapitalize="none"
@@ -143,6 +161,7 @@ const handleLogin = async () => {
               :type="showPassword ? 'text' : 'password'"
               name="password"
               class="input password-input"
+              placeholder="Digite sua senha"
               autocomplete="current-password"
               enterkeyhint="done"
               required
@@ -232,8 +251,8 @@ const handleLogin = async () => {
   align-items: center;
   justify-content: center;
   gap: 3rem;
-  height: 100%;
-  padding: 2rem;
+  min-height: 100%;
+  padding: 2rem 1.25rem;
   flex-wrap: wrap;
 }
 
@@ -241,34 +260,88 @@ const handleLogin = async () => {
 .notice-card {
   display: flex;
   flex-direction: column;
-  padding: 2.5rem;
+  padding: 2.25rem 2rem;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background-color: var(--color-surface);
   width: 100%;
-  max-width: 400px;
-  box-shadow: var(--shadow-sm);
+  max-width: 420px;
+  box-shadow: var(--shadow-md);
 }
 
 .login-card {
   align-items: stretch;
+  border-top: 3px solid var(--color-brand);
 }
 
-.login-card h2 {
-  margin-bottom: 1.5rem;
-  text-align: center;
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand-logo {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: contain;
+  background-color: var(--color-surface-soft);
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.brand-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--color-heading);
+  letter-spacing: -0.01em;
+}
+
+.brand-subtitle {
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+.login-card-header {
+  margin-bottom: 1.5rem;
+}
+
+.login-card-header h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.login-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
 .login-error-banner {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--badge-danger-border);
   background: var(--badge-danger-bg);
   color: var(--badge-danger-text);
@@ -279,13 +352,28 @@ const handleLogin = async () => {
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.125rem;
 }
 
 .form-group .label {
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+  margin-bottom: 0.45rem;
+  font-weight: 600;
   color: var(--color-heading);
+}
+
+.login-card .input {
+  min-height: 42px;
+  padding: 0.625rem 0.875rem;
+  border-radius: 6px;
+  background-color: var(--color-surface-soft);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.login-card .input:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-ring);
 }
 
 .password-input-wrapper {
@@ -296,7 +384,7 @@ const handleLogin = async () => {
 
 .password-input {
   width: 100%;
-  padding-right: 2.5rem;
+  padding-right: 2.75rem;
 }
 
 .btn-visualizar {
@@ -304,14 +392,15 @@ const handleLogin = async () => {
   right: 0.5rem;
   background: transparent;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem;
+  padding: 0.35rem;
   color: var(--color-text-muted);
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  opacity: 0.8;
+  transition: opacity 0.2s, color 0.2s;
 }
 
 .btn-visualizar:hover {
@@ -319,8 +408,24 @@ const handleLogin = async () => {
   color: var(--color-brand);
 }
 
+.btn-visualizar:focus-visible {
+  outline: none;
+  opacity: 1;
+  color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-ring);
+}
+
 .login-card .btn {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
+  width: 100%;
+  min-height: 44px;
+  font-weight: 700;
+  border-radius: 6px;
+}
+
+.login-card .btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-brand-ring);
 }
 
 .notice-card {
