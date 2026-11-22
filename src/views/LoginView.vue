@@ -12,10 +12,11 @@ const route = useRoute()
 const email = ref('')
 const senha = ref('')
 const showPassword = ref(false)
-const selectedRole = ref<string>(userService.getCurrentUser().role)
+/* const selectedRole = ref<string>(userService.getCurrentUser().role) */
 const loginError = ref('')
 const isSubmitting = ref(false)
 
+/*
 const SEED_CREDENTIALS: Record<string, { email: string; password: string }> = {
   Operador: { email: 'operador@georural.com.br', password: 'Troca123' },
   Auditor: { email: 'auditor@georural.com.br', password: 'Troca123' },
@@ -31,6 +32,7 @@ const fillLogin = (role: string) => {
   senha.value = preset?.password ?? ''
   loginError.value = ''
 }
+*/
 
 const redirectAfterLogin = (user: UserSession) => {
   const rawRedirect = typeof route.query.redirect === 'string' ? route.query.redirect.trim() : null
@@ -54,8 +56,7 @@ const redirectAfterLogin = (user: UserSession) => {
       if (resolved && resolved.name && resolved.name !== 'login' && resolved.name !== 'forbidden') {
         const reqPerm = resolved.meta?.permission as string | string[] | undefined
         const hasAccess =
-          !reqPerm ||
-          (Array.isArray(reqPerm) ? canAny(user, reqPerm) : can(user, reqPerm))
+          !reqPerm || (Array.isArray(reqPerm) ? canAny(user, reqPerm) : can(user, reqPerm))
 
         if (hasAccess) {
           router.replace(cleanRedirect)
@@ -107,7 +108,12 @@ const handleLogin = async () => {
     <div class="login-card">
       <h2>Login</h2>
 
-      <div v-if="loginError" class="login-error-banner" role="alert" data-testid="login-error-banner">
+      <div
+        v-if="loginError"
+        class="login-error-banner"
+        role="alert"
+        data-testid="login-error-banner"
+      >
         {{ loginError }}
       </div>
 
@@ -166,6 +172,7 @@ const handleLogin = async () => {
       </form>
     </div>
 
+    <!-- Acesso Rápido comentado temporariamente
     <div class="notice-card">
       <h3 class="aviso">Acesso Rápido (Ambiente de Homologação)</h3>
       <p>
@@ -214,6 +221,7 @@ const handleLogin = async () => {
         </button>
       </div>
     </div>
+    -->
   </div>
 </template>
 

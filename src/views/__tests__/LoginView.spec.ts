@@ -88,22 +88,15 @@ describe('LoginView - Autenticação JWT Real', () => {
     expect(banner.text()).toContain('E-mail ou senha inválidos')
   })
 
-  it('preenche credenciais seed V44 (Troca123) no clique rápido e exibe erro real se o back-end estiver indisponível', async () => {
+  it('exibe erro real de rede quando o back-end estiver indisponível', async () => {
     const loginSpy = vi.spyOn(userService, 'loginWithCredentials').mockRejectedValueOnce({
       code: 'ERR_NETWORK',
       message: 'Network Error',
     })
 
     const wrapper = mount(LoginView)
-    const buttons = wrapper.findAll('button')
-    const opBtn = buttons.find((b) => b.text().includes('Entrar Operador'))
-    expect(opBtn).toBeDefined()
-    await opBtn!.trigger('click')
-
-    const emailInput = wrapper.find('[data-testid="login-email-input"]').element as HTMLInputElement
-    const passwordInput = wrapper.find('[data-testid="login-password-input"]').element as HTMLInputElement
-    expect(emailInput.value).toBe('operador@georural.com.br')
-    expect(passwordInput.value).toBe('Troca123')
+    await wrapper.find('[data-testid="login-email-input"]').setValue('operador@georural.com.br')
+    await wrapper.find('[data-testid="login-password-input"]').setValue('Troca123')
 
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
@@ -115,18 +108,11 @@ describe('LoginView - Autenticação JWT Real', () => {
     expect(banner.text()).toContain('Network Error')
   })
 
-  it('exibe apenas os 5 botões de acesso rápido dos perfis oficiais', () => {
+  it('oculta a seção de Acesso Rápido na tela de login', () => {
     const wrapper = mount(LoginView)
-    const quickButtons = wrapper.findAll('.roles-container button')
-    const labels = quickButtons.map((b) => b.text().trim())
 
-    expect(quickButtons).toHaveLength(5)
-    expect(labels).toEqual([
-      'Entrar Operador',
-      'Entrar Analista',
-      'Entrar Auditor',
-      'Entrar Gestor',
-      'Entrar Administrador',
-    ])
+    expect(wrapper.find('.notice-card').exists()).toBe(false)
+    expect(wrapper.find('.roles-container').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Acesso Rápido')
   })
 })
