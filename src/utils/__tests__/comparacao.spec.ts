@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseBbox, percentageVariation, synchronizeCameras, type CameraMap } from '../comparacao'
+import {
+  normalizeBbox,
+  parseBbox,
+  percentageVariation,
+  synchronizeCameras,
+  type CameraMap,
+} from '../comparacao'
 
 function camera(lat: number, lng: number, zoom: number) {
   const handlers = new Set<() => void>()
@@ -70,5 +76,39 @@ describe('comparação temporal', () => {
       ['NaN', '-20', '-40', '-10'],
     ])
       expect(parseBbox(values)).toBeNull()
+  })
+
+  it('normaliza coordenadas de bbox com voltas de longitude, limites de latitude e ordenação', () => {
+    expect(normalizeBbox(310.977287, -12.000704, 311.140022, -11.840135)).toEqual([
+      '-49.022713',
+      '-12.000704',
+      '-48.859978',
+      '-11.840135',
+    ])
+    expect(normalizeBbox(-409.022713, -95, -408.859978, 95)).toEqual([
+      '-49.022713',
+      '-90.000000',
+      '-48.859978',
+      '90.000000',
+    ])
+    expect(normalizeBbox(-180, -90, 180, 90)).toEqual([
+      '-180.000000',
+      '-90.000000',
+      '180.000000',
+      '90.000000',
+    ])
+    expect(normalizeBbox(0, -10, 360, 10)).toEqual([
+      '-180.000000',
+      '-10.000000',
+      '180.000000',
+      '10.000000',
+    ])
+    expect(normalizeBbox(170, -10, 190, 10)).toEqual([
+      '170.000000',
+      '-10.000000',
+      '180.000000',
+      '10.000000',
+    ])
+    expect(normalizeBbox(-40, -10, -40, 10)).toBeNull()
   })
 })
